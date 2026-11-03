@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PrintDrop - Modern Digital Print &amp; Document Station</title>
+  <meta name="description" content="PrintDrop provides on-demand secure digital document printing, photocopying, and scanning services with instant UPI online payments.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%234f46e5'><path d='M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z'/></svg>">
+  <style>
+    :root {
+      --primary: #4f46e5;
+      --primary-dark: #3730a3;
+      --bg: #090d16;
+      --card-bg: #111827;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --border: #1e293b;
+      --accent: #06b6d4;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background: var(--bg); color: var(--text); line-height: 1.6; padding-bottom: 3rem; }
+    header { background: #0b1120; border-bottom: 1px solid var(--border); padding: 1.25rem 2rem; position: sticky; top: 0; z-index: 100; display: flex; justify-content: space-between; align-items: center; }
+    .logo { font-size: 1.3rem; font-weight: 800; color: #ffffff; display: flex; align-items: center; gap: 0.5rem; text-decoration: none; }
+    .logo span { background: linear-gradient(135deg, #06b6d4, #4f46e5); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    nav a { color: var(--text-muted); text-decoration: none; margin-left: 1.5rem; font-size: 0.9rem; font-weight: 600; transition: color 0.2s; }
+    nav a:hover { color: #38bdf8; }
+    .hero { padding: 4rem 2rem; text-align: center; max-width: 850px; margin: 0 auto; }
+    .hero h1 { font-size: 2.5rem; font-weight: 900; line-height: 1.2; margin-bottom: 1rem; }
+    .hero h1 span { background: linear-gradient(135deg, #38bdf8, #818cf8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .hero p { font-size: 1.1rem; color: var(--text-muted); margin-bottom: 2rem; }
+    .badge { display: inline-block; background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.4); color: #818cf8; padding: 0.35rem 0.85rem; border-radius: 9999px; font-size: 0.8rem; font-weight: 700; margin-bottom: 1rem; }
+    .container { max-width: 1050px; margin: 0 auto; padding: 0 1.5rem; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-top: 2rem; }
+    .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 1rem; padding: 1.75rem; transition: transform 0.2s; }
+    .card:hover { transform: translateY(-3px); }
+    .card h3 { font-size: 1.15rem; font-weight: 700; margin-bottom: 0.5rem; color: #f1f5f9; }
+    .card p { font-size: 0.88rem; color: var(--text-muted); }
+    .pricing-table { width: 100%; border-collapse: collapse; margin-top: 1.5rem; background: var(--card-bg); border-radius: 0.75rem; overflow: hidden; border: 1px solid var(--border); }
+    .pricing-table th, .pricing-table td { padding: 1rem; text-align: left; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+    .pricing-table th { background: #0f172a; color: #94a3b8; font-weight: 700; }
+    .pricing-table td { color: #f8fafc; }
+    .pricing-table tr:last-child td { border-bottom: none; }
+    section { padding: 3.5rem 0; border-top: 1px solid var(--border); }
+    h2 { font-size: 1.8rem; font-weight: 800; color: #ffffff; margin-bottom: 0.75rem; text-align: center; }
+    .section-desc { text-align: center; color: var(--text-muted); font-size: 0.95rem; max-width: 600px; margin: 0 auto 2rem auto; }
+    .legal-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 0.75rem; padding: 1.5rem; margin-bottom: 1.25rem; }
+    .legal-card h4 { font-size: 1.05rem; font-weight: 700; color: #38bdf8; margin-bottom: 0.5rem; }
+    .legal-card p { font-size: 0.85rem; color: var(--text-muted); line-height: 1.6; }
+    footer { text-align: center; padding: 2.5rem 1rem 1rem; font-size: 0.8rem; color: #64748b; border-top: 1px solid var(--border); margin-top: 3rem; }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header>
+    <a href="#" class="logo">
+      <span>🖨️ PrintDrop</span>
+    </a>
+    <nav>
+      <a href="#services">Services</a>
+      <a href="#pricing">Rates</a>
+      <a href="#contact">Contact</a>
+      <a href="#policies">Policies</a>
+    </nav>
+  </header>
+
+  <!-- Hero -->
+  <div class="hero">
+    <div class="badge">FAST &bull; ZERO-RESIDENT &bull; SECURE</div>
+    <h1>Instant Digital Document Printing &amp; <span>Xerox Station</span></h1>
+    <p>Walk-in document printing, color photocopying, and high-speed multi-page batch scanning. Pay securely with UPI, Cards, or NetBanking.</p>
+  </div>
+
+  <div class="container">
+    <!-- Services Section -->
+    <section id="services">
+      <h2>Our Print &amp; Copy Services</h2>
+      <p class="section-desc">Professional-grade printing and scanning solutions for individuals, students, and businesses.</p>
+      
+      <div class="grid">
+        <div class="card">
+          <h3>📄 Black &amp; White Printing</h3>
+          <p>High-resolution laser printing for resumes, official documents, books, and legal documents. Available in Single-sided or Duplex.</p>
+        </div>
+        <div class="card">
+          <h3>🎨 Full Color Printing</h3>
+          <p>Vibrant color printouts on premium 80–120 GSM paper for project reports, certificates, presentations, and digital photos.</p>
+        </div>
+        <div class="card">
+          <h3>📑 Scanning &amp; Digitization</h3>
+          <p>Multi-page duplex ADF scanning into searchable high-definition PDFs with instant mobile transfer.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Pricing Section (Mandatory for Razorpay Compliance) -->
+    <section id="pricing">
+      <h2>Standard Rate Card</h2>
+      <p class="section-desc">Transparent pricing with zero hidden convenience fees.</p>
+
+      <table class="pricing-table">
+        <thead>
+          <tr>
+            <th>Service / Document Type</th>
+            <th>Paper Size</th>
+            <th>Mode</th>
+            <th>Rate per Sheet</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Laser Document Print (B&amp;W)</td>
+            <td>A4</td>
+            <td>Single Side</td>
+            <td>₹3.00</td>
+          </tr>
+          <tr>
+            <td>Laser Document Print (B&amp;W)</td>
+            <td>A4</td>
+            <td>Duplex (Both Sides)</td>
+            <td>₹5.00</td>
+          </tr>
+          <tr>
+            <td>Color Digital Print</td>
+            <td>A4</td>
+            <td>Single Side</td>
+            <td>₹10.00</td>
+          </tr>
+          <tr>
+            <td>Color Digital Print</td>
+            <td>A4</td>
+            <td>Duplex (Both Sides)</td>
+            <td>₹18.00</td>
+          </tr>
+          <tr>
+            <td>Legal / Certificate Printing</td>
+            <td>Legal / Foolscap</td>
+            <td>Single / Both Sides</td>
+            <td>₹4.00 - ₹22.00</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- Policies Section (Mandatory for Razorpay Approval) -->
+    <section id="policies">
+      <h2>Terms, Privacy &amp; Refund Policies</h2>
+      <p class="section-desc">Compliant with Indian digital commerce and payment gateway guidelines.</p>
+
+      <div class="legal-card">
+        <h4>1. Refund &amp; Cancellation Policy</h4>
+        <p>If printed copies are smudged, jammed, or defective due to printer malfunction or hardware error, customers are entitled to an immediate free reprint or a full 100% refund. Refund requests are processed within 24 to 48 hours directly to the original payment source (UPI/Card). Once print jobs are successfully produced per customer specifications, cancellations cannot be made for customized printed materials.</p>
+      </div>
+
+      <div class="legal-card">
+        <h4>2. Privacy &amp; Data Security Policy</h4>
+        <p>PrintDrop adheres to a strict Zero-Resident Security Protocol. Files uploaded by customers are used solely for the immediate print job execution and are permanently shredded and purged from local disk storage immediately after printing. No customer documents are retained, shared, or archived.</p>
+      </div>
+
+      <div class="legal-card">
+        <h4>3. Terms &amp; Conditions</h4>
+        <p>Customers must own or hold proper authorization to reproduce the materials submitted for printing. PrintDrop reserves the right to decline printing of unauthorized government IDs, counterfeits, or unlawful documents. All payments processed via online gateways (Razorpay) are subject to standard banking settlement terms.</p>
+      </div>
+    </section>
+
+    <!-- Contact Us Section (Mandatory for Razorpay Approval) -->
+    <section id="contact">
+      <h2>Contact Us</h2>
+      <p class="section-desc">Get in touch with our store management for inquiries, corporate accounts, or payment support.</p>
+
+      <div class="card" style="max-width: 600px; margin: 0 auto; text-align: left;">
+        <h3 style="color:#38bdf8;">TechnoSoft Solution / PrintDrop</h3>
+        <p style="margin-top:0.5rem;"><strong>Business Entity:</strong> TechnoSoft Solution (Print &amp; Document Division)</p>
+        <p style="margin-top:0.35rem;"><strong>Support Email:</strong> technosoftsolutionin@gmail.com</p>
+        <p style="margin-top:0.35rem;"><strong>Operating Hours:</strong> Monday – Saturday (9:00 AM – 8:30 PM IST)</p>
+        <p style="margin-top:0.35rem;"><strong>Service Location:</strong> India</p>
+        <p style="margin-top:0.35rem;"><strong>Payment Inquiries:</strong> Contact via support email with your Razorpay Payment ID.</p>
+      </div>
+    </section>
+  </div>
+
+  <!-- Footer -->
+  <footer>
+    <p>&copy; 2026 TechnoSoft Solution / PrintDrop. All rights reserved.</p>
+    <p style="margin-top:0.35rem;">Powered by Razorpay Secure Payments Gateway.</p>
+  </footer>
+
+</body>
+</html>
