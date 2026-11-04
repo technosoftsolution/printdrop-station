@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Connect - TechnoSoft Solution | PrintDrop Station</title>
   <meta name="description" content="Permanent access gateway for TechnoSoft Solution PrintDrop digital document printing and scanning station.">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%234f46e5'><path d='M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z'/></svg>">
+  <link rel="icon" href="icon.svg">
+  <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#090d16">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -67,7 +68,7 @@
       color: var(--text-muted);
       letter-spacing: 0.05em;
       text-transform: uppercase;
-      margin-bottom: 2rem;
+      margin-bottom: 1.75rem;
     }
     .card {
       background: var(--card-bg);
@@ -239,7 +240,7 @@
     <a href="index.html" class="brand-logo">
       <span>🖨️ TechnoSoft Solution</span>
     </a>
-    <div class="subtitle">PrintDrop • Permanent Counter Dispatcher</div>
+    <div class="subtitle">PrintDrop • Permanent Portal</div>
 
     <!-- Main Dynamic Card -->
     <div class="card">
@@ -258,6 +259,21 @@
       <button id="mainActionBtn" class="action-btn" style="display:none;" onclick="handleManualRetry()">
         <span>🔄 Retry Connection</span>
       </button>
+
+      <!-- Install Permanent Shortcut Card (shown if ?install=1) -->
+      <div id="installPromptCard" style="display:none; margin:1rem 0; padding:1.25rem; background:rgba(79,70,229,0.18); border:1.5px solid #6366f1; border-radius:1.2rem; text-align:center;">
+        <div style="font-size:2rem; margin-bottom:0.35rem;">📲</div>
+        <h3 style="font-size:1.05rem; font-weight:800; color:#fff; margin-bottom:0.35rem;">Add Permanent PrintDrop Shortcut</h3>
+        <p style="font-size:0.8rem; color:#c7d2fe; line-height:1.45; margin-bottom:1rem;">
+          This installs a permanent shortcut that connects to TechnoSoft Solution anytime without ever expiring across PC restarts!
+        </p>
+        <button id="btnTriggerInstall" class="action-btn" style="background:linear-gradient(135deg, #06b6d4, #4f46e5); font-size:0.95rem;" onclick="triggerPwaInstall()">
+          ➕ Add to Phone Home Screen
+        </button>
+        <button class="action-btn btn-secondary" style="margin-top:0.65rem;" onclick="skipInstallToStation()">
+          Open Document Uploader &rarr;
+        </button>
+      </div>
 
       <!-- Home Screen Guide -->
       <div class="instructions-box" id="pwaGuide">
@@ -309,6 +325,32 @@
     const mainActionBtn = document.getElementById("mainActionBtn");
     const adminUrlInput = document.getElementById("adminUrlInput");
     const adminGistInput = document.getElementById("adminGistInput");
+    const installPromptCard = document.getElementById("installPromptCard");
+
+    // Register Service Worker for PWA
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("sw.js").catch(e => console.warn("SW error:", e));
+    }
+
+    let deferredPrompt = null;
+    let pendingRedirectUrl = "";
+    const urlParams = new URLSearchParams(window.location.search);
+    const isInstallMode = urlParams.get("install") === "1";
+
+    window.addEventListener("beforeinstallprompt", (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      if (isInstallMode) {
+        showInstallUI();
+      }
+    });
+
+    window.addEventListener("appinstalled", () => {
+      deferredPrompt = null;
+      if (pendingRedirectUrl) {
+        window.location.replace(pendingRedirectUrl);
+      }
+    });
 
     // Populate admin inputs
     const savedUrl = localStorage.getItem(CONFIG.localStorageUrlKey) || "";
@@ -317,7 +359,6 @@
     if (adminGistInput) adminGistInput.value = savedGistId;
 
     async function initDispatcher() {
-      const urlParams = new URLSearchParams(window.location.search);
       const targetParam = urlParams.get("target") || urlParams.get("to") || urlParams.get("url");
       const gistParam = urlParams.get("gist");
 
@@ -376,7 +417,6 @@
       // 4. Fallback to cached Station URL if available
       if (savedUrl && savedUrl.startsWith("http")) {
         statusEl.textContent = "Connecting to last known station session...";
-        // Verify with quick ping or redirect directly
         setTimeout(() => {
           redirectToStation(savedUrl);
         }, 500);
@@ -388,14 +428,22 @@
     }
 
     function redirectToStation(stationBaseUrl) {
+      pendingRedirectUrl = stationBaseUrl;
+
+      // If install requested, pause and show Install Card
+      if (isInstallMode) {
+        showInstallUI();
+        return;
+      }
+
       statusEl.textContent = "Station found! Launching customer upload portal...";
       
-      // Preserve existing query params except target/gist
       const currentParams = new URLSearchParams(window.location.search);
       currentParams.delete("target");
       currentParams.delete("to");
       currentParams.delete("url");
       currentParams.delete("gist");
+      currentParams.delete("install");
       
       const queryStr = currentParams.toString();
       const separator = stationBaseUrl.includes("?") ? "&" : "?";
@@ -404,6 +452,38 @@
       setTimeout(() => {
         window.location.replace(finalUrl);
       }, 400);
+    }
+
+    function showInstallUI() {
+      if (spinnerWrap) spinnerWrap.style.display = "none";
+      titleEl.textContent = "Install Permanent Shortcut";
+      statusEl.textContent = "Save TechnoSoft Solution to your phone for instant 1-tap document printing anytime.";
+      if (installPromptCard) installPromptCard.style.display = "block";
+    }
+
+    async function triggerPwaInstall() {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        const choice = await deferredPrompt.userChoice;
+        if (choice.outcome === "accepted") {
+          if (pendingRedirectUrl) {
+            setTimeout(() => window.location.replace(pendingRedirectUrl), 800);
+          }
+        }
+      } else {
+        alert("To install on your phone:\n• Android (Chrome): Tap ⋮ menu -> 'Add to Home screen'\n• iPhone (Safari): Tap Share -> 'Add to Home Screen'");
+        if (pendingRedirectUrl) {
+          setTimeout(() => window.location.replace(pendingRedirectUrl), 1500);
+        }
+      }
+    }
+
+    function skipInstallToStation() {
+      if (pendingRedirectUrl) {
+        window.location.replace(pendingRedirectUrl);
+      } else {
+        location.reload();
+      }
     }
 
     function showOfflineState() {
@@ -442,7 +522,6 @@
       }
     }
 
-    // Run on page load
     window.addEventListener("DOMContentLoaded", initDispatcher);
   </script>
 </body>
