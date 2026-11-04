@@ -236,7 +236,7 @@
 
   <div class="container">
     <!-- Brand -->
-    <a href="../index.html" class="brand-logo">
+    <a href="index.html" class="brand-logo">
       <span>🖨️ TechnoSoft Solution</span>
     </a>
     <div class="subtitle">PrintDrop • Permanent Counter Dispatcher</div>
@@ -297,7 +297,7 @@
     // PrintDrop Permanent Dispatcher Logic
     // -------------------------------------------------------------
     const CONFIG = {
-      defaultGistId: "printdrop_station_gist",
+      defaultGistId: "a558621ed6cf671701267478cbfc1cce",
       localStorageUrlKey: "printdrop_active_station_url",
       localStorageGistKey: "printdrop_station_gist_id",
       defaultFallbackTimeoutMs: 3500
@@ -334,13 +334,13 @@
         localStorage.setItem(CONFIG.localStorageGistKey, gistParam.trim());
       }
 
-      const activeGistId = gistParam || savedGistId;
+      const activeGistId = gistParam || savedGistId || CONFIG.defaultGistId;
 
       // 3. Try resolving from GitHub Gist Registry
-      if (activeGistId && activeGistId !== "printdrop_station_gist") {
+      if (activeGistId) {
         try {
-          statusEl.textContent = "Querying live station registry from GitHub...";
-          const response = await fetch("https://api.github.com/gists/" + encodeURIComponent(activeGistId), {
+          statusEl.textContent = "Connecting to TechnoSoft Solution Print Station...";
+          const response = await fetch("https://api.github.com/gists/" + encodeURIComponent(activeGistId) + "?_t=" + Date.now(), {
             headers: { "Accept": "application/vnd.github+json" },
             cache: "no-store"
           });
@@ -350,14 +350,18 @@
             const stationFile = data.files && (data.files["station.json"] || data.files["station.txt"] || Object.values(data.files)[0]);
             if (stationFile && stationFile.content) {
               let liveUrl = "";
+              let isOnline = true;
               try {
                 const parsed = JSON.parse(stationFile.content);
                 liveUrl = parsed.url || parsed.stationUrl || parsed.tunnelUrl;
+                if (parsed.status === "offline") {
+                  isOnline = false;
+                }
               } catch (_) {
                 liveUrl = stationFile.content.trim();
               }
 
-              if (liveUrl && liveUrl.startsWith("http")) {
+              if (isOnline && liveUrl && liveUrl.startsWith("http")) {
                 localStorage.setItem(CONFIG.localStorageUrlKey, liveUrl);
                 redirectToStation(liveUrl);
                 return;
@@ -372,6 +376,7 @@
       // 4. Fallback to cached Station URL if available
       if (savedUrl && savedUrl.startsWith("http")) {
         statusEl.textContent = "Connecting to last known station session...";
+        // Verify with quick ping or redirect directly
         setTimeout(() => {
           redirectToStation(savedUrl);
         }, 500);
@@ -385,6 +390,7 @@
     function redirectToStation(stationBaseUrl) {
       statusEl.textContent = "Station found! Launching customer upload portal...";
       
+      // Preserve existing query params except target/gist
       const currentParams = new URLSearchParams(window.location.search);
       currentParams.delete("target");
       currentParams.delete("to");
@@ -436,6 +442,7 @@
       }
     }
 
+    // Run on page load
     window.addEventListener("DOMContentLoaded", initDispatcher);
   </script>
 </body>
