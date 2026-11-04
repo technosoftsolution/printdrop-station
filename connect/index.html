@@ -358,6 +358,22 @@
     if (adminUrlInput) adminUrlInput.value = savedUrl;
     if (adminGistInput) adminGistInput.value = savedGistId;
 
+    async function pingStationHealth(url) {
+      try {
+        const cleanBase = url.split("?")[0].replace(/\/+$/, "");
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2200);
+        const res = await fetch(cleanBase + "/api/health", {
+          signal: controller.signal,
+          cache: "no-store"
+        });
+        clearTimeout(timeoutId);
+        return res.ok;
+      } catch (_) {
+        return false;
+      }
+    }
+
     async function initDispatcher() {
       const targetParam = urlParams.get("target") || urlParams.get("to") || urlParams.get("url");
       const gistParam = urlParams.get("gist");
@@ -365,9 +381,16 @@
       // 1. Direct URL Override in query string
       if (targetParam && targetParam.startsWith("http")) {
         const cleanTarget = targetParam.trim();
-        localStorage.setItem(CONFIG.localStorageUrlKey, cleanTarget);
-        redirectToStation(cleanTarget);
-        return;
+        statusEl.textContent = "Verifying station connection...";
+        const isHealthy = await pingStationHealth(cleanTarget);
+        if (isHealthy) {
+          localStorage.setItem(CONFIG.localStorageUrlKey, cleanTarget);
+          redirectToStation(cleanTarget);
+          return;
+        } else {
+          showOfflineState();
+          return;
+        }
       }
 
       // 2. Gist ID override in query string
@@ -395,16 +418,31 @@
               try {
                 const parsed = JSON.parse(stationFile.content);
                 liveUrl = parsed.url || parsed.stationUrl || parsed.tunnelUrl;
-                if (parsed.status === "offline") {
+                if (parsed.status === "offline" || !liveUrl) {
                   isOnline = false;
                 }
               } catch (_) {
                 liveUrl = stationFile.content.trim();
               }
 
-              if (isOnline && liveUrl && liveUrl.startsWith("http")) {
+              // If Gist explicitly marks station as offline or URL is empty:
+              if (!isOnline || !liveUrl) {
+                localStorage.removeItem(CONFIG.localStorageUrlKey);
+                showOfflineState();
+                return;
+              }
+
+              // Verify station is ACTUALLY online & responding before redirecting!
+              statusEl.textContent = "Verifying station status...";
+              const isHealthy = await pingStationHealth(liveUrl);
+              if (isHealthy) {
                 localStorage.setItem(CONFIG.localStorageUrlKey, liveUrl);
                 redirectToStation(liveUrl);
+                return;
+              } else {
+                // Station is down or tunnel stopped: DO NOT show Cloudflare Error 1033!
+                localStorage.removeItem(CONFIG.localStorageUrlKey);
+                showOfflineState();
                 return;
               }
             }
@@ -414,16 +452,8 @@
         }
       }
 
-      // 4. Fallback to cached Station URL if available
-      if (savedUrl && savedUrl.startsWith("http")) {
-        statusEl.textContent = "Connecting to last known station session...";
-        setTimeout(() => {
-          redirectToStation(savedUrl);
-        }, 500);
-        return;
-      }
-
-      // 5. If no station found, display Offline / Desk notification
+      // 4. Station offline or registry unreachable: Show friendly offline screen
+      localStorage.removeItem(CONFIG.localStorageUrlKey);
       showOfflineState();
     }
 
