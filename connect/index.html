@@ -475,6 +475,25 @@
       currentParams.delete("gist");
       currentParams.delete("install");
       
+      // Preserve persistent device identity across dynamic tunnel domains
+      try {
+        let dt = localStorage.getItem("printdrop_device_token");
+        if (!dt || !dt.startsWith("dev_token_")) {
+          const randomBytes = new Uint8Array(16);
+          if (window.crypto && window.crypto.getRandomValues) {
+            window.crypto.getRandomValues(randomBytes);
+          } else {
+            for (let i = 0; i < 16; i++) randomBytes[i] = Math.floor(Math.random() * 256);
+          }
+          const hex = Array.from(randomBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+          dt = "dev_token_" + hex + "_" + Date.now().toString(36);
+          localStorage.setItem("printdrop_device_token", dt);
+        }
+        if (dt && !currentParams.has("dt")) {
+          currentParams.set("dt", dt);
+        }
+      } catch (_) {}
+
       const queryStr = currentParams.toString();
       const separator = stationBaseUrl.includes("?") ? "&" : "?";
       const finalUrl = queryStr ? (stationBaseUrl + separator + queryStr) : stationBaseUrl;
