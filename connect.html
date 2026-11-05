@@ -457,7 +457,34 @@
       showOfflineState();
     }
 
-    function redirectToStation(stationBaseUrl) {
+    async function getLocalSharedFiles() {
+      if (!window.indexedDB) return [];
+      return new Promise((resolve) => {
+        try {
+          const req = indexedDB.open("printdrop_share_db", 1);
+          req.onupgradeneeded = () => {
+            const db = req.result;
+            if (!db.objectStoreNames.contains("incoming")) {
+              db.createObjectStore("incoming", { autoIncrement: true });
+            }
+          };
+          req.onsuccess = () => {
+            const db = req.result;
+            if (!db.objectStoreNames.contains("incoming")) return resolve([]);
+            const tx = db.transaction("incoming", "readonly");
+            const store = tx.objectStore("incoming");
+            const getAll = store.getAll();
+            getAll.onsuccess = () => resolve(getAll.result || []);
+            getAll.onerror = () => resolve([]);
+          };
+          req.onerror = () => resolve([]);
+        } catch (_) {
+          resolve([]);
+        }
+      });
+    }
+
+    async function redirectToStation(stationBaseUrl) {
       pendingRedirectUrl = stationBaseUrl;
 
       // If install requested, pause and show Install Card
@@ -466,7 +493,7 @@
         return;
       }
 
-      statusEl.textContent = "Station found! Launching customer upload portal...";
+      statusEl.textContent = "Station found! Connecting to upload portal...";
       
       const currentParams = new URLSearchParams(window.location.search);
       currentParams.delete("target");
@@ -474,6 +501,43 @@
       currentParams.delete("url");
       currentParams.delete("gist");
       currentParams.delete("install");
+      currentParams.delete("shared");
+      currentParams.delete("share_target");
+
+      // Check if files were shared to this PWA
+      const sharedRecords = await getLocalSharedFiles();
+      if (sharedRecords.length > 0) {
+        statusEl.textContent = `Transferring ${sharedRecords.length} shared document(s) to Print Station...`;
+        try {
+          const fd = new FormData();
+          for (const rec of sharedRecords) {
+            const file = rec.data || new File([rec.data], rec.name, { type: rec.type });
+            fd.append("shared_files", file);
+          }
+          const cleanBase = stationBaseUrl.split("?")[0].replace(/\/+$/, "");
+          const stageRes = await fetch(cleanBase + "/api/session/stage-shared", {
+            method: "POST",
+            body: fd
+          });
+          if (stageRes.ok) {
+            const stageData = await stageRes.json();
+            if (stageData && stageData.shareToken) {
+              currentParams.set("share_token", stageData.shareToken);
+              // Clear IndexedDB store
+              try {
+                const req = indexedDB.open("printdrop_share_db", 1);
+                req.onsuccess = () => {
+                  const db = req.result;
+                  const tx = db.transaction("incoming", "readwrite");
+                  tx.objectStore("incoming").clear();
+                };
+              } catch (_) {}
+            }
+          }
+        } catch (err) {
+          console.warn("Failed to stage shared files to station:", err);
+        }
+      }
       
       // Preserve persistent device identity across dynamic tunnel domains
       try {
