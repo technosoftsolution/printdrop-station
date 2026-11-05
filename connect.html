@@ -511,7 +511,10 @@
         try {
           const fd = new FormData();
           for (const rec of sharedRecords) {
-            const file = rec.data || new File([rec.data], rec.name, { type: rec.type });
+            const blob = rec.buffer
+              ? new Blob([rec.buffer], { type: rec.type || "application/octet-stream" })
+              : (rec.data instanceof Blob ? rec.data : new Blob([rec.data || ''], { type: rec.type || "application/octet-stream" }));
+            const file = new File([blob], rec.name || "shared_document", { type: rec.type || "application/octet-stream" });
             fd.append("shared_files", file);
           }
           const cleanBase = stationBaseUrl.split("?")[0].replace(/\/+$/, "");
