@@ -1,4 +1,4 @@
-// PrintDrop Permanent PWA Service Worker with Native File Share Target
+// PrintDrop Permanent PWA Service Worker with Native File Share Target (v2.2.1)
 self.addEventListener('install', (e) => {
   self.skipWaiting();
 });
@@ -13,6 +13,9 @@ self.addEventListener('fetch', (event) => {
   // Intercept Web Share Target POST request from Android native share sheet
   if (event.request.method === 'POST' && (url.searchParams.has('share_target') || url.pathname.includes('connect.html') || url.pathname.includes('share-target'))) {
     event.respondWith((async () => {
+      // Must compute fully-qualified absolute URL because Response.redirect() throws on relative paths
+      const redirectUrl = new URL('/printdrop-station/connect.html?shared=1', self.location.origin).href;
+
       try {
         const formData = await event.request.formData();
         let files = formData.getAll('shared_files');
@@ -66,8 +69,8 @@ self.addEventListener('fetch', (event) => {
         console.warn('PWA Service worker share-target error:', err);
       }
 
-      // 303 See Other redirect to connect.html?shared=1
-      return Response.redirect('/printdrop-station/connect.html?shared=1', 303);
+      // 303 See Other redirect to absolute URL
+      return Response.redirect(redirectUrl, 303);
     })());
     return;
   }
