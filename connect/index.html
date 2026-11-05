@@ -585,8 +585,35 @@
       }, 400);
     }
 
+    function isRunningStandalone() {
+      return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+    }
+
     function showInstallUI() {
       if (spinnerWrap) spinnerWrap.style.display = "none";
+
+      if (isRunningStandalone()) {
+        titleEl.textContent = "PrintDrop App Active";
+        statusEl.textContent = "TechnoSoft Solution PrintDrop is already installed on this phone! Connecting to print counter...";
+        if (installPromptCard) {
+          installPromptCard.style.display = "block";
+          installPromptCard.innerHTML = `
+            <div style="font-size:2.2rem; margin-bottom:0.35rem;">✅</div>
+            <h3 style="font-size:1.05rem; font-weight:800; color:#34d399; margin-bottom:0.35rem;">PrintDrop App is Already Installed!</h3>
+            <p style="font-size:0.8rem; color:#c7d2fe; line-height:1.45; margin-bottom:1rem;">
+              Your permanent home screen shortcut and Android Share Sheet integration are active and ready.
+            </p>
+            <button class="action-btn" style="background:linear-gradient(135deg, #10b981, #059669); font-size:0.95rem;" onclick="skipInstallToStation()">
+              🚀 Open Document Uploader &rarr;
+            </button>
+          `;
+        }
+        if (pendingRedirectUrl) {
+          setTimeout(() => window.location.replace(pendingRedirectUrl), 1000);
+        }
+        return;
+      }
+
       titleEl.textContent = "Install Permanent Shortcut";
       statusEl.textContent = "Save TechnoSoft Solution to your phone for instant 1-tap document printing anytime.";
       if (installPromptCard) installPromptCard.style.display = "block";
@@ -597,14 +624,20 @@
         deferredPrompt.prompt();
         const choice = await deferredPrompt.userChoice;
         if (choice.outcome === "accepted") {
+          deferredPrompt = null;
+          statusEl.textContent = "✅ Shortcut Installed! Connecting to upload portal...";
           if (pendingRedirectUrl) {
             setTimeout(() => window.location.replace(pendingRedirectUrl), 800);
           }
         }
       } else {
-        alert("To install on your phone:\n• Android (Chrome): Tap ⋮ menu -> 'Add to Home screen'\n• iPhone (Safari): Tap Share -> 'Add to Home Screen'");
-        if (pendingRedirectUrl) {
-          // Do not redirect automatically while on install screen
+        const guide = document.getElementById("pwaGuide");
+        if (guide) {
+          guide.scrollIntoView({ behavior: "smooth" });
+          guide.style.background = "rgba(56,189,248,0.12)";
+          guide.style.border = "1.5px solid #38bdf8";
+          guide.style.borderRadius = "0.75rem";
+          guide.style.padding = "0.85rem";
         }
       }
     }
