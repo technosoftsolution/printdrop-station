@@ -462,6 +462,7 @@
     async function getLocalSharedFiles() {
       if (!window.indexedDB) return [];
       return new Promise((resolve) => {
+        const timeout = setTimeout(() => resolve([]), 2000);
         try {
           const req = indexedDB.open("printdrop_share_db", 1);
           req.onupgradeneeded = () => {
@@ -520,7 +521,10 @@
             fd.append("shared_files", file);
           }
           const cleanBase = stationBaseUrl.split("?")[0].replace(/\/+$/, "");
+          const stageAbort = new AbortController();
+          const stageTimer = setTimeout(() => stageAbort.abort(), 4000);
           const stageRes = await fetch(cleanBase + "/api/session/stage-shared", {
+            signal: stageAbort.signal,
             method: "POST",
             body: fd
           });
