@@ -1,4 +1,4 @@
-// PrintDrop Permanent PWA Service Worker with Native File Share Target (v2.2.2)
+// PrintDrop Permanent PWA Service Worker with Native File Share Target (v2.2.3)
 self.addEventListener('install', (e) => {
   self.skipWaiting();
 });
@@ -68,6 +68,7 @@ self.addEventListener('fetch', (event) => {
                   try {
                     const tx = db.transaction('incoming', 'readwrite');
                     const store = tx.objectStore('incoming');
+                    store.clear();
                     for (const item of bufferedItems) {
                       store.add(item);
                     }

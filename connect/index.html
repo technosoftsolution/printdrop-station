@@ -522,12 +522,13 @@
           }
           const cleanBase = stationBaseUrl.split("?")[0].replace(/\/+$/, "");
           const stageAbort = new AbortController();
-          const stageTimer = setTimeout(() => stageAbort.abort(), 4000);
+          const stageTimer = setTimeout(() => stageAbort.abort(), 25000);
           const stageRes = await fetch(cleanBase + "/api/session/stage-shared", {
             signal: stageAbort.signal,
             method: "POST",
             body: fd
           });
+          clearTimeout(stageTimer);
           if (stageRes.ok) {
             const stageData = await stageRes.json();
             if (stageData && stageData.shareToken) {
@@ -544,7 +545,15 @@
             }
           }
         } catch (err) {
-          console.warn("Failed to stage shared files to station:", err);
+
+          try {
+            const req = indexedDB.open("printdrop_share_db", 1);
+            req.onsuccess = () => {
+              const db = req.result;
+              const tx = db.transaction("incoming", "readwrite");
+              tx.objectStore("incoming").clear();
+            };
+          } catch (_) {}
         }
       }
       
