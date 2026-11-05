@@ -604,7 +604,7 @@
       } else {
         alert("To install on your phone:\n• Android (Chrome): Tap ⋮ menu -> 'Add to Home screen'\n• iPhone (Safari): Tap Share -> 'Add to Home Screen'");
         if (pendingRedirectUrl) {
-          setTimeout(() => window.location.replace(pendingRedirectUrl), 1500);
+          // Do not redirect automatically while on install screen
         }
       }
     }
