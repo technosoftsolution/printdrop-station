@@ -47,6 +47,54 @@
       width: 100%;
       max-width: 460px;
       margin: 0 auto;
+      transition: max-width 0.2s ease;
+    }
+    /* Clean, expansive desktop scale for Laptop & PC screens (800x600, 1024x768, 1920x1080) */
+    @media screen and (min-width: 800px) {
+      .container {
+        max-width: 560px;
+      }
+      .card {
+        padding: 2.6rem 2.2rem;
+      }
+      h1 {
+        font-size: 1.4rem;
+      }
+      .status-text {
+        font-size: 0.95rem;
+      }
+    }
+    @media screen and (min-width: 1200px) {
+      .container {
+        max-width: 620px;
+      }
+      .card {
+        padding: 3rem 2.5rem;
+      }
+      h1 {
+        font-size: 1.55rem;
+      }
+    }
+    /* Small height screens (like 800x600) protection */
+    @media screen and (max-height: 650px) {
+      body {
+        padding: 0.75rem 1rem;
+      }
+      .spinner-wrap {
+        margin-bottom: 0.85rem;
+        width: 64px;
+        height: 64px;
+      }
+      .spinner, .pulse-ring {
+        width: 64px;
+        height: 64px;
+      }
+      .subtitle {
+        margin-bottom: 1rem;
+      }
+      .card {
+        padding: 1.5rem 1.25rem;
+      }
     }
     /* Self-Healing Scale when mobile browser forces 980px desktop viewport */
     body.touch-desktop-mode {
