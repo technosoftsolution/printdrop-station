@@ -48,13 +48,61 @@
       max-width: 460px;
       margin: 0 auto;
     }
-    /* Safeguard when mobile browser forces desktop viewport (e.g. 980px) */
+    /* Self-Healing Scale when mobile browser forces 980px desktop viewport */
     body.touch-desktop-mode {
-      padding: 1rem 0.5rem;
+      padding: 1.5rem 1rem;
+      font-size: 135%;
     }
     body.touch-desktop-mode .container {
-      max-width: 520px;
+      max-width: 860px;
+      width: 95%;
       margin: 0 auto;
+    }
+    body.touch-desktop-mode .card {
+      padding: 3rem 2.2rem;
+      border-radius: 2.2rem;
+    }
+    body.touch-desktop-mode .brand-logo {
+      font-size: 2.4rem;
+    }
+    body.touch-desktop-mode .subtitle {
+      font-size: 1.3rem;
+      margin-bottom: 2.2rem;
+    }
+    body.touch-desktop-mode h1,
+    body.touch-desktop-mode #installCardTitle {
+      font-size: 2.1rem;
+    }
+    body.touch-desktop-mode .status-text,
+    body.touch-desktop-mode #installCardDesc {
+      font-size: 1.45rem;
+      line-height: 1.55;
+    }
+    body.touch-desktop-mode .action-btn {
+      font-size: 1.55rem;
+      padding: 1.4rem 1.8rem;
+      border-radius: 1.4rem;
+    }
+    body.touch-desktop-mode .btn-secondary {
+      font-size: 1.3rem;
+      padding: 1.1rem 1.5rem;
+    }
+    body.touch-desktop-mode .spinner-wrap {
+      width: 130px;
+      height: 130px;
+    }
+    body.touch-desktop-mode .spinner,
+    body.touch-desktop-mode .pulse-ring {
+      width: 130px;
+      height: 130px;
+    }
+    body.touch-desktop-mode .icon-badge {
+      font-size: 3.5rem;
+    }
+    body.touch-desktop-mode .desktop-mode-notice {
+      font-size: 1.25rem;
+      padding: 1.1rem 1.4rem;
+      border-radius: 1.2rem;
     }
     .desktop-mode-notice {
       display: none;
@@ -394,6 +442,7 @@
         if (notice) notice.style.display = "block";
       }
     }
+    detectAndShieldDesktopMode();
 
     function getAndroidBrowserInfo() {
       const ua = navigator.userAgent || "";
