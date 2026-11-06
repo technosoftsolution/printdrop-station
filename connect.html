@@ -40,13 +40,33 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 1.5rem;
+      padding: 1.25rem 1rem;
       text-align: center;
     }
     .container {
       width: 100%;
-      max-width: 440px;
+      max-width: 460px;
       margin: 0 auto;
+    }
+    /* Safeguard when mobile browser forces desktop viewport (e.g. 980px) */
+    body.touch-desktop-mode {
+      padding: 1rem 0.5rem;
+    }
+    body.touch-desktop-mode .container {
+      max-width: 520px;
+      margin: 0 auto;
+    }
+    .desktop-mode-notice {
+      display: none;
+      background: rgba(245, 158, 11, 0.15);
+      border: 1px solid #f59e0b;
+      color: #fde68a;
+      padding: 0.65rem 0.85rem;
+      border-radius: 0.85rem;
+      font-size: 0.78rem;
+      margin-bottom: 1rem;
+      line-height: 1.4;
+      text-align: left;
     }
     .brand-logo {
       display: inline-flex;
@@ -236,6 +256,16 @@
 <body>
 
   <div class="container">
+    <!-- Desktop Mode Viewport Notice (Shown if phone opens in desktop mode) -->
+    <div id="desktopModeNotice" class="desktop-mode-notice">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:0.5rem;">
+        <div>
+          <strong>📱 Mobile View Recommended:</strong> Your browser opened in Desktop Mode. If text looks small, tap Chrome's <strong>⋮ (3 dots)</strong> &rarr; uncheck <strong>"Desktop site"</strong>.
+        </div>
+        <button type="button" onclick="document.getElementById('desktopModeNotice').style.display='none'" style="background:transparent; border:none; color:#f59e0b; font-size:1.1rem; cursor:pointer; padding:0 0.2rem; line-height:1;">✕</button>
+      </div>
+    </div>
+
     <!-- Brand -->
     <a href="index.html" class="brand-logo">
       <span>🖨️ TechnoSoft Solution</span>
@@ -263,25 +293,39 @@
       <!-- Install Permanent Shortcut Card (shown if ?install=1) -->
       <div id="installPromptCard" style="display:none; margin:1rem 0; padding:1.25rem; background:rgba(79,70,229,0.18); border:1.5px solid #6366f1; border-radius:1.2rem; text-align:center;">
         <div style="font-size:2rem; margin-bottom:0.35rem;">📲</div>
-        <h3 style="font-size:1.05rem; font-weight:800; color:#fff; margin-bottom:0.35rem;">Add Permanent PrintDrop Shortcut</h3>
-        <p style="font-size:0.8rem; color:#c7d2fe; line-height:1.45; margin-bottom:1rem;">
-          This installs a permanent shortcut that connects to TechnoSoft Solution anytime without ever expiring across PC restarts!
+        <h3 id="installCardTitle" style="font-size:1.05rem; font-weight:800; color:#fff; margin-bottom:0.35rem;">Install PrintDrop App (1-Tap)</h3>
+        <p id="installCardDesc" style="font-size:0.8rem; color:#c7d2fe; line-height:1.45; margin-bottom:1rem;">
+          Enables 1-tap printing directly from WhatsApp and Phone Files without scanning QR codes!
         </p>
+
+        <!-- Dynamic Browser Alert (Shown if on Android non-Chrome e.g. JioSphere, Mi Browser, Custom Tab) -->
+        <div id="nonChromeAlert" style="display:none; background:rgba(245,158,11,0.18); border:1.5px solid #f59e0b; border-radius:0.85rem; padding:0.75rem 0.85rem; margin-bottom:1rem; text-align:left;">
+          <div style="font-weight:700; color:#fde68a; font-size:0.82rem; margin-bottom:0.25rem;">
+            ⚠️ Non-Chrome Browser Detected (<span id="detectedBrowserName">Browser</span>)
+          </div>
+          <div style="font-size:0.75rem; color:#fef3c7; line-height:1.4; margin-bottom:0.75rem;">
+            To enable <strong>WhatsApp &amp; Phone Files direct printing</strong>, PrintDrop needs Google Chrome.
+          </div>
+          <a id="btnLaunchChromeIntent" href="intent://technosoftsolution.github.io/printdrop-station/connect.html?install=1#Intent;scheme=https;package=com.android.chrome;end" class="action-btn" style="background:linear-gradient(135deg, #f59e0b, #d97706); font-size:0.88rem; padding:0.65rem 1rem; text-decoration:none;">
+            🚀 Open in Google Chrome (1-Tap Install) &rarr;
+          </a>
+        </div>
+
         <button id="btnTriggerInstall" class="action-btn" style="background:linear-gradient(135deg, #06b6d4, #4f46e5); font-size:0.95rem;" onclick="triggerPwaInstall()">
-          ➕ Add to Phone Home Screen
+          ⚡ Install PrintDrop App in 1-Tap
         </button>
         <button class="action-btn btn-secondary" style="margin-top:0.65rem;" onclick="skipInstallToStation()">
           Open Document Uploader &rarr;
         </button>
       </div>
 
-      <!-- Home Screen Guide -->
-      <div class="instructions-box" id="pwaGuide">
-        <h4>📱 Save as 1-Tap Home Screen App</h4>
+      <!-- Home Screen Guide (iPhone Safari fallback) -->
+      <div class="instructions-box" id="pwaGuide" style="display:none;">
+        <h4>📱 Save as 1-Tap App on iPhone</h4>
         <ol>
-          <li><strong>Android (Chrome):</strong> Tap <strong>⋮</strong> (three dots) &rarr; <strong>"Add to Home screen"</strong></li>
-          <li><strong>iPhone (Safari):</strong> Tap <strong>Share</strong> (box with arrow) &rarr; <strong>"Add to Home Screen"</strong></li>
-          <li>Next time you visit, tap the icon directly from your phone!</li>
+          <li>Tap <strong>Share</strong> (box with arrow at the bottom of Safari)</li>
+          <li>Scroll down and tap <strong>"Add to Home Screen"</strong></li>
+          <li>Next time, tap the PrintDrop icon on your home screen!</li>
         </ol>
       </div>
 
@@ -335,13 +379,45 @@
     }
 
     let deferredPrompt = null;
+    let installPromptWaiters = [];
     let pendingRedirectUrl = "";
     const urlParams = new URLSearchParams(window.location.search);
     const isInstallMode = urlParams.get("install") === "1";
 
+    function detectAndShieldDesktopMode() {
+      const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+      const isMobileDevice = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+      const isWideViewport = window.innerWidth >= 768;
+      if ((isTouch || isMobileDevice) && isWideViewport) {
+        document.body.classList.add("touch-desktop-mode");
+        const notice = document.getElementById("desktopModeNotice");
+        if (notice) notice.style.display = "block";
+      }
+    }
+
+    function getAndroidBrowserInfo() {
+      const ua = navigator.userAgent || "";
+      const isAndroid = /Android/i.test(ua);
+      if (!isAndroid) return { isAndroid: false, isCleanChrome: false, name: "Other OS" };
+      
+      let name = "Other Browser";
+      if (/JioSphere|JioPages/i.test(ua)) name = "JioSphere";
+      else if (/MiuiBrowser|XiaoMi/i.test(ua)) name = "Mi Browser";
+      else if (/OPT\/|OPR\//i.test(ua)) name = "Opera";
+      else if (/wv|Version\/4\.0/i.test(ua)) name = "In-App Scanner";
+      else if (/Chrome\//i.test(ua) && !/SamsungBrowser/i.test(ua)) {
+        return { isAndroid: true, isCleanChrome: true, name: "Google Chrome" };
+      }
+      return { isAndroid: true, isCleanChrome: false, name };
+    }
+
     window.addEventListener("beforeinstallprompt", (e) => {
       e.preventDefault();
       deferredPrompt = e;
+      while (installPromptWaiters.length > 0) {
+        const resolve = installPromptWaiters.shift();
+        resolve(e);
+      }
       if (isInstallMode) {
         showInstallUI();
       }
@@ -601,7 +677,7 @@
             <div style="font-size:2.2rem; margin-bottom:0.35rem;">✅</div>
             <h3 style="font-size:1.05rem; font-weight:800; color:#34d399; margin-bottom:0.35rem;">PrintDrop App is Already Installed!</h3>
             <p style="font-size:0.8rem; color:#c7d2fe; line-height:1.45; margin-bottom:1rem;">
-              Your permanent home screen shortcut and Android Share Sheet integration are active and ready.
+              Your permanent home screen app and Android Share Sheet integration are active and ready.
             </p>
             <button class="action-btn" style="background:linear-gradient(135deg, #10b981, #059669); font-size:0.95rem;" onclick="skipInstallToStation()">
               🚀 Open Document Uploader &rarr;
@@ -614,31 +690,96 @@
         return;
       }
 
-      titleEl.textContent = "Install Permanent Shortcut";
-      statusEl.textContent = "Save TechnoSoft Solution to your phone for instant 1-tap document printing anytime.";
+      titleEl.textContent = "Install Permanent PrintDrop App";
+      statusEl.textContent = "Enable 1-tap document printing directly from WhatsApp & phone files anytime.";
       if (installPromptCard) installPromptCard.style.display = "block";
+
+      // Check if Android user is on non-Chrome browser (e.g. JioSphere, Mi Browser, Scanner)
+      const browserInfo = getAndroidBrowserInfo();
+      if (browserInfo.isAndroid && !browserInfo.isCleanChrome) {
+        const alertEl = document.getElementById("nonChromeAlert");
+        const nameEl = document.getElementById("detectedBrowserName");
+        if (nameEl) nameEl.textContent = browserInfo.name;
+        if (alertEl) alertEl.style.display = "block";
+      }
+
+      // If iPhone Safari, show Safari guide
+      if (/iPhone|iPad|iPod/i.test(navigator.userAgent) && !isRunningStandalone()) {
+        const guide = document.getElementById("pwaGuide");
+        if (guide) guide.style.display = "block";
+        const btn = document.getElementById("btnTriggerInstall");
+        if (btn) btn.style.display = "none";
+      }
     }
 
     async function triggerPwaInstall() {
-      if (deferredPrompt) {
+      const btn = document.getElementById("btnTriggerInstall");
+      const originalHtml = btn ? btn.innerHTML : "⚡ Install PrintDrop App in 1-Tap";
+
+      // 1. If non-Chrome Android (like JioSphere), launch Chrome directly
+      const browserInfo = getAndroidBrowserInfo();
+      if (browserInfo.isAndroid && !browserInfo.isCleanChrome) {
+        const intentUrl = "intent://technosoftsolution.github.io/printdrop-station/connect.html?install=1#Intent;scheme=https;package=com.android.chrome;end";
+        window.location.href = intentUrl;
+        return;
+      }
+
+      // 2. If deferredPrompt not yet ready, wait up to 3.5 seconds for beforeinstallprompt
+      if (!deferredPrompt) {
+        if (btn) {
+          btn.disabled = true;
+          btn.innerHTML = `<span>⏳ Preparing 1-Tap Install...</span>`;
+        }
+
+        const promptArrived = await new Promise((resolve) => {
+          const timer = setTimeout(() => resolve(null), 3500);
+          installPromptWaiters.push((prompt) => {
+            clearTimeout(timer);
+            resolve(prompt);
+          });
+        });
+
+        if (btn) btn.disabled = false;
+
+        if (!promptArrived && !deferredPrompt) {
+          // Fallback: If still not ready on Android, trigger Chrome Intent
+          if (browserInfo.isAndroid) {
+            window.location.href = "intent://technosoftsolution.github.io/printdrop-station/connect.html?install=1#Intent;scheme=https;package=com.android.chrome;end";
+            return;
+          }
+          if (btn) btn.innerHTML = originalHtml;
+          return;
+        }
+      }
+
+      // 3. Trigger native Android system prompt
+      try {
         deferredPrompt.prompt();
         const choice = await deferredPrompt.userChoice;
         if (choice.outcome === "accepted") {
           deferredPrompt = null;
-          statusEl.textContent = "✅ Shortcut Installed! Connecting to upload portal...";
+          statusEl.textContent = "✅ PrintDrop App Installed! Connecting to upload portal...";
+          if (installPromptCard) {
+            installPromptCard.innerHTML = `
+              <div style="font-size:2.2rem; margin-bottom:0.35rem;">🎉</div>
+              <h3 style="font-size:1.05rem; font-weight:800; color:#34d399; margin-bottom:0.35rem;">PrintDrop App Installed!</h3>
+              <p style="font-size:0.8rem; color:#c7d2fe; line-height:1.45; margin-bottom:1rem;">
+                PrintDrop is now active in your phone's Apps and Share Sheet.
+              </p>
+              <button class="action-btn" style="background:linear-gradient(135deg, #10b981, #059669); font-size:0.95rem;" onclick="skipInstallToStation()">
+                🚀 Open Document Uploader &rarr;
+              </button>
+            `;
+          }
           if (pendingRedirectUrl) {
             setTimeout(() => window.location.replace(pendingRedirectUrl), 800);
           }
+        } else {
+          if (btn) btn.innerHTML = originalHtml;
         }
-      } else {
-        const guide = document.getElementById("pwaGuide");
-        if (guide) {
-          guide.scrollIntoView({ behavior: "smooth" });
-          guide.style.background = "rgba(56,189,248,0.12)";
-          guide.style.border = "1.5px solid #38bdf8";
-          guide.style.borderRadius = "0.75rem";
-          guide.style.padding = "0.85rem";
-        }
+      } catch (err) {
+        console.warn("Install prompt error:", err);
+        if (btn) btn.innerHTML = originalHtml;
       }
     }
 
@@ -686,7 +827,10 @@
       }
     }
 
-    window.addEventListener("DOMContentLoaded", initDispatcher);
+    window.addEventListener("DOMContentLoaded", () => {
+      detectAndShieldDesktopMode();
+      initDispatcher();
+    });
   </script>
 </body>
 </html>
