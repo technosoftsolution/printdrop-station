@@ -212,9 +212,12 @@
         Your transaction was approved and recorded in the Cloud Registry.
       </p>
       <div class="ref-box" id="refBox">Reference: pay_...</div>
-      <p style="font-size:0.75rem; color:#10b981; font-weight:600;">
+      <p style="font-size:0.75rem; color:#10b981; font-weight:600; margin-bottom: 1rem;">
         Your PrintDrop desktop app has been notified and will update automatically.
       </p>
+      <button type="button" class="btn" style="background:#10b981; box-shadow:0 4px 14px rgba(16,185,129,0.35);" onclick="dismissGateway()">
+        <span>✓ Return to PrintDrop Station</span>
+      </button>
     </div>
   </div>
 
@@ -322,7 +325,12 @@
         console.warn("Could not postMessage to parent:", err);
       }
 
-      // 4b. Direct Patch to Supabase licenses table
+      // 4b. Send auto-close event to parent after 1.5 seconds
+      setTimeout(() => {
+        dismissGateway();
+      }, 1500);
+
+      // 4c. Direct Patch to Supabase licenses table
       try {
         const res = await fetch(`${SUPABASE_URL}/rest/v1/licenses?hwid=eq.${encodeURIComponent(hwid)}`, {
           method: 'PATCH',
@@ -345,6 +353,14 @@
       } catch (syncErr) {
         console.error("Supabase direct sync error:", syncErr);
       }
+    }
+
+    function dismissGateway() {
+      try {
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage({ type: 'PRINTDROP_CLOSE_GATEWAY' }, '*');
+        }
+      } catch (e) {}
     }
 
     // Auto-launch Razorpay if autoOpen flag is true
