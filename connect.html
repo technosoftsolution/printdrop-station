@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Connect - TechnoSoft Solution | PrintDrop Station</title>
   <meta name="description" content="Permanent access gateway for TechnoSoft Solution PrintDrop digital document printing and scanning station.">
   <link rel="icon" href="icon.svg">
@@ -537,7 +537,7 @@
       try {
         const cleanBase = url.split("?")[0].replace(/\/+$/, "");
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 2200);
+        const timeoutId = setTimeout(() => controller.abort(), 3500);
         const res = await fetch(cleanBase + "/api/health", {
           signal: controller.signal,
           cache: "no-store"
@@ -551,6 +551,7 @@
 
     async function initDispatcher() {
       const targetParam = urlParams.get("target") || urlParams.get("to") || urlParams.get("url");
+      const rawHwid = urlParams.get("hwid");
       const gistParam = urlParams.get("gist");
 
       // 1. Direct URL Override in query string
@@ -568,14 +569,89 @@
         }
       }
 
-      // 2. Gist ID override in query string
+      // Persist HWID to localStorage so PWA home screen shortcuts retain station identity
+      if (rawHwid && rawHwid.trim().length > 0) {
+        localStorage.setItem("printdrop_station_hwid", rawHwid.trim());
+      }
+      const activeHwid = (rawHwid || localStorage.getItem("printdrop_station_hwid") || "").trim();
+
+      // 2. High-Speed Multi-Tenant HWID Station Resolution (Zero-Collision Routing via Supabase)
+      if (activeHwid.length > 0) {
+        statusEl.textContent = "Resolving active PrintDrop station session...";
+        try {
+          const supUrl = "https://nslcrlvuulgqtrdqrkgv.supabase.co/rest/v1/system_config?key=eq.station_tunnel_" + encodeURIComponent(activeHwid) + "&select=value";
+          const supKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5zbGNybHZ1dWxncXRyZHFya2d2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQxNTI4NzEsImV4cCI6MjEwOTcyODg3MX0.lpRc097A_PFCD-eJVhyQZmPFxexhSGjM2dhCE0LNdxk";
+          const supRes = await fetch(supUrl, {
+            headers: {
+              "apikey": supKey,
+              "Authorization": "Bearer " + supKey,
+              "Accept": "application/json"
+            },
+            cache: "no-store"
+          });
+          if (supRes.ok) {
+            const list = await supRes.json();
+            if (list && list.length > 0 && list[0].value) {
+              const val = list[0].value;
+              const liveUrl = (val.url || val.tunnelUrl || val.stationUrl || "").trim();
+              const isOnline = val.status === "online" && liveUrl.length > 0;
+              if (isOnline) {
+                statusEl.textContent = "Verifying counter connection...";
+                const isHealthy = await pingStationHealth(liveUrl);
+                if (isHealthy) {
+                  localStorage.setItem(CONFIG.localStorageUrlKey, liveUrl);
+                  redirectToStation(liveUrl);
+                  return;
+                }
+              }
+            }
+          }
+        } catch (hwidErr) {
+          console.warn("HWID resolution error:", hwidErr);
+        }
+        // If HWID resolution did not match an active tunnel, fall through to Global Supabase & Gist
+      }
+
+      // 3. Fallback: Global Supabase Station Registry
+      try {
+        const supGlobalUrl = "https://nslcrlvuulgqtrdqrkgv.supabase.co/rest/v1/system_config?key=eq.station_live_registry&select=value";
+        const supKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5zbGNybHZ1dWxncXRyZHFya2d2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQxNTI4NzEsImV4cCI6MjEwOTcyODg3MX0.lpRc097A_PFCD-eJVhyQZmPFxexhSGjM2dhCE0LNdxk";
+        const globalRes = await fetch(supGlobalUrl, {
+          headers: {
+            "apikey": supKey,
+            "Authorization": "Bearer " + supKey,
+            "Accept": "application/json"
+          },
+          cache: "no-store"
+        });
+        if (globalRes.ok) {
+          const list = await globalRes.json();
+          if (list && list.length > 0 && list[0].value) {
+            const val = list[0].value;
+            const liveUrl = (val.url || val.tunnelUrl || val.stationUrl || "").trim();
+            const isOnline = val.status === "online" && liveUrl.length > 0;
+            if (isOnline) {
+              statusEl.textContent = "Verifying station connection...";
+              const isHealthy = await pingStationHealth(liveUrl);
+              if (isHealthy) {
+                localStorage.setItem(CONFIG.localStorageUrlKey, liveUrl);
+                redirectToStation(liveUrl);
+                return;
+              }
+            }
+          }
+        }
+      } catch (globalErr) {
+        console.warn("Global registry resolution error:", globalErr);
+      }
+
+      // 4. Fallback: GitHub Gist Registry
       if (gistParam) {
         localStorage.setItem(CONFIG.localStorageGistKey, gistParam.trim());
       }
 
       const activeGistId = gistParam || savedGistId || CONFIG.defaultGistId;
 
-      // 3. Try resolving from GitHub Gist Registry
       if (activeGistId) {
         try {
           statusEl.textContent = "Connecting to TechnoSoft Solution Print Station...";
@@ -600,25 +676,14 @@
                 liveUrl = stationFile.content.trim();
               }
 
-              // If Gist explicitly marks station as offline or URL is empty:
-              if (!isOnline || !liveUrl) {
-                localStorage.removeItem(CONFIG.localStorageUrlKey);
-                showOfflineState();
-                return;
-              }
-
-              // Verify station is ACTUALLY online & responding before redirecting!
-              statusEl.textContent = "Verifying station status...";
-              const isHealthy = await pingStationHealth(liveUrl);
-              if (isHealthy) {
-                localStorage.setItem(CONFIG.localStorageUrlKey, liveUrl);
-                redirectToStation(liveUrl);
-                return;
-              } else {
-                // Station is down or tunnel stopped: DO NOT show Cloudflare Error 1033!
-                localStorage.removeItem(CONFIG.localStorageUrlKey);
-                showOfflineState();
-                return;
+              if (isOnline && liveUrl) {
+                statusEl.textContent = "Verifying station status...";
+                const isHealthy = await pingStationHealth(liveUrl);
+                if (isHealthy) {
+                  localStorage.setItem(CONFIG.localStorageUrlKey, liveUrl);
+                  redirectToStation(liveUrl);
+                  return;
+                }
               }
             }
           }
@@ -627,7 +692,7 @@
         }
       }
 
-      // 4. Station offline or registry unreachable: Show friendly offline screen
+      // 5. Station offline or all registries unreachable: Show friendly offline screen
       localStorage.removeItem(CONFIG.localStorageUrlKey);
       showOfflineState();
     }
@@ -679,6 +744,11 @@
       currentParams.delete("install");
       currentParams.delete("shared");
       currentParams.delete("share_target");
+
+      const savedHwid = localStorage.getItem("printdrop_station_hwid");
+      if (savedHwid && !currentParams.has("hwid")) {
+        currentParams.set("hwid", savedHwid);
+      }
 
       // Check if files were shared to this PWA
       const sharedRecords = await getLocalSharedFiles();
