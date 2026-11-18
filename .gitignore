@@ -1,0 +1,49 @@
+# Node / Vite dependencies and build artifacts
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# Rust / Cargo / Tauri build outputs
+src-tauri/target/
+src-tauri/Cargo.lock
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.log
+
+# Editor & OS artifacts
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+Thumbs.db
+[Dd]esktop.ini
+
+# SQLite databases & runtime storage
+*.db
+*.db-shm
+*.db-wal
+storage/temp/
+storage/orders/
+storage/staging/
+storage/test_spooler/
+*-settings.txt
+
+# Temporary extracted files
+PrintDrop_Phase1_Master_Prompt_Extracted.txt
+
+# Large binary tools & local test assets
+**/cloudflared.exe
+dist-installer/*.exe
+*.mp4
+*.jpg
+*.jpeg
+*.png

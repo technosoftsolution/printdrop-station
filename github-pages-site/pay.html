@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>PrintDrop License Payment | TechnoSoft Solution</title>
+  <meta name="description" content="Official License Payment Gateway for PrintDrop Retail Station">
+  <link rel="icon" href="icon.svg">
+  <meta name="theme-color" content="#020617">
+  
+  <!-- Razorpay Official Checkout SDK -->
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+
+  <style>
+    :root {
+      --primary: #4f46e5;
+      --primary-hover: #4338ca;
+      --accent: #06b6d4;
+      --emerald: #10b981;
+      --bg: #020617;
+      --card-bg: #0f172a;
+      --border: #1e293b;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      text-align: center;
+    }
+    .card {
+      width: 100%;
+      max-width: 440px;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 1.25rem;
+      padding: 2rem 1.5rem;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+      position: relative;
+      overflow: hidden;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.25rem 0.75rem;
+      background: rgba(79, 70, 229, 0.15);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      color: #a5b4fc;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 1rem;
+    }
+    h1 {
+      font-size: 1.35rem;
+      font-weight: 800;
+      color: #fff;
+      margin-bottom: 0.4rem;
+    }
+    .subtitle {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-bottom: 1.5rem;
+    }
+    .price-box {
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid var(--border);
+      border-radius: 1rem;
+      padding: 1.25rem;
+      margin-bottom: 1.5rem;
+      text-align: left;
+    }
+    .price-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.5rem;
+      font-size: 0.82rem;
+      color: var(--text-muted);
+    }
+    .price-row.total {
+      margin-top: 0.75rem;
+      padding-top: 0.75rem;
+      border-top: 1px dashed var(--border);
+      margin-bottom: 0;
+      font-size: 1rem;
+      font-weight: 800;
+      color: #fff;
+    }
+    .amount {
+      color: var(--emerald);
+      font-size: 1.5rem;
+      font-weight: 900;
+    }
+    .btn {
+      width: 100%;
+      padding: 0.85rem 1.25rem;
+      background: linear-gradient(135deg, #4f46e5 0%, #06b6d4 100%);
+      color: #fff;
+      border: none;
+      border-radius: 0.75rem;
+      font-size: 0.95rem;
+      font-weight: 800;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      box-shadow: 0 4px 15px rgba(79, 70, 229, 0.4);
+      transition: all 0.2s ease;
+    }
+    .btn:hover {
+      opacity: 0.95;
+      transform: translateY(-1px);
+    }
+    .btn:active {
+      transform: translateY(1px);
+    }
+    .status-msg {
+      margin-top: 1rem;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+    .success-container {
+      display: none;
+      padding: 1rem 0;
+    }
+    .check-icon {
+      width: 64px;
+      height: 64px;
+      background: rgba(16, 185, 129, 0.15);
+      border: 2px solid var(--emerald);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 1rem;
+      color: var(--emerald);
+      font-size: 2rem;
+      font-weight: 900;
+    }
+    .ref-box {
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid var(--border);
+      padding: 0.75rem;
+      border-radius: 0.5rem;
+      font-family: monospace;
+      font-size: 0.85rem;
+      color: #38bdf8;
+      margin: 1rem 0;
+      word-break: break-all;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="card" id="paymentCard">
+    <div class="badge">
+      <span>Official Payment Gateway</span>
+    </div>
+    <h1 id="shopTitle">PrintDrop License Upgrade</h1>
+    <p class="subtitle" id="stationHwidLabel">Station Hardware ID: Loading...</p>
+
+    <div class="price-box">
+      <div class="price-row">
+        <span>Selected Plan</span>
+        <strong id="planName" style="color:#fff;">Loading...</strong>
+      </div>
+      <div class="price-row" id="pagesRow">
+        <span>Prepaid Page Quota</span>
+        <strong id="pagesCount" style="color:#fff;">-</strong>
+      </div>
+      <div class="price-row">
+        <span>Payee Business</span>
+        <span style="color:#e2e8f0;">TechnoSoft Solution</span>
+      </div>
+      <div class="price-row total">
+        <span>Total Payable</span>
+        <span class="amount" id="totalAmount">₹0.00</span>
+      </div>
+    </div>
+
+    <button type="button" class="btn" id="btnPay" onclick="startRazorpayPayment()">
+      <span>Proceed to Pay Securely &rarr;</span>
+    </button>
+
+    <p class="status-msg" id="statusMessage">
+      Supports UPI (PhonePe, GPay, Paytm), Cards, NetBanking, and Wallets
+    </p>
+
+    <!-- Success Screen (Shown after payment) -->
+    <div class="success-container" id="successContainer">
+      <div class="check-icon">✓</div>
+      <h2 style="font-size:1.2rem; color:#fff; margin-bottom:0.4rem;">Payment Successful!</h2>
+      <p style="font-size:0.8rem; color:var(--text-muted);">
+        Your transaction was approved and recorded in the Cloud Registry.
+      </p>
+      <div class="ref-box" id="refBox">Reference: pay_...</div>
+      <p style="font-size:0.75rem; color:#10b981; font-weight:600; margin-bottom: 1rem;">
+        Your PrintDrop desktop app has been notified and will update automatically.
+      </p>
+      <button type="button" class="btn" style="background:#10b981; box-shadow:0 4px 14px rgba(16,185,129,0.35);" onclick="dismissGateway()">
+        <span>✓ Return to PrintDrop Station</span>
+      </button>
+    </div>
+  </div>
+
+  <script>
+    const SUPABASE_URL = "https://nslcrlvuulgqtrdqrkgv.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5zbGNybHZ1dWxncXRyZHFya2d2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQxNTI4NzEsImV4cCI6MjEwOTcyODg3MX0.lpRc097A_PFCD-eJVhyQZmPFxexhSGjM2dhCE0LNdxk";
+
+    // 1. Parse URL Parameters
+    const params = new URLSearchParams(window.location.search);
+    const hwid = params.get('hwid') || 'UNKNOWN';
+    const plan = params.get('plan') || 'WALLET_25';
+    const planName = params.get('plan_name') || 'Micro Trial Pack (25 Pgs)';
+    const pages = params.get('pages') ? parseInt(params.get('pages')) : 25;
+    const amount = params.get('amount') ? parseFloat(params.get('amount')) : 75.0;
+    const customerName = params.get('name') || 'PrintDrop Retail Station';
+    const customerPhone = params.get('contact') || '';
+    const keyId = params.get('key_id') || 'rzp_live_TvfyWRnZVTnIbK';
+    const autoOpen = params.get('auto') !== 'false';
+
+    // 2. Populate UI
+    document.getElementById('stationHwidLabel').textContent = "Station HWID: " + hwid;
+    document.getElementById('planName').textContent = planName;
+    document.getElementById('pagesCount').textContent = pages ? (pages.toLocaleString() + " Pages") : "Unlimited";
+    document.getElementById('totalAmount').textContent = "₹" + amount.toFixed(2);
+    document.getElementById('btnPay').textContent = "Pay ₹" + amount.toFixed(2) + " via UPI / Cards / NetBanking →";
+
+    // 3. Initiate Razorpay Checkout on verified domain
+    function startRazorpayPayment() {
+      const btn = document.getElementById('btnPay');
+      btn.disabled = true;
+      btn.style.opacity = '0.7';
+      btn.textContent = "Opening Razorpay Secure Gateway...";
+
+      const amountPaise = Math.round(amount * 100);
+
+      const options = {
+        key: keyId,
+        amount: amountPaise,
+        currency: "INR",
+        name: "TechnoSoft Solution",
+        description: "PrintDrop License: " + planName,
+        image: "https://rzp.io/rzp/4DH7ll4d",
+        prefill: {
+          name: customerName,
+          contact: customerPhone
+        },
+        notes: {
+          hwid: hwid,
+          plan_code: plan,
+          requested_pages: pages
+        },
+        theme: {
+          color: "#4f46e5"
+        },
+        modal: {
+          ondismiss: function() {
+            btn.disabled = false;
+            btn.style.opacity = '1';
+            btn.textContent = "Pay ₹" + amount.toFixed(2) + " via UPI / Cards / NetBanking →";
+          }
+        },
+        handler: async function(response) {
+          const paymentId = response.razorpay_payment_id;
+          handlePaymentSuccess(paymentId);
+        }
+      };
+
+      try {
+        const rzp = new window.Razorpay(options);
+        rzp.on('payment.failed', function(resp) {
+          alert("Payment Failed: " + (resp.error ? resp.error.description : "Transaction declined"));
+          btn.disabled = false;
+          btn.style.opacity = '1';
+          btn.textContent = "Retry Payment (₹" + amount.toFixed(2) + ") →";
+        });
+        rzp.open();
+      } catch (e) {
+        alert("Failed to open Razorpay: " + e.message);
+        btn.disabled = false;
+        btn.style.opacity = '1';
+      }
+    }
+
+    // 4. Handle Payment Success & Sync to Cloud
+    async function handlePaymentSuccess(paymentId) {
+      document.querySelector('.price-box').style.display = 'none';
+      document.getElementById('btnPay').style.display = 'none';
+      document.getElementById('statusMessage').style.display = 'none';
+      document.getElementById('successContainer').style.display = 'block';
+      document.getElementById('refBox').textContent = "Payment Reference: " + paymentId;
+
+      // 4a. Notify Parent Desktop Window if running in iframe / WebView
+      try {
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage({
+            type: 'PRINTDROP_PAYMENT_SUCCESS',
+            paymentId: paymentId,
+            hwid: hwid,
+            plan: plan,
+            pages: pages,
+            amount: amount
+          }, '*');
+        }
+      } catch (err) {
+        console.warn("Could not postMessage to parent:", err);
+      }
+
+      // 4b. Send auto-close event to parent after 1.5 seconds
+      setTimeout(() => {
+        dismissGateway();
+      }, 1500);
+
+      // 4c. Direct Patch to Supabase licenses table
+      try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/licenses?hwid=eq.${encodeURIComponent(hwid)}`, {
+          method: 'PATCH',
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=representation'
+          },
+          body: JSON.stringify({
+            requested_plan: plan,
+            requested_pages: pages,
+            amount_paid: amount,
+            payment_mode: 'RAZORPAY_CHECKOUT',
+            payment_reference: paymentId,
+            payment_status: 'PAYMENT_SUBMITTED'
+          })
+        });
+        console.log("Supabase claim recorded:", res.status);
+      } catch (syncErr) {
+        console.error("Supabase direct sync error:", syncErr);
+      }
+    }
+
+    function dismissGateway() {
+      try {
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage({ type: 'PRINTDROP_CLOSE_GATEWAY' }, '*');
+        }
+      } catch (e) {}
+    }
+
+    // Auto-launch Razorpay if autoOpen flag is true
+    window.addEventListener('load', () => {
+      if (autoOpen && typeof window.Razorpay !== 'undefined') {
+        setTimeout(startRazorpayPayment, 600);
+      }
+    });
+  </script>
+</body>
+</html>

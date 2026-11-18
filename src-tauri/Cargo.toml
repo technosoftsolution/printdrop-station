@@ -1,0 +1,50 @@
+[package]
+name = "printdrop"
+version = "1.0.1"
+description = "PrintDrop Windows 11 Desktop Application"
+authors = ["PrintDrop Team"]
+edition = "2021"
+
+[lib]
+name = "printdrop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.0", features = [] }
+
+[dependencies]
+tauri = { version = "2.1", features = [] }
+tauri-plugin-shell = "2.0"
+tauri-plugin-updater = "2"
+tauri-plugin-process = "2"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+rusqlite = { version = "0.32", features = ["bundled", "backup"] }
+rusqlite_migration = "1.3"
+tokio = { version = "1", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+local-ip-address = "0.6"
+uuid = { version = "1", features = ["v4", "serde"] }
+sha2 = "0.10"
+hmac = "0.12"
+hex = "0.4"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+axum = { version = "0.7", features = ["multipart"] }
+tokio-stream = { version = "0.1", features = ["sync"] }
+tower = "0.5"
+tower-http = { version = "0.5", features = ["cors", "fs", "trace"] }
+qrcode = "0.14"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "bmp", "gif"] }
+chrono = { version = "0.4", features = ["serde"] }
+base64 = "0.22"
+zip = { version = "2.2", default-features = false, features = ["deflate"] }
+quick-xml = { version = "0.37", features = ["serialize"] }
+lopdf = "0.46.0"
+aes-gcm = "0.11.1"
+rust_xlsxwriter = "0.102.0"
+rfd = "0.18.0"
+
+[features]
+default = ["simulation"]
+simulation = []

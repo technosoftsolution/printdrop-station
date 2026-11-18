@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PrintDrop - Shopkeeper Dashboard</title>
+    <!-- Razorpay In-Context Embedded Checkout SDK -->
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+  </head>
+  <body class="bg-slate-950 text-slate-100 antialiased selection:bg-indigo-500 selection:text-white overflow-hidden">
+    <div id="root">
+      <!-- Instant zero-latency placeholder to eliminate blank white window flash on startup -->
+      <div style="min-height: 100vh; background-color: #020617; color: #f8fafc; font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; flex-direction: column;">
+        <header style="border-bottom: 1px solid #1e293b; background: rgba(15, 23, 42, 0.8); padding: 12px 24px; display: flex; align-items: center; justify-content: space-between;">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <div style="padding: 10px; background: #4f46e5; border-radius: 12px; display: flex; align-items: center; justify-content: center;">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: white;"><path d="M6 9V2h12v7"></path><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><path d="M6 14h12v8H6z"></path></svg>
+            </div>
+            <div>
+              <div style="font-size: 20px; font-weight: 700; color: white; display: flex; align-items: center; gap: 8px;">
+                PrintDrop
+                <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; background: rgba(49, 46, 129, 0.7); color: #a5b4fc; border: 1px solid rgba(67, 56, 202, 0.6); padding: 2px 10px; border-radius: 9999px; font-weight: 600;">Shopkeeper Station</span>
+              </div>
+              <div style="font-size: 12px; color: #94a3b8;">Batch Print Automation & Custom Print Workflow</div>
+            </div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: #34d399; background: rgba(6, 78, 59, 0.6); border: 1px solid rgba(6, 95, 70, 0.7); padding: 6px 12px; border-radius: 9999px;">
+            <span style="width: 8px; height: 8px; border-radius: 50%; background: #34d399; display: inline-block;"></span>
+            Starting Core Services...
+          </div>
+        </header>
+        <main style="flex: 1; max-width: 1280px; width: 100%; margin: 0 auto; padding: 20px; display: flex; flex-direction: column; gap: 16px;">
+          <div style="background: #0f172a; border: 1px solid #1e293b; border-radius: 16px; padding: 24px; text-align: center; color: #94a3b8; font-size: 14px;">
+            <div style="margin-bottom: 8px; font-weight: 600; color: #e2e8f0;">Loading Workspaces & Connecting to Local Station...</div>
+            <div style="font-size: 12px; color: #64748b;">Instant cache active (Wi-Fi LAN mode)</div>
+          </div>
+        </main>
+      </div>
+    </div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

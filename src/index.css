@@ -1,0 +1,66 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  /* Base root font size for default normal window view (~1100px - 1300px) */
+  font-size: 15px;
+}
+
+/* Responsive root scaling for compact laptop monitors and un-maximized windows */
+@media screen and (max-height: 760px) {
+  :root {
+    font-size: 14px;
+  }
+}
+@media screen and (max-height: 650px) {
+  :root {
+    font-size: 13px;
+  }
+}
+@media screen and (max-width: 1024px) {
+  :root {
+    font-size: 13.5px;
+  }
+}
+
+/* Proportional scaling for wide un-maximized windows */
+@media screen and (min-width: 1450px) {
+  :root {
+    font-size: 16.5px;
+  }
+}
+
+/* When Desktop Application is MAXIMIZED:
+   Automatically scale up all fonts, buttons, cards, and icons proportionally
+   so maximized 1080p mode is clear, readable, and perfectly balanced. */
+html[data-maximized="true"] {
+  font-size: 17.5px;
+}
+
+/* Full HD 1080p Maximized at 100% scale (or wide displays >= 1700px) */
+@media screen and (min-width: 1700px) {
+  html[data-maximized="true"] {
+    font-size: 18.5px;
+  }
+}
+
+/* 2K / 4K / Ultra-wide monitors */
+@media screen and (min-width: 2100px) {
+  html[data-maximized="true"] {
+    font-size: 20px;
+  }
+}
+
+/* Clean utility for horizontal single-row badge containers without scrollbars */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

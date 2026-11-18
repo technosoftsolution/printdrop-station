@@ -1,0 +1,69 @@
+name: PrintDrop Windows Release & Auto-Updater
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Setup Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Run Cargo tests (Clean Retail Edition)
+        run: cargo test --manifest-path src-tauri/Cargo.toml --no-default-features
+
+      - name: Run Cargo tests (Virtual Demo Edition)
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+
+      - name: Build & Publish Clean Retail Edition + Updater Manifest (latest.json)
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'PrintDrop ${{ github.ref_name }}'
+          releaseBody: 'Automated signed Windows 11 release for PrintDrop Retail & Virtual Demo stations.'
+          releaseDraft: false
+          prerelease: false
+          args: -- --no-default-features
+
+      - name: Build Virtual Demo Edition Installer
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          npx tauri build -f simulation
+          mkdir -Force dist-ci
+          Copy-Item "src-tauri/target/release/bundle/nsis/*_x64-setup.exe" "dist-ci/PrintDrop_Demo_Station_Virtual_x64-setup.exe"
+
+      - name: Attach Virtual Demo Installer to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: dist-ci/PrintDrop_Demo_Station_Virtual_x64-setup.exe
