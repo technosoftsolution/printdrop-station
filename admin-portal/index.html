@@ -4352,7 +4352,94 @@
     // =========================================================================
     let parsedAdminBackupPayload = null;
 
-    function openAdminBackupModal() {
+    let adminBackupDirHandle = null;
+
+    function openAdminPrefsDb() {
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open('printdrop_admin_prefs', 1);
+        req.onupgradeneeded = () => {
+          if (!req.result.objectStoreNames.contains('handles')) {
+            req.result.createObjectStore('handles');
+          }
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+    }
+
+    async function saveAdminBackupDirHandle(handle) {
+      const db = await openAdminPrefsDb();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction('handles', 'readwrite');
+        tx.objectStore('handles').put(handle, 'backup_dir');
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+    }
+
+    async function loadAdminBackupDirHandle() {
+      try {
+        const db = await openAdminPrefsDb();
+        return await new Promise((resolve) => {
+          const tx = db.transaction('handles', 'readonly');
+          const req = tx.objectStore('handles').get('backup_dir');
+          req.onsuccess = () => resolve(req.result || null);
+          req.onerror = () => resolve(null);
+        });
+      } catch (_) {
+        return null;
+      }
+    }
+
+    async function clearAdminBackupDirHandle() {
+      adminBackupDirHandle = null;
+      try {
+        const db = await openAdminPrefsDb();
+        await new Promise((resolve) => {
+          const tx = db.transaction('handles', 'readwrite');
+          tx.objectStore('handles').delete('backup_dir');
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => resolve();
+        });
+      } catch (_) {}
+      updateAdminBackupPathUi();
+    }
+
+    function updateAdminBackupPathUi() {
+      const pathEl = document.getElementById('adminBackupFolderLabel');
+      const resetBtn = document.getElementById('btnResetAdminBackupFolder');
+      if (!pathEl) return;
+      if (adminBackupDirHandle) {
+        pathEl.innerText = `📁 Custom Folder: ${adminBackupDirHandle.name}`;
+        pathEl.className = 'text-[11px] font-semibold text-emerald-300 truncate';
+        if (resetBtn) resetBtn.classList.remove('hidden');
+      } else {
+        pathEl.innerText = 'Browser Default Downloads Folder';
+        pathEl.className = 'text-[11px] text-slate-400 truncate';
+        if (resetBtn) resetBtn.classList.add('hidden');
+      }
+    }
+
+    async function chooseAdminBackupFolder() {
+      const statusEl = document.getElementById('adminBackupStatus');
+      if (!window.showDirectoryPicker) {
+        if (statusEl) statusEl.innerText = '⚠️ Custom folder selection requires Chrome or Edge desktop browser. Using default Downloads.';
+        return;
+      }
+      try {
+        const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
+        adminBackupDirHandle = handle;
+        await saveAdminBackupDirHandle(handle);
+        updateAdminBackupPathUi();
+        if (statusEl) statusEl.innerText = `✅ Backup destination set to folder "${handle.name}".`;
+      } catch (err) {
+        if (err && err.name !== 'AbortError' && statusEl) {
+          statusEl.innerText = `⚠️ Could not set folder: ${err.message}`;
+        }
+      }
+    }
+
+    async function openAdminBackupModal() {
       parsedAdminBackupPayload = null;
       const fileInput = document.getElementById('adminBackupFileInput');
       if (fileInput) fileInput.value = '';
@@ -4360,6 +4447,8 @@
       if (preview) preview.classList.add('hidden');
       const statusEl = document.getElementById('adminBackupStatus');
       if (statusEl) statusEl.innerText = '';
+      adminBackupDirHandle = await loadAdminBackupDirHandle();
+      updateAdminBackupPathUi();
       document.getElementById('adminBackupModal').classList.remove('hidden');
       lucide.createIcons();
     }
@@ -4414,18 +4503,42 @@
           ? `PrintDrop_Admin_FullDB_${dateTag}.json`
           : `PrintDrop_Admin_Config_${dateTag}.json`;
 
-        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = fileName;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        const jsonText = JSON.stringify(payload, null, 2);
+        let savedToCustomFolder = false;
+
+        if (adminBackupDirHandle) {
+          try {
+            let perm = await adminBackupDirHandle.queryPermission({ mode: 'readwrite' });
+            if (perm !== 'granted') {
+              perm = await adminBackupDirHandle.requestPermission({ mode: 'readwrite' });
+            }
+            if (perm === 'granted') {
+              const fileHandle = await adminBackupDirHandle.getFileHandle(fileName, { create: true });
+              const writable = await fileHandle.createWritable();
+              await writable.write(jsonText);
+              await writable.close();
+              savedToCustomFolder = true;
+            }
+          } catch (fsErr) {
+            console.warn('Custom folder write fallback to browser download:', fsErr);
+          }
+        }
+
+        if (!savedToCustomFolder) {
+          const blob = new Blob([jsonText], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = fileName;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        }
 
         if (statusEl) {
-          statusEl.innerText = `✅ Exported ${fileName} (${systemConfig.length} config keys${includeDatabase ? `, ${licenses.length} stations` : ''}).`;
+          const destNote = savedToCustomFolder ? ` into folder "${adminBackupDirHandle.name}"` : '';
+          statusEl.innerText = `✅ Exported ${fileName}${destNote} (${systemConfig.length} config keys${includeDatabase ? `, ${licenses.length} stations` : ''}).`;
         }
       } catch (err) {
         if (statusEl) statusEl.innerText = `❌ Export failed: ${err.message}`;
@@ -4541,6 +4654,20 @@
         <!-- Backup Section -->
         <div class="space-y-2.5">
           <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">1. Create Cloud Backup</div>
+          <div class="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800 flex items-center justify-between gap-2">
+            <div class="min-w-0">
+              <div class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Backup Destination Path</div>
+              <div id="adminBackupFolderLabel" class="text-[11px] text-slate-400 truncate">Browser Default Downloads Folder</div>
+            </div>
+            <div class="flex items-center gap-1.5 shrink-0">
+              <button type="button" onclick="chooseAdminBackupFolder()" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-bold border border-slate-700 transition cursor-pointer">
+                Choose Folder
+              </button>
+              <button type="button" id="btnResetAdminBackupFolder" onclick="clearAdminBackupDirHandle()" class="hidden px-2 py-1.5 rounded-lg bg-slate-800 hover:bg-rose-950/60 text-slate-400 hover:text-rose-300 text-[11px] font-bold border border-slate-700 transition cursor-pointer" title="Reset to browser Downloads">
+                Reset
+              </button>
+            </div>
+          </div>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             <button onclick="exportAdminCloudBackup(false)" class="p-3 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/35 border border-indigo-500/40 text-left transition cursor-pointer">
               <div class="font-bold text-indigo-200 flex items-center gap-1.5">
