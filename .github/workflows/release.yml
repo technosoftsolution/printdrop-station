@@ -61,14 +61,14 @@ jobs:
           releaseBody: 'Automated signed Windows 11 release for PrintDrop Retail & Virtual Demo stations.'
           releaseDraft: false
           prerelease: false
-          args: -- --no-default-features
+          args: --ignore-version-mismatches -- --no-default-features
 
       - name: Build Virtual Demo Edition Installer
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
-          npx tauri build -f simulation
+          npx tauri build -f simulation --ignore-version-mismatches
           mkdir -Force dist-ci
           Copy-Item "src-tauri/target/release/bundle/nsis/*_x64-setup.exe" "dist-ci/PrintDrop_Demo_Station_Virtual_x64-setup.exe"
 
