@@ -676,6 +676,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_live_supabase_heartbeat_sync() {
+        if std::env::var("CI").is_ok() {
+            return;
+        }
         let db = Arc::new(Database::new_in_memory().unwrap());
         let mgr = Arc::new(LicenseManager::new(db.clone()).unwrap());
 
