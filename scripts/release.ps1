@@ -47,20 +47,16 @@ if ([string]::IsNullOrWhiteSpace($summary)) {
 }
 
 # 3. Run pre-release verification before modifying version files
-Write-Host "`n>>> [1/5] Running Frontend Production Build (npm run build)..." -ForegroundColor Yellow
+Write-Host "`n>>> [1/4] Running Frontend Production Build (npm run build)..." -ForegroundColor Yellow
 & npm run build
 if ($LASTEXITCODE -ne 0) { throw "Frontend build failed!" }
 
-Write-Host "`n>>> [2/5] Running Cargo Tests (Virtual Demo Edition)..." -ForegroundColor Yellow
+Write-Host "`n>>> [2/4] Running Cargo Tests (all 68 tests; Retail edition is also verified on GitHub Actions)..." -ForegroundColor Yellow
 & cargo test --manifest-path src-tauri/Cargo.toml
-if ($LASTEXITCODE -ne 0) { throw "Cargo tests (Virtual) failed!" }
-
-Write-Host "`n>>> [3/5] Running Cargo Tests (Clean Retail Edition)..." -ForegroundColor Yellow
-& cargo test --manifest-path src-tauri/Cargo.toml --no-default-features
-if ($LASTEXITCODE -ne 0) { throw "Cargo tests (Retail) failed!" }
+if ($LASTEXITCODE -ne 0) { throw "Cargo tests failed!" }
 
 # 4. Bump version in all 3 files (UTF-8 without BOM)
-Write-Host "`n>>> [4/5] Updating version to $newVersion in package.json, tauri.conf.json, and Cargo.toml..." -ForegroundColor Yellow
+Write-Host "`n>>> [3/4] Updating version to $newVersion in package.json, tauri.conf.json, and Cargo.toml..." -ForegroundColor Yellow
 $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 
 $pkgContent = [System.IO.File]::ReadAllText($pkgJsonPath)
@@ -85,7 +81,7 @@ if ($confirm -notin @('Y', 'y', 'YES', 'yes')) {
 }
 
 # 5. Commit, push branch, and push tag to trigger GitHub Actions
-Write-Host "`n>>> [5/5] Committing, pushing to GitHub, and triggering $tagName CI/CD..." -ForegroundColor Yellow
+Write-Host "`n>>> [4/4] Committing, pushing to GitHub, and triggering $tagName CI/CD..." -ForegroundColor Yellow
 & git add -A
 if ($LASTEXITCODE -ne 0) { throw "git add failed!" }
 
