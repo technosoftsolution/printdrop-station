@@ -33,6 +33,16 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      - name: Prepare Windows Binary Resources (cloudflared & SumatraPDF settings)
+        run: |
+          New-Item -ItemType Directory -Force -Path "src-tauri/bin" | Out-Null
+          if (-not (Test-Path "src-tauri/bin/cloudflared.exe")) {
+            Invoke-WebRequest -Uri "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe" -OutFile "src-tauri/bin/cloudflared.exe"
+          }
+          if (-not (Test-Path "src-tauri/bin/SumatraPDF-settings.txt") -and (Test-Path "bin/SumatraPDF-settings.txt")) {
+            Copy-Item "bin/SumatraPDF-settings.txt" "src-tauri/bin/SumatraPDF-settings.txt"
+          }
+
       - name: Run Cargo tests (Clean Retail Edition)
         run: cargo test --manifest-path src-tauri/Cargo.toml --no-default-features
 
