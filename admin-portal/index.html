@@ -2383,6 +2383,21 @@
       }
     }
 
+    function togglePastPlanDetail(hwidSafe, pIdx) {
+      const panel = document.getElementById(`pastPlanDetail_${hwidSafe}_${pIdx}`);
+      const chev = document.getElementById(`pastPlanChevron_${hwidSafe}_${pIdx}`);
+      if (!panel) return;
+      const isHidden = panel.classList.contains('hidden');
+      if (isHidden) {
+        panel.classList.remove('hidden');
+        if (chev) chev.setAttribute('data-lucide', 'chevron-up');
+      } else {
+        panel.classList.add('hidden');
+        if (chev) chev.setAttribute('data-lucide', 'chevron-down');
+      }
+      lucide.createIcons();
+    }
+
     function refreshData() {
       loadStations();
     }
@@ -2644,6 +2659,94 @@
           ? `<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">⏳ Pending</span>`
           : activeTrayRec ? `<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">${escapeHtml(activeTrayRec.status)}</span>` : '';
 
+        const pastHistoryHtml = history.length > 1 ? `
+          <div class="rounded-xl border border-slate-800 bg-slate-950/50 p-3 space-y-2">
+            <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
+              <span>Past Purchased Plans (${history.length - 1})</span>
+              <span class="text-slate-500 font-normal">Click any plan to view invoice, UTR &amp; total prints</span>
+            </div>
+            <div class="space-y-2">
+              ${history.slice(1).map((pastRec, sliceIdx) => {
+                const pIdx = sliceIdx + 1;
+                const pDateStr = pastRec.date ? new Date(pastRec.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A';
+                const pFullDateStr = pastRec.date ? new Date(pastRec.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A';
+                const pTotalPrints = pastRec.usage
+                  ? Number(pastRec.usage.totalPagesConsumed !== undefined ? pastRec.usage.totalPagesConsumed : (pastRec.usage.pagesPrintedTotal || 0))
+                  : 0;
+                const pIsWallet = (pastRec.usage && pastRec.usage.isWalletPlan) || pastRec.plan_code === 'WALLET_PAGES' || Boolean(pastRec.pages);
+                const pGranted = Number((pastRec.usage && (pastRec.usage.totalQuotaGranted !== undefined ? pastRec.usage.totalQuotaGranted : pastRec.usage.initialQuotaPages)) || pastRec.pages || 0);
+                const pRemaining = pastRec.usage
+                  ? Number(pastRec.usage.pagesRemaining !== undefined ? pastRec.usage.pagesRemaining : (pastRec.usage.quotaRemainingPages || Math.max(0, pGranted - pTotalPrints)))
+                  : Math.max(0, pGranted - pTotalPrints);
+                const pIsVerified = pastRec.status === 'VERIFIED_PAID' || pastRec.status === 'COMPLETED';
+                const pStatusBadge = pIsVerified
+                  ? `<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">✓ Verified</span>`
+                  : `<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">${escapeHtml(pastRec.status || 'RECORDED')}</span>`;
+                return `
+                  <div class="rounded-lg border border-slate-800/90 bg-slate-900/70 overflow-hidden">
+                    <div onclick="event.stopPropagation(); togglePastPlanDetail('${hwidSafe}', ${pIdx})" class="px-3 py-2 flex flex-wrap items-center justify-between gap-2 cursor-pointer hover:bg-slate-800/60 transition select-none">
+                      <div class="flex items-center gap-2 min-w-0">
+                        <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">#${pIdx + 1}</span>
+                        <span class="text-xs font-bold text-slate-200 truncate">${escapeHtml(pastRec.plan_name || pastRec.plan_code)}</span>
+                        <span class="text-[10px] text-slate-400">&bull; ${pDateStr}</span>
+                      </div>
+                      <div class="flex items-center gap-2.5 shrink-0">
+                        <span class="text-[11px] font-bold text-emerald-400">₹${Number(pastRec.amount || 0).toLocaleString()}</span>
+                        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">${pTotalPrints.toLocaleString()} prints total</span>
+                        <i id="pastPlanChevron_${hwidSafe}_${pIdx}" data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400"></i>
+                      </div>
+                    </div>
+                    <div id="pastPlanDetail_${hwidSafe}_${pIdx}" class="hidden p-3 border-t border-slate-800 bg-slate-950/60 space-y-2.5 text-xs">
+                      <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+                        <div class="p-2 rounded-lg bg-slate-900/90 border border-slate-800/80">
+                          <div class="text-[9px] uppercase font-bold text-slate-500 tracking-wider">Plan &amp; Amount</div>
+                          <div class="font-bold text-white text-xs mt-0.5 truncate">${escapeHtml(pastRec.plan_name || pastRec.plan_code)}</div>
+                          <div class="text-emerald-400 font-extrabold text-sm mt-0.5">₹${Number(pastRec.amount || 0).toLocaleString()}</div>
+                        </div>
+                        <div class="p-2 rounded-lg bg-slate-900/90 border border-slate-800/80">
+                          <div class="text-[9px] uppercase font-bold text-slate-500 tracking-wider">Date &amp; Status</div>
+                          <div class="font-medium text-slate-300 text-xs mt-0.5">${pFullDateStr}</div>
+                          <div class="mt-1">${pStatusBadge}</div>
+                        </div>
+                        <div class="p-2 rounded-lg bg-slate-900/90 border border-slate-800/80">
+                          <div class="text-[9px] uppercase font-bold text-slate-500 tracking-wider">Tax Invoice &amp; Mode</div>
+                          <div class="font-mono font-bold text-slate-200 text-xs mt-0.5 truncate">${escapeHtml(pastRec.invoice_number || 'N/A')}</div>
+                          <div class="text-slate-400 text-[11px] mt-0.5">${escapeHtml(pastRec.payment_mode || 'UPI')}</div>
+                        </div>
+                        <div class="p-2 rounded-lg bg-slate-900/90 border border-slate-800/80">
+                          <div class="text-[9px] uppercase font-bold text-slate-500 tracking-wider">Bank UTR / Ref</div>
+                          <div class="font-mono font-bold text-cyan-300 text-xs break-all select-all mt-0.5">${escapeHtml(pastRec.payment_reference || 'N/A')}</div>
+                          <div class="text-emerald-400 text-[10px] font-semibold mt-0.5">${pastRec.pages ? `+${Number(pastRec.pages).toLocaleString()} Pages` : (pastRec.duration_days ? `+${pastRec.duration_days} Days` : 'Full Access')}</div>
+                        </div>
+                      </div>
+                      <div class="p-2 rounded-lg bg-slate-900/90 border border-slate-800 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                        <span class="text-slate-300 font-semibold">Total Prints Since Purchase: <span class="text-cyan-300 font-bold">${pTotalPrints.toLocaleString()} pages</span></span>
+                        ${pIsWallet && pGranted > 0 ? `<span class="text-emerald-400 font-bold">${pTotalPrints.toLocaleString()} / ${pGranted.toLocaleString()} pgs (${pRemaining.toLocaleString()} remaining)</span>` : ''}
+                      </div>
+                      <div class="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-800/60">
+                        <div class="flex items-center gap-2">
+                          <button type="button" onclick="event.stopPropagation(); printDailyUsageReport('${s.hwid}', ${pIdx})" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-300 font-bold text-xs transition flex items-center gap-1.5 border border-slate-700 cursor-pointer">
+                            <i data-lucide="printer" class="w-3.5 h-3.5 text-cyan-400"></i>
+                            <span>Print Usage</span>
+                          </button>
+                          <button type="button" onclick="event.stopPropagation(); exportUsageCsv('${s.hwid}', ${pIdx})" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition flex items-center gap-1.5 border border-slate-700 cursor-pointer">
+                            <i data-lucide="download" class="w-3.5 h-3.5 text-emerald-400"></i>
+                            <span>Export CSV</span>
+                          </button>
+                        </div>
+                        <button type="button" onclick="event.stopPropagation(); printInvoiceForStation('${s.hwid}', ${pIdx})" class="px-3 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition flex items-center gap-1.5 cursor-pointer">
+                          <i data-lucide="receipt" class="w-3.5 h-3.5"></i>
+                          <span>Print Tax Invoice</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        ` : '';
+
         const trayTr = document.createElement('tr');
         trayTr.id = `trayRow_${hwidSafe}`;
         trayTr.className = "border-b border-slate-800/80 bg-slate-900/20";
@@ -2761,6 +2864,7 @@
                   </div>
                 `}
               </div>
+              ${pastHistoryHtml}
               <!-- Bottom collapse bar -->
               <div onclick="toggleStationPaymentTray('${s.hwid}')" class="w-full py-0.5 flex items-center justify-center cursor-pointer hover:bg-slate-800/40 text-slate-500 hover:text-slate-300 text-[10px] transition rounded">
                 <i data-lucide="chevron-up" class="w-3.5 h-3.5"></i>
