@@ -194,14 +194,6 @@ impl BackupManager {
             generate_financial_excel_report(conn, &target_path, password)
         })?;
 
-        // Reveal in explorer
-        #[cfg(target_os = "windows")]
-        {
-            let _ = std::process::Command::new("explorer.exe")
-                .arg(format!("/select,{}", target_path.display()))
-                .spawn();
-        }
-
         Ok(saved_path)
     }
 
