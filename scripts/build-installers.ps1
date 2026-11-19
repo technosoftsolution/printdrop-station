@@ -9,6 +9,13 @@ $ErrorActionPreference = "Stop"
 $root = Resolve-Path "$PSScriptRoot\.."
 Set-Location $root
 
+if (-not $env:TAURI_SIGNING_PRIVATE_KEY) {
+    $defaultKeyPath = Join-Path $env:USERPROFILE ".tauri\printdrop-updater.key"
+    if (Test-Path $defaultKeyPath) {
+        $env:TAURI_SIGNING_PRIVATE_KEY = $defaultKeyPath
+    }
+}
+
 $distDir = Join-Path $root "dist-installer"
 if (-not (Test-Path $distDir)) {
     New-Item -ItemType Directory -Path $distDir -Force | Out-Null

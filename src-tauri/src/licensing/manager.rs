@@ -245,11 +245,13 @@ impl LicenseManager {
             });
         }
 
-        // 4. Compute days and remaining metrics
+        // 4. Compute days and remaining metrics (calendar-day aligned at local midnight 12:00 AM)
+        let today_local = Local::now().date_naive();
         let issued_dt = DateTime::parse_from_rfc3339(&issued_at_str)
             .map(|dt| dt.with_timezone(&Utc))
             .unwrap_or(now_dt);
-        let active_tenure_days = (now_dt - issued_dt).num_days().max(0);
+        let issued_local = issued_dt.with_timezone(&Local).date_naive();
+        let active_tenure_days = (today_local - issued_local).num_days().max(0);
 
         let expiry_dt = expires_at_str.as_deref().and_then(|exp| {
             DateTime::parse_from_rfc3339(exp)
@@ -258,7 +260,8 @@ impl LicenseManager {
         });
 
         let days_remaining = if let Some(exp) = expiry_dt {
-            (exp - now_dt).num_days()
+            let expiry_local = exp.with_timezone(&Local).date_naive();
+            (expiry_local - today_local).num_days()
         } else {
             9999 // Unlimited duration (e.g. Wallet pack without expiry)
         };
@@ -1752,6 +1755,77 @@ mod tests {
         assert!(!state.is_valid, "Trial must lock immediately on expiry without grace");
         assert!(!state.is_license_grace_active, "Trial must never activate grace period");
         assert_eq!(state.status, LicenseStatus::TrialExpired);
+    }
+
+    #[test]
+    fn test_trial_calendar_day_midnight_boundary() {
+        let db = Arc::new(Database::new_in_memory().unwrap());
+        let mgr = LicenseManager::new(db.clone()).unwrap();
+        let hwid = mgr.get_hwid();
+
+        let today_local = Local::now().date_naive();
+        let issued_at = (Utc::now() - chrono::Duration::days(13)).to_rfc3339();
+
+        // 1. Expires tomorrow (e.g., tomorrow 00:00:00 local, which may be < 24h from now) => 1 day left, TrialActive!
+        let tomorrow_local = today_local + chrono::Duration::days(1);
+        let tomorrow_midnight = tomorrow_local
+            .and_hms_opt(0, 0, 0)
+            .unwrap()
+            .and_local_timezone(Local)
+            .unwrap()
+            .with_timezone(&Utc)
+            .to_rfc3339();
+        let canonical_1d = crate::licensing::crypto::format_canonical_license_string(
+            &hwid,
+            &LicensePlanType::Trial,
+            Some(300),
+            &issued_at,
+            Some(&tomorrow_midnight),
+        );
+        let sig_1d = crate::licensing::crypto::sign_license_data(&canonical_1d);
+
+        db.with_conn(|conn| {
+            conn.execute(
+                "UPDATE app_licenses SET plan_type = 'TRIAL', issued_at = ?1, expires_at = ?2, signature = ?3, pages_granted = 300, pages_used = 0 WHERE id = 1",
+                params![issued_at, tomorrow_midnight, sig_1d],
+            )?;
+            Ok(())
+        }).unwrap();
+
+        let state_1d = mgr.get_license_state().unwrap();
+        assert_eq!(state_1d.days_remaining, 1);
+        assert!(state_1d.is_valid, "Trial expiring tomorrow must remain active today until midnight");
+        assert_eq!(state_1d.status, LicenseStatus::TrialActive);
+
+        // 2. Expires today (even at 23:59:59 local) => 0 days left, TrialExpired at midnight!
+        let today_end = today_local
+            .and_hms_opt(23, 59, 59)
+            .unwrap()
+            .and_local_timezone(Local)
+            .unwrap()
+            .with_timezone(&Utc)
+            .to_rfc3339();
+        let canonical_0d = crate::licensing::crypto::format_canonical_license_string(
+            &hwid,
+            &LicensePlanType::Trial,
+            Some(300),
+            &issued_at,
+            Some(&today_end),
+        );
+        let sig_0d = crate::licensing::crypto::sign_license_data(&canonical_0d);
+
+        db.with_conn(|conn| {
+            conn.execute(
+                "UPDATE app_licenses SET expires_at = ?1, signature = ?2 WHERE id = 1",
+                params![today_end, sig_0d],
+            )?;
+            Ok(())
+        }).unwrap();
+
+        let state_0d = mgr.get_license_state().unwrap();
+        assert_eq!(state_0d.days_remaining, 0);
+        assert!(!state_0d.is_valid, "Trial whose expiry date is today must be expired");
+        assert_eq!(state_0d.status, LicenseStatus::TrialExpired);
     }
 
     #[test]

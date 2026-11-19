@@ -1812,6 +1812,26 @@
       key: localStorage.getItem('printdrop_sb_key') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5zbGNybHZ1dWxncXRyZHFya2d2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQxNTI4NzEsImV4cCI6MjEwOTcyODg3MX0.lpRc097A_PFCD-eJVhyQZmPFxexhSGjM2dhCE0LNdxk'
     };
 
+    function getCalendarDaysRemaining(isoStr) {
+      if (!isoStr) return null;
+      const expDt = new Date(isoStr);
+      if (isNaN(expDt.getTime())) return null;
+      const now = new Date();
+      const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const expMidnight = new Date(expDt.getFullYear(), expDt.getMonth(), expDt.getDate());
+      return Math.round((expMidnight - todayMidnight) / (1000 * 60 * 60 * 24));
+    }
+
+    function getCalendarDaysConsumed(isoStr) {
+      if (!isoStr) return 0;
+      const issuedDt = new Date(isoStr);
+      if (isNaN(issuedDt.getTime())) return 0;
+      const now = new Date();
+      const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const issuedMidnight = new Date(issuedDt.getFullYear(), issuedDt.getMonth(), issuedDt.getDate());
+      return Math.max(0, Math.round((todayMidnight - issuedMidnight) / (1000 * 60 * 60 * 24)));
+    }
+
     window.addEventListener('DOMContentLoaded', () => {
       lucide.createIcons();
       loadCommercialPlansFromCloud();
@@ -2050,9 +2070,9 @@
 
         const isRevoked = s.is_active === false;
         const now = new Date();
-        const expiresAt = s.expires_at ? new Date(s.expires_at) : null;
-        const isExpired = expiresAt && expiresAt < now;
-        const daysLeft = expiresAt ? Math.ceil((expiresAt - now) / (1000 * 60 * 60 * 24)) : 9999;
+        const daysLeftVal = getCalendarDaysRemaining(s.expires_at);
+        const isExpired = daysLeftVal !== null && daysLeftVal <= 0;
+        const daysLeft = daysLeftVal !== null ? daysLeftVal : 9999;
         const isExpiring = daysLeft > 0 && daysLeft <= 3;
 
         const isTrial = s.plan_type === 'TRIAL' || s.is_trial === true;
@@ -2101,13 +2121,13 @@
         const expiresDt = s.expires_at ? new Date(s.expires_at) : null;
         const now = new Date();
 
-        const daysConsumed = Math.max(0, Math.floor((now - issuedDt) / (1000 * 60 * 60 * 24)));
-        const daysRemaining = expiresDt ? Math.ceil((expiresDt - now) / (1000 * 60 * 60 * 24)) : null;
+        const daysConsumed = getCalendarDaysConsumed(s.issued_at);
+        const daysRemaining = getCalendarDaysRemaining(s.expires_at);
 
         const cleanShopName = (s.shop_name || 'Retail Station').replace(/\s*\((Trial|Trial Mode)\)\s*/gi, '').trim();
 
         const hasWallet = s.pages_granted && Number(s.pages_granted) > 0;
-        const hasSubscription = expiresDt && expiresDt > now && s.plan_type !== 'TRIAL' && s.plan_type !== 'WALLET_PAGES';
+        const hasSubscription = daysRemaining !== null && daysRemaining > 0 && s.plan_type !== 'TRIAL' && s.plan_type !== 'WALLET_PAGES';
         const isHybrid = hasWallet && hasSubscription;
 
         const isRevoked = s.is_active === false;
@@ -2456,8 +2476,8 @@
       const isTrialStation = (s) => (s.plan_type === 'TRIAL' || s.is_trial === true);
       const isRevoked = (s) => s.is_active === false;
       const isExpired = (s) => {
-        if (!s.expires_at) return false;
-        return new Date(s.expires_at) < now;
+        const rem = getCalendarDaysRemaining(s.expires_at);
+        return rem !== null && rem <= 0;
       };
 
       // Active Commercial Licenses: Installed, Paid/Commercial plan, not revoked, and valid (unexpired or has page wallet)
@@ -2788,14 +2808,13 @@
 
       const issuedDt = s.issued_at ? new Date(s.issued_at) : new Date();
       const expiresDt = s.expires_at ? new Date(s.expires_at) : null;
-      const now = new Date();
 
-      const daysConsumed = Math.max(0, Math.floor((now - issuedDt) / (1000 * 60 * 60 * 24)));
-      const daysRemaining = expiresDt ? Math.ceil((expiresDt - now) / (1000 * 60 * 60 * 24)) : null;
+      const daysConsumed = getCalendarDaysConsumed(s.issued_at);
+      const daysRemaining = getCalendarDaysRemaining(s.expires_at);
 
       const hasWallet = s.pages_granted && Number(s.pages_granted) > 0;
-      const hasSub = expiresDt && expiresDt > now && s.plan_type !== 'WALLET_PAGES' && s.plan_type !== 'TRIAL';
-      const isSubExpired = expiresDt && expiresDt <= now && s.plan_type !== 'WALLET_PAGES' && s.plan_type !== 'TRIAL';
+      const hasSub = daysRemaining !== null && daysRemaining > 0 && s.plan_type !== 'WALLET_PAGES' && s.plan_type !== 'TRIAL';
+      const isSubExpired = daysRemaining !== null && daysRemaining <= 0 && s.plan_type !== 'WALLET_PAGES' && s.plan_type !== 'TRIAL';
 
       // Card A: Subscription
       const subBadge = document.getElementById('drwSubStatusBadge');
@@ -2817,7 +2836,7 @@
         document.getElementById('drwDaysRemaining').innerText = `0 days (Expired)`;
         subExpiryNotice.innerText = `Expired on ${expiresDt.toLocaleDateString()}`;
       } else if (s.plan_type === 'TRIAL') {
-        const isTrialExp = expiresDt && expiresDt <= now;
+        const isTrialExp = daysRemaining !== null && daysRemaining <= 0;
         subBadge.className = isTrialExp
           ? "text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-950 text-red-400 border border-red-800"
           : "text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30";
@@ -3366,9 +3385,13 @@
         return pushTrialExtensionToCloud(days);
       }
       const now = new Date();
-      const currentExp = s.expires_at ? new Date(s.expires_at) : now;
-      const baseDate = currentExp > now ? currentExp : now;
-      const newExp = new Date(baseDate.getTime() + days * 24 * 60 * 60 * 1000).toISOString();
+      const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const currentExp = s.expires_at ? new Date(s.expires_at) : null;
+      const calRem = getCalendarDaysRemaining(s.expires_at);
+      const baseMidnight = (calRem !== null && calRem > 0 && currentExp)
+        ? new Date(currentExp.getFullYear(), currentExp.getMonth(), currentExp.getDate())
+        : todayMidnight;
+      const newExp = new Date(baseMidnight.getFullYear(), baseMidnight.getMonth(), baseMidnight.getDate() + days).toISOString();
       const issuedAt = s.issued_at || now.toISOString();
 
       const planType = s.plan_type.startsWith('SUB_') ? s.plan_type : 'SUB_MONTHLY';
@@ -3428,27 +3451,21 @@
       if (!selectedStation) return;
       const s = selectedStation;
       const now = new Date();
+      const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       const input = document.getElementById('drwTrialDaysInput');
       const parsedDays = parseInt(input ? input.value : "14", 10);
       const daysToAdd = isNaN(parsedDays) ? 14 : parsedDays;
 
       const currentExp = s.expires_at ? new Date(s.expires_at) : null;
-      let remainingDays = 0;
-      let baseDate = now;
-
-      if (currentExp) {
-        if (currentExp > now) {
-          remainingDays = Math.ceil((currentExp - now) / (1000 * 60 * 60 * 24));
-          baseDate = currentExp;
-        } else {
-          remainingDays = 0;
-          baseDate = now;
-        }
-      }
+      const calRem = getCalendarDaysRemaining(s.expires_at);
+      const remainingDays = (calRem !== null && calRem > 0) ? calRem : 0;
+      const baseMidnight = (calRem !== null && calRem > 0 && currentExp)
+        ? new Date(currentExp.getFullYear(), currentExp.getMonth(), currentExp.getDate())
+        : todayMidnight;
 
       const rawTotal = remainingDays + daysToAdd;
       const totalDays = Math.max(0, rawTotal);
-      const newExp = new Date(baseDate.getTime() + daysToAdd * 24 * 60 * 60 * 1000);
+      const newExp = new Date(baseMidnight.getFullYear(), baseMidnight.getMonth(), baseMidnight.getDate() + daysToAdd);
 
       const mathEl = document.getElementById('drwTrialMathText');
       if (mathEl) {
@@ -3458,7 +3475,7 @@
       }
       const totalEl = document.getElementById('drwTrialNewTotalText');
       if (totalEl) {
-        totalEl.innerText = newExp <= now ? `Expired (0 Days Left)` : `${totalDays} Days Total`;
+        totalEl.innerText = totalDays <= 0 ? `Expired (0 Days Left)` : `${totalDays} Days Total`;
       }
       const expEl = document.getElementById('drwTrialNewExpiryText');
       if (expEl) {
@@ -3470,6 +3487,7 @@
       if (!selectedStation) return;
       const s = selectedStation;
       const now = new Date();
+      const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       const input = document.getElementById('drwTrialDaysInput');
       const parsedInput = parseInt(input ? input.value : "14", 10);
       const daysToAdd = typeof customDays === 'number'
@@ -3477,8 +3495,11 @@
         : (isNaN(parsedInput) ? 14 : parsedInput);
 
       const currentExp = s.expires_at ? new Date(s.expires_at) : null;
-      const baseDate = (currentExp && currentExp > now) ? currentExp : now;
-      const newExp = new Date(baseDate.getTime() + daysToAdd * 24 * 60 * 60 * 1000).toISOString();
+      const calRem = getCalendarDaysRemaining(s.expires_at);
+      const baseMidnight = (calRem !== null && calRem > 0 && currentExp)
+        ? new Date(currentExp.getFullYear(), currentExp.getMonth(), currentExp.getDate())
+        : todayMidnight;
+      const newExp = new Date(baseMidnight.getFullYear(), baseMidnight.getMonth(), baseMidnight.getDate() + daysToAdd).toISOString();
       const issuedAt = s.issued_at || now.toISOString();
 
       const currentPages = Number(s.pages_granted) || 0;
