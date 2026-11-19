@@ -90,6 +90,17 @@
           <i data-lucide="user-plus" class="w-4 h-4"></i>
           <span>Onboard Customer</span>
         </button>
+
+        <!-- Admin Security (Change Username / Password) -->
+        <button onclick="openAdminSecurityModal()" class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 transition cursor-pointer" title="Change Admin Username & Password">
+          <i data-lucide="shield-check" class="w-4 h-4 text-cyan-400"></i>
+          <span class="hidden lg:inline">Security</span>
+        </button>
+
+        <!-- Logout -->
+        <button onclick="logoutAdminPortal()" class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 text-xs font-bold border border-rose-500/40 transition cursor-pointer" title="Lock & Sign Out of Admin Portal">
+          <i data-lucide="log-out" class="w-4 h-4"></i>
+        </button>
       </div>
     </div>
   </header>
@@ -1836,12 +1847,256 @@
       return Math.max(0, Math.round((todayMidnight - issuedMidnight) / (1000 * 60 * 60 * 24)));
     }
 
-    window.addEventListener('DOMContentLoaded', () => {
+    window.addEventListener('DOMContentLoaded', async () => {
       lucide.createIcons();
+      if (sessionStorage.getItem('printdrop_admin_authed') === '1') {
+        unlockAdminPortalUi();
+      } else {
+        const uInput = document.getElementById('loginUsernameInput');
+        if (uInput) setTimeout(() => uInput.focus(), 50);
+      }
+    });
+
+    function unlockAdminPortalUi() {
+      const overlay = document.getElementById('adminLoginOverlay');
+      if (overlay) overlay.classList.add('hidden');
       loadCommercialPlansFromCloud();
       loadStations();
       loadProviderProfileFromCloud();
-    });
+    }
+
+    function pureJsSha256Hex(ascii) {
+      const rightRotate = (value, amount) => (value >>> amount) | (value << (32 - amount));
+      const mathPow = Math.pow;
+      const maxWord = mathPow(2, 32);
+      let result = '';
+      const words = [];
+      const asciiBitLength = ascii.length * 8;
+      const hash = pureJsSha256Hex.h = pureJsSha256Hex.h || [];
+      const k = pureJsSha256Hex.k = pureJsSha256Hex.k || [];
+      let primeCounter = k.length;
+      const isComposite = {};
+      for (let candidate = 2; primeCounter < 64; candidate++) {
+        if (!isComposite[candidate]) {
+          for (let i = 0; i < 313; i += candidate) isComposite[i] = candidate;
+          hash[primeCounter] = (mathPow(candidate, 0.5) * maxWord) | 0;
+          k[primeCounter++] = (mathPow(candidate, 1 / 3) * maxWord) | 0;
+        }
+      }
+      ascii += '\x80';
+      while (ascii.length % 64 - 56) ascii += '\x00';
+      for (let i = 0; i < ascii.length; i++) {
+        const j = ascii.charCodeAt(i);
+        words[i >> 2] |= j << ((3 - i) % 4) * 8;
+      }
+      words[words.length] = (asciiBitLength / maxWord) | 0;
+      words[words.length] = asciiBitLength;
+      const h = hash.slice(0, 8);
+      for (let j = 0; j < words.length;) {
+        const w = words.slice(j, j += 16);
+        const oldHash = h.slice(0);
+        for (let i = 0; i < 64; i++) {
+          const w15 = w[i - 15], w2 = w[i - 2];
+          const a = h[0], e = h[4];
+          const temp1 = h[7] + (rightRotate(e, 6) ^ rightRotate(e, 11) ^ rightRotate(e, 25)) + ((e & h[5]) ^ ((~e) & h[6])) + k[i] + (w[i] = (i < 16) ? w[i] : (w[i - 16] + (rightRotate(w15, 7) ^ rightRotate(w15, 18) ^ (w15 >>> 3)) + w[i - 7] + (rightRotate(w2, 17) ^ rightRotate(w2, 19) ^ (w2 >>> 10))) | 0);
+          const temp2 = (rightRotate(a, 2) ^ rightRotate(a, 13) ^ rightRotate(a, 22)) + ((a & h[1]) ^ (a & h[2]) ^ (h[1] & h[2]));
+          h.unshift((temp1 + temp2) | 0);
+          h.pop();
+          h[4] = (h[4] + temp1) | 0;
+        }
+        for (let i = 0; i < 8; i++) h[i] = (h[i] + oldHash[i]) | 0;
+      }
+      for (let i = 0; i < 8; i++) {
+        for (let j = 3; j + 1; j--) {
+          const b = (h[i] >> (j * 8)) & 255;
+          result += ((b < 16) ? 0 : '') + b.toString(16);
+        }
+      }
+      return result;
+    }
+
+    async function hashAdminSecret(salt, password) {
+      const raw = `${salt}:${password}`;
+      if (window.crypto && window.crypto.subtle) {
+        const bytes = new TextEncoder().encode(raw);
+        const digest = await crypto.subtle.digest('SHA-256', bytes);
+        return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+      }
+      const utf8 = unescape(encodeURIComponent(raw));
+      return pureJsSha256Hex(utf8);
+    }
+
+    function randomHexSalt(len = 16) {
+      const arr = new Uint8Array(len);
+      if (window.crypto && window.crypto.getRandomValues) {
+        window.crypto.getRandomValues(arr);
+      } else {
+        for (let i = 0; i < len; i++) arr[i] = Math.floor(Math.random() * 256);
+      }
+      return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    async function fetchAdminAuthRecord() {
+      const cleanUrl = cloudConfig.url.trim().replace(/\/$/, '');
+      const res = await fetch(`${cleanUrl}/rest/v1/system_config?key=eq.admin_portal_auth&select=value`, {
+        headers: {
+          'apikey': cloudConfig.key,
+          'Authorization': `Bearer ${cloudConfig.key}`
+        },
+        cache: 'no-store'
+      });
+      if (res.ok) {
+        const rows = await res.json();
+        if (rows && rows.length > 0 && rows[0].value) {
+          try {
+            return typeof rows[0].value === 'string' ? JSON.parse(rows[0].value) : rows[0].value;
+          } catch (_) {}
+        }
+      }
+      return null;
+    }
+
+    async function saveAdminAuthRecord(authObj) {
+      const cleanUrl = cloudConfig.url.trim().replace(/\/$/, '');
+      const res = await fetch(`${cleanUrl}/rest/v1/system_config`, {
+        method: 'POST',
+        headers: {
+          'apikey': cloudConfig.key,
+          'Authorization': `Bearer ${cloudConfig.key}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'resolution=merge-duplicates'
+        },
+        body: JSON.stringify({
+          key: 'admin_portal_auth',
+          value: JSON.stringify(authObj),
+          updated_at: new Date().toISOString()
+        })
+      });
+      if (!res.ok) {
+        throw new Error(`Failed to save credentials (HTTP ${res.status})`);
+      }
+    }
+
+    async function handleAdminLoginSubmit(event) {
+      event.preventDefault();
+      const errEl = document.getElementById('loginErrorMsg');
+      const btn = document.getElementById('btnAdminLoginSubmit');
+      const username = (document.getElementById('loginUsernameInput')?.value || '').trim();
+      const password = document.getElementById('loginPasswordInput')?.value || '';
+      if (errEl) errEl.classList.add('hidden');
+      if (!username || !password) {
+        if (errEl) { errEl.innerText = 'Please enter both username and password.'; errEl.classList.remove('hidden'); }
+        return;
+      }
+      if (btn) { btn.disabled = true; btn.innerText = 'Verifying...'; }
+      try {
+        let authRec = await fetchAdminAuthRecord();
+        let valid = false;
+        if (!authRec) {
+          // Default bootstrap credentials if none configured yet in Supabase
+          valid = (username === 'admin' && password === 'PrintDrop@2026');
+        } else {
+          const computed = await hashAdminSecret(authRec.salt, password);
+          valid = (username === authRec.username && computed === authRec.passwordHash);
+        }
+        if (valid) {
+          sessionStorage.setItem('printdrop_admin_authed', '1');
+          sessionStorage.setItem('printdrop_admin_user', username);
+          const pwdInput = document.getElementById('loginPasswordInput');
+          if (pwdInput) pwdInput.value = '';
+          unlockAdminPortalUi();
+        } else {
+          if (errEl) { errEl.innerText = 'Invalid username or password.'; errEl.classList.remove('hidden'); }
+        }
+      } catch (err) {
+        if (errEl) { errEl.innerText = `Login check failed: ${err.message}`; errEl.classList.remove('hidden'); }
+      } finally {
+        if (btn) { btn.disabled = false; btn.innerText = 'Sign In to Admin Portal'; }
+      }
+    }
+
+    function logoutAdminPortal() {
+      sessionStorage.removeItem('printdrop_admin_authed');
+      sessionStorage.removeItem('printdrop_admin_user');
+      const overlay = document.getElementById('adminLoginOverlay');
+      if (overlay) overlay.classList.remove('hidden');
+      const uInput = document.getElementById('loginUsernameInput');
+      if (uInput) setTimeout(() => uInput.focus(), 50);
+    }
+
+    async function openAdminSecurityModal() {
+      const statusEl = document.getElementById('adminSecurityStatus');
+      if (statusEl) statusEl.innerText = '';
+      const curPwd = document.getElementById('secCurrentPassword');
+      const newPwd = document.getElementById('secNewPassword');
+      const confPwd = document.getElementById('secConfirmPassword');
+      if (curPwd) curPwd.value = '';
+      if (newPwd) newPwd.value = '';
+      if (confPwd) confPwd.value = '';
+
+      const authRec = await fetchAdminAuthRecord().catch(() => null);
+      const newUser = document.getElementById('secNewUsername');
+      if (newUser) newUser.value = (authRec && authRec.username) ? authRec.username : (sessionStorage.getItem('printdrop_admin_user') || 'admin');
+
+      document.getElementById('adminSecurityModal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function closeAdminSecurityModal() {
+      document.getElementById('adminSecurityModal').classList.add('hidden');
+    }
+
+    async function saveAdminCredentials(event) {
+      event.preventDefault();
+      const statusEl = document.getElementById('adminSecurityStatus');
+      const currentPwd = document.getElementById('secCurrentPassword')?.value || '';
+      const newUsername = (document.getElementById('secNewUsername')?.value || '').trim();
+      const newPwd = document.getElementById('secNewPassword')?.value || '';
+      const confPwd = document.getElementById('secConfirmPassword')?.value || '';
+
+      if (!newUsername || newUsername.length < 3) {
+        if (statusEl) statusEl.innerText = '⚠️ Username must be at least 3 characters.';
+        return;
+      }
+      if (newPwd.length < 6) {
+        if (statusEl) statusEl.innerText = '⚠️ New password must be at least 6 characters.';
+        return;
+      }
+      if (newPwd !== confPwd) {
+        if (statusEl) statusEl.innerText = '⚠️ New password and confirmation do not match.';
+        return;
+      }
+
+      if (statusEl) statusEl.innerText = 'Verifying current credentials...';
+      try {
+        const authRec = await fetchAdminAuthRecord();
+        let currentValid = false;
+        if (!authRec) {
+          currentValid = (currentPwd === 'PrintDrop@2026');
+        } else {
+          const computed = await hashAdminSecret(authRec.salt, currentPwd);
+          currentValid = (computed === authRec.passwordHash);
+        }
+        if (!currentValid) {
+          if (statusEl) statusEl.innerText = '❌ Current password is incorrect.';
+          return;
+        }
+
+        const salt = randomHexSalt(16);
+        const passwordHash = await hashAdminSecret(salt, newPwd);
+        await saveAdminAuthRecord({
+          username: newUsername,
+          salt,
+          passwordHash,
+          updatedAt: new Date().toISOString()
+        });
+        sessionStorage.setItem('printdrop_admin_user', newUsername);
+        if (statusEl) statusEl.innerText = '✅ Admin username & password updated in cloud!';
+        setTimeout(() => closeAdminSecurityModal(), 1200);
+      } catch (err) {
+        if (statusEl) statusEl.innerText = `❌ Failed to update credentials: ${err.message}`;
+      }
+    }
 
     let currentPage = 0;
     const PAGE_SIZE = 100;
@@ -4703,6 +4958,81 @@
 
         <div id="adminBackupStatus" class="text-xs font-medium text-slate-300 min-h-[1.25rem]"></div>
       </div>
+    </div>
+  </div>
+
+  <!-- Admin Portal Login Gate Overlay -->
+  <div id="adminLoginOverlay" class="fixed inset-0 z-[200] bg-slate-950/95 backdrop-blur-md flex items-center justify-center p-4 no-print">
+    <div class="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden">
+      <div class="px-6 py-5 border-b border-slate-800 bg-slate-950/80 flex items-center gap-3">
+        <div class="p-2.5 rounded-xl bg-indigo-600 text-white shadow-lg shadow-indigo-600/30">
+          <i data-lucide="lock" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <h2 class="text-base font-extrabold text-white tracking-tight">PrintDrop Admin Portal</h2>
+          <p class="text-xs text-slate-400">Sign in to manage stations, licenses &amp; billing</p>
+        </div>
+      </div>
+      <form onsubmit="handleAdminLoginSubmit(event)" class="p-6 space-y-4 text-xs">
+        <div class="space-y-1.5">
+          <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400">Username</label>
+          <input id="loginUsernameInput" type="text" autocomplete="username" required placeholder="Enter admin username" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-sm focus:outline-none focus:border-indigo-500" />
+        </div>
+        <div class="space-y-1.5">
+          <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400">Password</label>
+          <input id="loginPasswordInput" type="password" autocomplete="current-password" required placeholder="Enter admin password" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-sm focus:outline-none focus:border-indigo-500" />
+        </div>
+        <div id="loginErrorMsg" class="hidden p-2.5 rounded-xl bg-rose-500/15 border border-rose-500/40 text-rose-300 font-semibold"></div>
+        <button id="btnAdminLoginSubmit" type="submit" class="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm shadow-lg shadow-indigo-600/30 transition cursor-pointer">
+          Sign In to Admin Portal
+        </button>
+        <p class="text-[11px] text-slate-500 text-center">
+          First-time default: <span class="font-mono text-slate-300">admin</span> / <span class="font-mono text-slate-300">PrintDrop@2026</span> (change under Security after login)
+        </p>
+      </form>
+    </div>
+  </div>
+
+  <!-- Admin Security (Change Username & Password) Modal -->
+  <div id="adminSecurityModal" class="fixed inset-0 z-[150] hidden bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 no-print">
+    <div class="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden">
+      <div class="px-5 py-4 border-b border-slate-800 bg-slate-950/70 flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <div class="p-2 rounded-lg bg-cyan-500/20 text-cyan-400">
+            <i data-lucide="shield-check" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h2 class="text-sm font-bold text-white">Admin Portal Security</h2>
+            <p class="text-[11px] text-slate-400">Update administrator username &amp; password</p>
+          </div>
+        </div>
+        <button onclick="closeAdminSecurityModal()" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+      <form onsubmit="saveAdminCredentials(event)" class="p-5 space-y-3.5 text-xs">
+        <div class="space-y-1">
+          <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400">Current Password</label>
+          <input id="secCurrentPassword" type="password" required placeholder="Enter current password" class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white focus:outline-none focus:border-cyan-500" />
+        </div>
+        <div class="space-y-1">
+          <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400">New Username</label>
+          <input id="secNewUsername" type="text" required minlength="3" placeholder="New username" class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white focus:outline-none focus:border-cyan-500" />
+        </div>
+        <div class="space-y-1">
+          <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400">New Password (min 6 chars)</label>
+          <input id="secNewPassword" type="password" required minlength="6" placeholder="New password" class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white focus:outline-none focus:border-cyan-500" />
+        </div>
+        <div class="space-y-1">
+          <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400">Confirm New Password</label>
+          <input id="secConfirmPassword" type="password" required minlength="6" placeholder="Re-enter new password" class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white focus:outline-none focus:border-cyan-500" />
+        </div>
+        <div id="adminSecurityStatus" class="text-xs font-medium text-slate-300 min-h-[1.25rem]"></div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" onclick="closeAdminSecurityModal()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold cursor-pointer">Cancel</button>
+          <button type="submit" class="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold shadow-lg shadow-cyan-600/25 cursor-pointer">Save Credentials</button>
+        </div>
+      </form>
     </div>
   </div>
 </body>

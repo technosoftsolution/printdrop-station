@@ -11,7 +11,8 @@
     "build:virtual": "powershell -ExecutionPolicy Bypass -File ./scripts/build-installers.ps1 -Edition Virtual",
     "build:retail": "powershell -ExecutionPolicy Bypass -File ./scripts/build-installers.ps1 -Edition Retail",
     "build:all": "powershell -ExecutionPolicy Bypass -File ./scripts/build-installers.ps1 -Edition All",
-    "release": "powershell -ExecutionPolicy Bypass -File ./scripts/release.ps1"
+    "release": "powershell -ExecutionPolicy Bypass -File ./scripts/release.ps1",
+    "admin:serve": "node ./scripts/serve-admin-portal.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.1.1",
