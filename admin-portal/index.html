@@ -41,16 +41,16 @@
   <!-- Top Navigation Bar -->
   <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-30 no-print">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+      <div onclick="goToAdminHome()" class="flex items-center gap-3 cursor-pointer select-none group" title="PrintDrop Admin Home (Click to return to home)">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20 group-hover:scale-105 transition-transform">
           <i data-lucide="shield-check" class="w-6 h-6 text-white"></i>
         </div>
         <div>
           <div class="flex items-center gap-2">
-            <h1 class="text-base sm:text-lg font-bold text-white tracking-wide">PrintDrop</h1>
+            <h1 class="text-base sm:text-lg font-bold text-white tracking-wide group-hover:text-indigo-200 transition-colors">PrintDrop</h1>
             <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">ADMIN FLEET</span>
           </div>
-          <p class="text-xs text-slate-400 hidden sm:block">Customer Licensing, Billing Reconciliations &amp; Station Fleet</p>
+          <p class="text-xs text-slate-400 hidden sm:block group-hover:text-slate-300 transition-colors">Customer Licensing, Billing Reconciliations &amp; Station Fleet</p>
         </div>
       </div>
 
@@ -67,39 +67,57 @@
           <span id="cloudStatusText">Supabase Live</span>
         </div>
 
-        <!-- Manage Plans & Pricing Button -->
-        <button onclick="openPlansManagerModal()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 text-xs font-bold border border-amber-500/40 transition cursor-pointer">
-          <i data-lucide="sliders" class="w-4 h-4 text-amber-400"></i>
-          <span class="hidden sm:inline">Manage Plans &amp; Pricing</span>
-        </button>
-
-        <!-- Software Provider Profile & Support Gateway Button -->
-        <button onclick="openConfigModal()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 text-xs font-bold border border-indigo-500/40 transition cursor-pointer">
-          <i data-lucide="building-2" class="w-4 h-4 text-indigo-400"></i>
-          <span class="hidden sm:inline">🏢 Provider Profile &amp; Contact</span>
-        </button>
-
-        <!-- Admin Cloud Backup & Restore Button -->
-        <button onclick="openAdminBackupModal()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 text-xs font-bold border border-emerald-500/40 transition cursor-pointer" title="Backup & Restore Cloud Config or Full Database">
-          <i data-lucide="database-backup" class="w-4 h-4 text-emerald-400"></i>
-          <span class="hidden md:inline">Backup &amp; Restore</span>
-        </button>
-
-        <!-- Onboard Customer Button -->
-        <button onclick="openOnboardingWizard()" class="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-600/30 transition active:scale-95">
-          <i data-lucide="user-plus" class="w-4 h-4"></i>
-          <span>Onboard Customer</span>
-        </button>
-
-        <!-- Admin Security (Change Username / Password) -->
-        <button onclick="openAdminSecurityModal()" class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 transition cursor-pointer" title="Change Admin Username & Password">
-          <i data-lucide="shield-check" class="w-4 h-4 text-cyan-400"></i>
-          <span class="hidden lg:inline">Security</span>
-        </button>
+        <!-- Settings Dropdown (Hover to open list, Click item to open option) -->
+        <div id="adminSettingsDropdownContainer" class="relative" onmouseenter="openAdminSettingsMenu()" onmouseleave="scheduleCloseAdminSettingsMenu()">
+          <button type="button" onclick="toggleAdminSettingsMenu()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 text-xs font-bold border border-slate-700 transition cursor-pointer">
+            <i data-lucide="settings" class="w-4 h-4 text-indigo-400"></i>
+            <span>Settings</span>
+            <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400"></i>
+          </button>
+          <div id="adminSettingsDropdownMenu" class="hidden absolute right-0 mt-1.5 w-64 rounded-2xl bg-slate-900 border border-slate-700/80 shadow-2xl py-1.5 z-50">
+            <button type="button" onclick="closeAdminSettingsMenu(); openPlansManagerModal()" class="w-full px-3.5 py-2.5 text-left text-xs font-semibold text-slate-200 hover:bg-slate-800/90 flex items-center gap-2.5 transition cursor-pointer">
+              <i data-lucide="sliders" class="w-4 h-4 text-amber-400 shrink-0"></i>
+              <div>
+                <div class="text-white font-bold">Manage Plans &amp; Pricing</div>
+                <div class="text-[10px] text-slate-400">Commercial slabs &amp; rates</div>
+              </div>
+            </button>
+            <button type="button" onclick="closeAdminSettingsMenu(); openConfigModal()" class="w-full px-3.5 py-2.5 text-left text-xs font-semibold text-slate-200 hover:bg-slate-800/90 flex items-center gap-2.5 transition cursor-pointer">
+              <i data-lucide="building-2" class="w-4 h-4 text-indigo-400 shrink-0"></i>
+              <div>
+                <div class="text-white font-bold">Provider Profile &amp; Contact</div>
+                <div class="text-[10px] text-slate-400">UPI, Razorpay &amp; support info</div>
+              </div>
+            </button>
+            <button type="button" onclick="closeAdminSettingsMenu(); openAdminBackupModal()" class="w-full px-3.5 py-2.5 text-left text-xs font-semibold text-slate-200 hover:bg-slate-800/90 flex items-center gap-2.5 transition cursor-pointer">
+              <i data-lucide="database-backup" class="w-4 h-4 text-emerald-400 shrink-0"></i>
+              <div>
+                <div class="text-white font-bold">Backup &amp; Restore</div>
+                <div class="text-[10px] text-slate-400">Cloud DB &amp; config export</div>
+              </div>
+            </button>
+            <button type="button" onclick="closeAdminSettingsMenu(); openOnboardingWizard()" class="w-full px-3.5 py-2.5 text-left text-xs font-semibold text-slate-200 hover:bg-slate-800/90 flex items-center gap-2.5 transition cursor-pointer">
+              <i data-lucide="user-plus" class="w-4 h-4 text-purple-400 shrink-0"></i>
+              <div>
+                <div class="text-white font-bold">Onboard Customer</div>
+                <div class="text-[10px] text-slate-400">Provision new station license</div>
+              </div>
+            </button>
+            <div class="my-1 border-t border-slate-800"></div>
+            <button type="button" onclick="closeAdminSettingsMenu(); openAdminSecurityModal()" class="w-full px-3.5 py-2.5 text-left text-xs font-semibold text-slate-200 hover:bg-slate-800/90 flex items-center gap-2.5 transition cursor-pointer">
+              <i data-lucide="shield-check" class="w-4 h-4 text-cyan-400 shrink-0"></i>
+              <div>
+                <div class="text-white font-bold">Security</div>
+                <div class="text-[10px] text-slate-400">Change username &amp; password</div>
+              </div>
+            </button>
+          </div>
+        </div>
 
         <!-- Logout -->
         <button onclick="logoutAdminPortal()" class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 text-xs font-bold border border-rose-500/40 transition cursor-pointer" title="Lock & Sign Out of Admin Portal">
           <i data-lucide="log-out" class="w-4 h-4"></i>
+          <span class="hidden sm:inline">Logout</span>
         </button>
       </div>
     </div>
@@ -1863,6 +1881,68 @@
       loadCommercialPlansFromCloud();
       loadStations();
       loadProviderProfileFromCloud();
+    }
+
+    let adminSettingsCloseTimer = null;
+
+    function openAdminSettingsMenu() {
+      if (adminSettingsCloseTimer) {
+        clearTimeout(adminSettingsCloseTimer);
+        adminSettingsCloseTimer = null;
+      }
+      const menu = document.getElementById('adminSettingsDropdownMenu');
+      if (menu) menu.classList.remove('hidden');
+    }
+
+    function closeAdminSettingsMenu() {
+      if (adminSettingsCloseTimer) {
+        clearTimeout(adminSettingsCloseTimer);
+        adminSettingsCloseTimer = null;
+      }
+      const menu = document.getElementById('adminSettingsDropdownMenu');
+      if (menu) menu.classList.add('hidden');
+    }
+
+    function scheduleCloseAdminSettingsMenu() {
+      if (adminSettingsCloseTimer) clearTimeout(adminSettingsCloseTimer);
+      adminSettingsCloseTimer = setTimeout(() => {
+        closeAdminSettingsMenu();
+      }, 150);
+    }
+
+    function toggleAdminSettingsMenu() {
+      const menu = document.getElementById('adminSettingsDropdownMenu');
+      if (!menu) return;
+      if (menu.classList.contains('hidden')) {
+        openAdminSettingsMenu();
+      } else {
+        closeAdminSettingsMenu();
+      }
+    }
+
+    function goToAdminHome() {
+      closeAdminSettingsMenu();
+      if (typeof closePlansManagerModal === 'function') closePlansManagerModal();
+      if (typeof closeConfigModal === 'function') closeConfigModal();
+      if (typeof closeAdminBackupModal === 'function') closeAdminBackupModal();
+      if (typeof closeOnboardingWizard === 'function') closeOnboardingWizard();
+      if (typeof closeAdminSecurityModal === 'function') closeAdminSecurityModal();
+      if (typeof closeFullPaymentHistoryModal === 'function') closeFullPaymentHistoryModal();
+      if (typeof closeDrawer === 'function') closeDrawer();
+
+      const searchEl = document.getElementById('searchInput');
+      if (searchEl) searchEl.value = '';
+      const planEl = document.getElementById('filterPlan');
+      if (planEl) planEl.value = 'ALL';
+      const statusEl = document.getElementById('filterStatus');
+      if (statusEl) statusEl.value = 'ALL';
+      if (typeof switchFleetTab === 'function') {
+        switchFleetTab('ACTIVE_FLEET');
+      } else {
+        currentPage = 0;
+        loadStations();
+      }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     function pureJsSha256Hex(ascii) {
