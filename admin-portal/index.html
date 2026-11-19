@@ -2660,12 +2660,7 @@
           : activeTrayRec ? `<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">${escapeHtml(activeTrayRec.status)}</span>` : '';
 
         const pastHistoryHtml = history.length > 1 ? `
-          <div class="rounded-xl border border-slate-800 bg-slate-950/50 p-3 space-y-2">
-            <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
-              <span>Past Purchased Plans (${history.length - 1})</span>
-              <span class="text-slate-500 font-normal">Click any plan to view invoice, UTR &amp; total prints</span>
-            </div>
-            <div class="space-y-2">
+          <div class="space-y-2">
               ${history.slice(1).map((pastRec, sliceIdx) => {
                 const pIdx = sliceIdx + 1;
                 const pDateStr = pastRec.date ? new Date(pastRec.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A';
@@ -2743,7 +2738,6 @@
                   </div>
                 `;
               }).join('')}
-            </div>
           </div>
         ` : '';
 
