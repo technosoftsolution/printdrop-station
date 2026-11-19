@@ -11,7 +11,17 @@ This guide explains how to ship any new feature, bug fix, or Admin Portal update
 
 ---
 
-## Step-by-Step Release Checklist (For 10,000+ Shopkeeper PCs)
+## Quick 1-Command Release (Recommended)
+
+Run:
+```powershell
+npm run release
+```
+The interactive script ([scripts/release.ps1](file:///C:/Flutter_src/PrintDrop/scripts/release.ps1)) asks for the new version number (e.g., `1.0.8`) and release note, runs all tests and frontend checks, updates all 3 version files automatically, commits, pushes `master`, and pushes the `vX.Y.Z` tag to trigger GitHub Actions.
+
+---
+
+## Manual Step-by-Step Release Checklist (For 10,000+ Shopkeeper PCs)
 
 ### Step 1: Test Locally First
 Run the Rust test suite for both editions and verify the frontend build:
