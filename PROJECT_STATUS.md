@@ -9,7 +9,7 @@
 | **Current Phase** | **Phase-J: Live Customer Status Synchronization (SSE), Desktop Auto-Tunnel & Dual-Source Connection Resilience** (COMPLETED) |
 | **Current Status** | Windows 11 Desktop station auto-starts 4G/5G Cloudflare remote tunnel on boot, monitors internet reachability via 5s non-blocking TCP heartbeat, displays offline recovery UI with 1-click retry/stop controls, and auto-reconnects tunnel upon WAN resumption; Mobile web customer portal features persistent 3.0s station heartbeat, dual-source fault discrimination (phone offline vs shop PC offline), sticky glassmorphic notifications, zero-data-loss printed job card preservation during 502 outages, instant device detection, and self-healing bidirectional auto-reconnection. |
 | **Repository State** | Active Git repository |
-| **Last Updated** | 2026-11-16 |
+| **Last Updated** | 2026-11-19 |
 
 ---
 
@@ -1913,6 +1913,30 @@
   - Production frontend compiles cleanly in 5.30s.
   - **Edition A Installer**: `dist-installer/PrintDrop_Demo_Station_Virtual_1.0.0_x64-setup.exe` (28.24 MB, SHA-256: `60D10E1AD66E72898A38DCA40372B0DD5D0CB68F603B564258BD8097C7681FB4`).
   - **Edition B Installer**: `dist-installer/PrintDrop_Demo_Station_Retail_1.0.0_x64-setup.exe` (28.21 MB, SHA-256: `4B18EEB87C7057EFA9A6D170C0F2634799E20A8650D7F24B6189FD44FC8D7CC4`).
+
+---
+
+## 76. Calendar-Day Midnight Trial Alignment & Dual-Edition CI/CD OTA Pipeline (`v1.0.6`)
+
+- [x] **Local Midnight (`12:00 AM`) Calendar-Day Licensing Calculation (`src-tauri/src/licensing/manager.rs` & `admin-portal/index.html`)**:
+  - **Root Cause Fixed**: Admin Portal previously used `Math.ceil((expiresDt - now) / 86400000)` (rounding any partial day up to `1`), while Desktop Rust `LicenseManager::get_license_state` used `(exp - now_dt).num_days()` (truncating any `<24h` duration to `0` → immediate `TrialExpired`).
+  - **Desktop Fix (`manager.rs`)**: Switched `days_remaining` and `active_tenure_days` to local calendar-date arithmetic (`Local::now().date_naive()` vs `exp.with_timezone(&Local).date_naive()`), so counts decrement strictly at `12:00 AM` local midnight while preserving the 1-hour anti-clock-rollback guard (`last_seen_epoch`).
+  - **Admin Portal Fix (`admin-portal/index.html`)**: Added `getCalendarDaysRemaining()` and `getCalendarDaysConsumed()` and applied them consistently across the station table, filters, KPIs, Manage Drawer, `quickAddDays`, `updateTrialExtensionPreview`, and `pushTrialExtensionToCloud`.
+  - **Unit Test**: Added `test_trial_calendar_day_midnight_boundary` verifying `1 day left` (`TrialActive`) until midnight and `0 days left` (`TrialExpired`) on the expiry date.
+- [x] **GitHub Actions CI/CD & Dual-OTA Auto-Updater Pipeline (`.github/workflows/release.yml`)**:
+  - Added automated CI staging for gitignored binaries (`cloudflared-windows-amd64.exe` and `SumatraPDF-settings.txt`) before running tests and bundling.
+  - Pinned `tauri-plugin-shell = "~2.5.0"` in `src-tauri/Cargo.toml` and added `--ignore-version-mismatches` to CI build commands to prevent crates.io minor-version drift.
+  - Guarded `test_live_supabase_heartbeat_sync` (`if std::env::var("CI").is_ok() { return; }`) in `src-tauri/src/licensing/heartbeat.rs` so GitHub Actions runner VMs never register dummy stations in Supabase.
+  - Configured **Dual-OTA Manifests** on GitHub Releases (`v1.0.6` verified green):
+    - **Clean Retail Edition**: Publishes `latest.json` + signed `.exe` + `.sig`.
+    - **Virtual Demo Edition**: Updates `plugins.updater.endpoints` in CI to `virtual-latest.json`, builds `PrintDrop_Demo_Station_Virtual_x64-setup.exe`, generates `virtual-latest.json` from its `.sig`, and attaches both to the same release.
+- [x] **Release Documentation & Skill**:
+  - Created [.agents/skills/printdrop-ci-cd-ota-release/SKILL.md](file:///C:/Flutter_src/PrintDrop/.agents/skills/printdrop-ci-cd-ota-release/SKILL.md) and [docs/CI_CD_OTA_RELEASE_GUIDE.md](file:///C:/Flutter_src/PrintDrop/docs/CI_CD_OTA_RELEASE_GUIDE.md).
+- [x] **Verification**:
+  - `cargo test --manifest-path src-tauri/Cargo.toml`: **68/68** tests pass.
+  - `cargo test --manifest-path src-tauri/Cargo.toml --no-default-features`: **66/66** tests pass.
+  - `npm run build`: **0 errors** (6.70s).
+  - GitHub Actions `v1.0.6` release workflow completed green with both `latest.json` and `virtual-latest.json` published.
 
 
 
