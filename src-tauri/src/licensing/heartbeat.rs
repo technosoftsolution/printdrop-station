@@ -177,8 +177,15 @@ pub async fn perform_heartbeat(
             Vec::new()
         };
 
+        let trial_usage = if local_state.plan_type == LicensePlanType::Trial {
+            license_mgr.get_trial_usage_summary().ok()
+        } else {
+            None
+        };
+
         let notes_json = serde_json::json!({
-            "history": payments_with_usage
+            "history": payments_with_usage,
+            "trial_usage": trial_usage
         }).to_string();
 
         let new_record = serde_json::json!({
@@ -396,8 +403,15 @@ pub async fn perform_heartbeat(
         Vec::new()
     };
 
+    let trial_usage = if local_state.as_ref().map(|s| s.plan_type == LicensePlanType::Trial).unwrap_or(false) {
+        license_mgr.get_trial_usage_summary().ok()
+    } else {
+        None
+    };
+
     let notes_json = serde_json::json!({
-        "history": payments_with_usage
+        "history": payments_with_usage,
+        "trial_usage": trial_usage
     }).to_string();
 
     let is_reinstall_recovery = remote.is_installed == Some(false);

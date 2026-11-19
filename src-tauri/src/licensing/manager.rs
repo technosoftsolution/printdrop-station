@@ -1113,6 +1113,54 @@ impl LicenseManager {
             })
             .unwrap_or(None);
 
+        self.compute_usage_summary_for_window(
+            rec.id,
+            rec.plan_code,
+            rec.plan_name,
+            rec.pages_granted,
+            rec.duration_days,
+            rec.created_at,
+            next_payment_time,
+        )
+    }
+
+    /// Computes the daily print usage ledger for the active Free Trial evaluation window
+    pub fn get_trial_usage_summary(&self) -> Result<PaymentUsageSummaryDto, String> {
+        let state = self.get_license_state()?;
+        let (issued_at, pages_granted): (String, Option<u64>) = self
+            .db
+            .with_conn(|conn| {
+                let mut stmt = conn.prepare("SELECT issued_at, pages_granted FROM app_licenses WHERE id = 1")?;
+                stmt.query_row([], |r| Ok((r.get(0)?, r.get(1)?)))
+                    .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
+            })
+            .map_err(|e| format!("Failed to read trial license window: {}", e))?;
+
+        let duration_days = Some((state.active_tenure_days + state.days_remaining.max(0)).max(1));
+
+        self.compute_usage_summary_for_window(
+            format!("trial_{}", self.hwid),
+            "TRIAL".to_string(),
+            LicensePlanType::Trial.display_name().to_string(),
+            pages_granted,
+            duration_days,
+            issued_at,
+            None,
+        )
+    }
+
+    /// Shared helper that aggregates completed print jobs into daily usage records for any license/payment window
+    fn compute_usage_summary_for_window(
+        &self,
+        payment_id: String,
+        plan_code: String,
+        plan_name: String,
+        total_quota_granted: Option<u64>,
+        total_duration_days: Option<i64>,
+        window_start_ts: String,
+        window_end_ts: Option<String>,
+    ) -> Result<PaymentUsageSummaryDto, String> {
+
         struct RawJobItem {
             day_str: String,
             time_str: String,
@@ -1123,7 +1171,7 @@ impl LicenseManager {
         let raw_jobs: Vec<RawJobItem> = self
             .db
             .with_conn(|conn| {
-                let mut jobs_stmt = if let Some(ref _next_ts) = next_payment_time {
+                let mut jobs_stmt = if window_end_ts.is_some() {
                     conn.prepare(
                         r#"
                         SELECT 
@@ -1166,10 +1214,10 @@ impl LicenseManager {
                     )?
                 };
 
-                let query_params: &[&dyn rusqlite::ToSql] = if let Some(ref next_ts) = next_payment_time {
-                    &[&rec.created_at, next_ts]
+                let query_params: &[&dyn rusqlite::ToSql] = if let Some(ref next_ts) = window_end_ts {
+                    &[&window_start_ts, next_ts]
                 } else {
-                    &[&rec.created_at]
+                    &[&window_start_ts]
                 };
 
                 let rows = jobs_stmt.query_map(query_params, |r| {
@@ -1237,9 +1285,7 @@ impl LicenseManager {
             }
         }
 
-        let is_wallet_plan = rec.pages_granted.is_some() || rec.plan_code.contains("WALLET");
-        let total_quota_granted = rec.pages_granted;
-        let total_duration_days = rec.duration_days;
+        let is_wallet_plan = total_quota_granted.is_some() || plan_code.contains("WALLET");
         let today_str = Local::now().format("%Y-%m-%d").to_string();
 
         let format_12h = |t: &str| -> String {
@@ -1283,7 +1329,7 @@ impl LicenseManager {
 
             let days_left = if !is_wallet_plan {
                 let day_date_opt = NaiveDate::parse_from_str(&day_str, "%Y-%m-%d").ok();
-                let purchase_date_opt = rec.created_at.split('T').next()
+                let purchase_date_opt = window_start_ts.split('T').next()
                     .and_then(|s| NaiveDate::parse_from_str(s, "%Y-%m-%d").ok());
                 if let (Some(dd), Some(pd)) = (day_date_opt, purchase_date_opt) {
                     let elapsed = (dd - pd).num_days();
@@ -1324,16 +1370,16 @@ impl LicenseManager {
         };
 
         Ok(PaymentUsageSummaryDto {
-            payment_id: rec.id,
-            plan_code: rec.plan_code,
-            plan_name: rec.plan_name,
+            payment_id,
+            plan_code,
+            plan_name,
             is_wallet_plan,
             total_quota_granted,
             total_duration_days,
             total_pages_consumed: running_cumulative,
             pages_remaining,
             days_remaining,
-            purchase_date: rec.created_at,
+            purchase_date: window_start_ts,
             daily_records,
         })
     }

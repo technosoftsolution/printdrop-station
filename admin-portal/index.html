@@ -1340,6 +1340,8 @@
       }
 
       const history = getStationPaymentHistory(s);
+      const trialRec = history.length === 0 ? getStationTrialUsageRecord(s) : null;
+      const displayRecords = history.length > 0 ? history : (trialRec ? [trialRec] : []);
 
       const totalLtv = history
         .filter(p => p.status === 'VERIFIED_PAID' || p.status === 'COMPLETED')
@@ -1350,12 +1352,14 @@
       const latestRefEl = document.getElementById('fullHistLatestRef');
 
       if (totalLtvEl) totalLtvEl.innerText = `₹${totalLtv.toLocaleString()}`;
-      if (txnCountEl) txnCountEl.innerText = `${history.length} purchase${history.length === 1 ? '' : 's'}`;
-      if (latestRefEl) latestRefEl.innerText = history.length > 0 ? (history[0].payment_reference || 'DIRECT-VERIFIED') : 'N/A';
+      if (txnCountEl) txnCountEl.innerText = history.length > 0
+        ? `${history.length} purchase${history.length === 1 ? '' : 's'}`
+        : (trialRec ? 'Free Trial Evaluation' : '0 purchases');
+      if (latestRefEl) latestRefEl.innerText = history.length > 0 ? (history[0].payment_reference || 'DIRECT-VERIFIED') : (trialRec ? 'FREE-TRIAL' : 'N/A');
 
       const container = document.getElementById('fullHistListContainer');
       if (container) {
-        if (history.length === 0) {
+        if (displayRecords.length === 0) {
           container.innerHTML = `
             <div class="p-8 text-center rounded-xl bg-slate-950/40 border border-slate-800 text-sm text-slate-400">
               No historical payments recorded for this station yet.
@@ -1406,7 +1410,7 @@
             </div>
           ` : '';
 
-          container.innerHTML = hybridSummaryBanner + history.map((rec, idx) => {
+          container.innerHTML = hybridSummaryBanner + displayRecords.map((rec, idx) => {
             const dateStr = rec.date ? new Date(rec.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A';
             const isVerified = rec.status === 'VERIFIED_PAID' || rec.status === 'COMPLETED';
             const isPending = rec.status === 'PAYMENT_SUBMITTED' || rec.status === 'PENDING_VERIFICATION';
@@ -1622,7 +1626,7 @@
       const s = stations.find(item => item.hwid === hwid);
       if (!s) return;
       const history = getStationPaymentHistory(s);
-      const paymentRecord = history[historyIndex] || null;
+      const paymentRecord = historyIndex === -1 ? getStationTrialUsageRecord(s) : (history[historyIndex] || null);
       if (!paymentRecord) return;
       openPrintableDailyUsageModal(paymentRecord, s);
     }
@@ -1726,7 +1730,7 @@
       const s = stations.find(item => item.hwid === hwid);
       if (!s) return;
       const history = getStationPaymentHistory(s);
-      const paymentRecord = history[historyIndex] || null;
+      const paymentRecord = historyIndex === -1 ? getStationTrialUsageRecord(s) : (history[historyIndex] || null);
       if (!paymentRecord) return;
       downloadUsageCsv(paymentRecord, s);
     }
@@ -2131,6 +2135,8 @@
         const hwidSafe = sanitizeHwidId(s.hwid);
         const history = getStationPaymentHistory(s);
         const latest = history.length > 0 ? history[0] : null;
+        const trialRec = !latest ? getStationTrialUsageRecord(s) : null;
+        const activeTrayRec = latest || trialRec;
 
         const tr = document.createElement('tr');
         const isUninstalledRow = s.is_installed === false;
@@ -2291,14 +2297,17 @@
         `;
 
         const isExpanded = activeExpandedTrayHwid === s.hwid;
-        const latestDateStr = latest && latest.date ? new Date(latest.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A';
-        const isVerified = latest && (latest.status === 'VERIFIED_PAID' || latest.status === 'COMPLETED');
-        const isPending = latest && (latest.status === 'PAYMENT_SUBMITTED' || latest.status === 'PENDING_VERIFICATION');
-        const latestStatusBadge = isVerified
+        const latestDateStr = activeTrayRec && activeTrayRec.date ? new Date(activeTrayRec.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A';
+        const isTrialTray = Boolean(activeTrayRec && activeTrayRec.isTrialUsage);
+        const isVerified = activeTrayRec && (activeTrayRec.status === 'VERIFIED_PAID' || activeTrayRec.status === 'COMPLETED');
+        const isPending = activeTrayRec && (activeTrayRec.status === 'PAYMENT_SUBMITTED' || activeTrayRec.status === 'PENDING_VERIFICATION');
+        const latestStatusBadge = isTrialTray
+          ? `<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">🧪 Free Trial</span>`
+          : isVerified
           ? `<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">✓ Verified</span>`
           : isPending
           ? `<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">⏳ Pending</span>`
-          : latest ? `<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">${escapeHtml(latest.status)}</span>` : '';
+          : activeTrayRec ? `<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">${escapeHtml(activeTrayRec.status)}</span>` : '';
 
         const trayTr = document.createElement('tr');
         trayTr.id = `trayRow_${hwidSafe}`;
@@ -2320,13 +2329,13 @@
                     <div class="w-6 h-6 rounded-md bg-indigo-500/20 text-indigo-400 flex items-center justify-center shrink-0">
                       <i data-lucide="receipt" class="w-3.5 h-3.5"></i>
                     </div>
-                    <span class="text-xs font-bold text-white">Latest Payment &amp; Billing Details</span>
+                    <span class="text-xs font-bold text-white">${isTrialTray ? 'Free Trial Daily Print Activity' : 'Latest Payment &amp; Billing Details'}</span>
                     <span class="text-[10px] text-slate-400">(${escapeHtml(cleanShopName)})</span>
                   </div>
                   <div class="flex items-center gap-2">
-                    <button type="button" onclick="event.stopPropagation(); openFullPaymentHistoryModal('${s.hwid}')" title="View Full Payment History" class="px-2.5 py-1 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/50 border border-indigo-500/40 text-indigo-200 text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer shadow-sm">
+                    <button type="button" onclick="event.stopPropagation(); openFullPaymentHistoryModal('${s.hwid}')" title="${isTrialTray ? 'View Full Daily Trial Usage' : 'View Full Payment History'}" class="px-2.5 py-1 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/50 border border-indigo-500/40 text-indigo-200 text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer shadow-sm">
                       <i data-lucide="maximize-2" class="w-3.5 h-3.5 text-indigo-300"></i>
-                      <span>All Payments (${history.length})</span>
+                      <span>${isTrialTray ? 'Full Trial Ledger' : `All Payments (${history.length})`}</span>
                     </button>
                     <button type="button" onclick="event.stopPropagation(); toggleStationPaymentTray('${s.hwid}')" title="Collapse view" class="p-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition cursor-pointer">
                       <i data-lucide="chevron-up" class="w-4 h-4"></i>
@@ -2335,79 +2344,85 @@
                 </div>
 
                 <!-- Content -->
-                ${latest ? `
+                ${activeTrayRec ? `
                   <div class="grid grid-cols-2 md:grid-cols-4 gap-2.5 text-xs">
                     <div class="p-2.5 rounded-lg bg-slate-900/90 border border-slate-800/80">
-                      <div class="text-[9px] uppercase font-bold text-slate-500 tracking-wider">Plan &amp; Amount</div>
-                      <div class="font-bold text-white text-xs mt-0.5 truncate">${escapeHtml(latest.plan_name || latest.plan_code)}</div>
-                      <div class="text-emerald-400 font-extrabold text-sm mt-0.5">₹${Number(latest.amount || 0).toLocaleString()}</div>
+                      <div class="text-[9px] uppercase font-bold text-slate-500 tracking-wider">${isTrialTray ? 'Plan &amp; Evaluation' : 'Plan &amp; Amount'}</div>
+                      <div class="font-bold text-white text-xs mt-0.5 truncate">${escapeHtml(activeTrayRec.plan_name || activeTrayRec.plan_code)}</div>
+                      <div class="text-emerald-400 font-extrabold text-sm mt-0.5">${isTrialTray ? '₹0 (Free Trial)' : `₹${Number(activeTrayRec.amount || 0).toLocaleString()}`}</div>
                     </div>
                     <div class="p-2.5 rounded-lg bg-slate-900/90 border border-slate-800/80">
-                      <div class="text-[9px] uppercase font-bold text-slate-500 tracking-wider">Date &amp; Status</div>
+                      <div class="text-[9px] uppercase font-bold text-slate-500 tracking-wider">${isTrialTray ? 'Started &amp; Status' : 'Date &amp; Status'}</div>
                       <div class="font-medium text-slate-300 text-xs mt-0.5">${latestDateStr}</div>
                       <div class="mt-1">${latestStatusBadge}</div>
                     </div>
                     <div class="p-2.5 rounded-lg bg-slate-900/90 border border-slate-800/80">
-                      <div class="text-[9px] uppercase font-bold text-slate-500 tracking-wider">Tax Invoice &amp; Mode</div>
-                      <div class="font-mono font-bold text-slate-200 text-xs mt-0.5 truncate">${escapeHtml(latest.invoice_number || 'N/A')}</div>
-                      <div class="text-slate-400 text-[11px] mt-0.5">${escapeHtml(latest.payment_mode || 'UPI')}</div>
+                      <div class="text-[9px] uppercase font-bold text-slate-500 tracking-wider">${isTrialTray ? 'Reference &amp; Mode' : 'Tax Invoice &amp; Mode'}</div>
+                      <div class="font-mono font-bold text-slate-200 text-xs mt-0.5 truncate">${escapeHtml(activeTrayRec.invoice_number || 'N/A')}</div>
+                      <div class="text-slate-400 text-[11px] mt-0.5">${escapeHtml(activeTrayRec.payment_mode || 'UPI')}</div>
                     </div>
                     <div class="p-2.5 rounded-lg bg-slate-900/90 border border-slate-800/80">
-                      <div class="text-[9px] uppercase font-bold text-slate-500 tracking-wider">Bank UTR / Ref</div>
-                      <div class="font-mono font-bold text-cyan-300 text-xs break-all select-all mt-0.5">${escapeHtml(latest.payment_reference || 'N/A')}</div>
-                      <div class="text-emerald-400 text-[10px] font-semibold mt-0.5">${latest.pages ? `+${Number(latest.pages).toLocaleString()} Pages` : (latest.duration_days ? `+${latest.duration_days} Days` : 'Full Access')}</div>
+                      <div class="text-[9px] uppercase font-bold text-slate-500 tracking-wider">${isTrialTray ? 'Trial Quota' : 'Bank UTR / Ref'}</div>
+                      <div class="font-mono font-bold text-cyan-300 text-xs break-all select-all mt-0.5">${escapeHtml(activeTrayRec.payment_reference || 'N/A')}</div>
+                      <div class="text-emerald-400 text-[10px] font-semibold mt-0.5">${activeTrayRec.pages ? `${Number(activeTrayRec.pages).toLocaleString()} Pages` : (activeTrayRec.duration_days ? `+${activeTrayRec.duration_days} Days` : 'Full Access')}</div>
                     </div>
                   </div>
-                  ${latest.usage && (latest.usage.isWalletPlan || latest.plan_code === 'WALLET_PAGES') ? `
+                  ${activeTrayRec.usage && (activeTrayRec.usage.isWalletPlan || activeTrayRec.plan_code === 'WALLET_PAGES' || isTrialTray) ? `
                     <div class="p-2.5 rounded-lg bg-slate-900/90 border border-slate-800 space-y-1.5">
                       <div class="flex items-center justify-between text-[11px]">
                         <span class="text-slate-400 font-semibold flex items-center gap-1.5">
                           <i data-lucide="layers" class="w-3.5 h-3.5 text-amber-400"></i>
-                          <span>Quota Metering:</span>
+                          <span>${isTrialTray ? 'Trial Print Quota Metering:' : 'Quota Metering:'}</span>
                         </span>
                         <span class="font-bold text-emerald-400">
-                          ${Number(latest.usage.totalPagesConsumed !== undefined ? latest.usage.totalPagesConsumed : (latest.usage.pagesPrintedTotal || 0)).toLocaleString()} / ${Number(latest.usage.totalQuotaGranted !== undefined ? latest.usage.totalQuotaGranted : (latest.usage.initialQuotaPages || latest.pages || 0)).toLocaleString()} pgs (${Number(latest.usage.pagesRemaining !== undefined ? latest.usage.pagesRemaining : (latest.usage.quotaRemainingPages || 0)).toLocaleString()} remaining)
+                          ${Number(activeTrayRec.usage.totalPagesConsumed !== undefined ? activeTrayRec.usage.totalPagesConsumed : (activeTrayRec.usage.pagesPrintedTotal || 0)).toLocaleString()} / ${Number(activeTrayRec.usage.totalQuotaGranted !== undefined ? activeTrayRec.usage.totalQuotaGranted : (activeTrayRec.usage.initialQuotaPages || activeTrayRec.pages || 0)).toLocaleString()} pgs (${Number(activeTrayRec.usage.pagesRemaining !== undefined ? activeTrayRec.usage.pagesRemaining : (activeTrayRec.usage.quotaRemainingPages || 0)).toLocaleString()} remaining)
                         </span>
                       </div>
                       <div class="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
-                        <div class="bg-gradient-to-r from-emerald-500 to-cyan-500 h-1.5 rounded-full transition-all" style="width: ${Math.min(100, Math.round((Number(latest.usage.totalPagesConsumed !== undefined ? latest.usage.totalPagesConsumed : (latest.usage.pagesPrintedTotal || 0)) / (Number(latest.usage.totalQuotaGranted || latest.pages || 1))) * 100))}%"></div>
+                        <div class="bg-gradient-to-r from-emerald-500 to-cyan-500 h-1.5 rounded-full transition-all" style="width: ${Math.min(100, Math.round((Number(activeTrayRec.usage.totalPagesConsumed !== undefined ? activeTrayRec.usage.totalPagesConsumed : (activeTrayRec.usage.pagesPrintedTotal || 0)) / (Number(activeTrayRec.usage.totalQuotaGranted || activeTrayRec.pages || 1))) * 100))}%"></div>
                       </div>
                     </div>
                   ` : ''}
 
-                  ${latest.usage && Array.isArray(latest.usage.dailyRecords) && latest.usage.dailyRecords.length > 0 ? `
+                  ${activeTrayRec.usage && Array.isArray(activeTrayRec.usage.dailyRecords) && activeTrayRec.usage.dailyRecords.length > 0 ? `
                     <div class="p-2.5 rounded-lg bg-slate-900/90 border border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs">
                       <div class="flex items-center gap-2">
                         <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
                         <span class="text-slate-300 font-semibold">Latest Daily Output:</span>
-                        <span class="text-emerald-400 font-bold">${Number(latest.usage.totalPagesConsumed !== undefined ? latest.usage.totalPagesConsumed : (latest.usage.pagesPrintedTotal || 0)).toLocaleString()} pages printed</span>
-                        <span class="text-slate-400 text-[11px]">across ${latest.usage.dailyRecords.length} day(s)</span>
+                        <span class="text-emerald-400 font-bold">${Number(activeTrayRec.usage.totalPagesConsumed !== undefined ? activeTrayRec.usage.totalPagesConsumed : (activeTrayRec.usage.pagesPrintedTotal || 0)).toLocaleString()} pages printed</span>
+                        <span class="text-slate-400 text-[11px]">across ${activeTrayRec.usage.dailyRecords.length} day(s)</span>
                       </div>
                       <div class="text-[11px] text-slate-400 font-medium">
-                        ${(latest.usage.isWalletPlan || latest.plan_code === 'WALLET_PAGES') ? `<span class="text-emerald-400 font-bold">${Number(latest.usage.pagesRemaining !== undefined ? latest.usage.pagesRemaining : (latest.usage.quotaRemainingPages || 0)).toLocaleString()} pages remaining</span>` : (latest.usage.daysRemaining !== null && latest.usage.daysRemaining !== undefined ? `<span class="text-blue-400 font-bold">${latest.usage.daysRemaining} days left</span>` : 'Active')}
+                        ${(activeTrayRec.usage.isWalletPlan || activeTrayRec.plan_code === 'WALLET_PAGES' || isTrialTray) ? `<span class="text-emerald-400 font-bold">${Number(activeTrayRec.usage.pagesRemaining !== undefined ? activeTrayRec.usage.pagesRemaining : (activeTrayRec.usage.quotaRemainingPages || 0)).toLocaleString()} pages remaining</span>` : (activeTrayRec.usage.daysRemaining !== null && activeTrayRec.usage.daysRemaining !== undefined ? `<span class="text-blue-400 font-bold">${activeTrayRec.usage.daysRemaining} days left</span>` : 'Active')}
                       </div>
                     </div>
-                  ` : ''}
+                  ` : `
+                    <div class="p-2.5 rounded-lg bg-slate-900/90 border border-slate-800 text-xs text-slate-400 text-center">
+                      No pages printed yet during this period.
+                    </div>
+                  `}
 
                   <div class="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-800/60">
                     <div class="flex items-center gap-2">
-                      <button type="button" onclick="event.stopPropagation(); printDailyUsageReport('${s.hwid}', 0)" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-300 font-bold text-xs transition flex items-center gap-1.5 border border-slate-700 cursor-pointer shadow-sm">
+                      <button type="button" onclick="event.stopPropagation(); printDailyUsageReport('${s.hwid}', ${isTrialTray ? -1 : 0})" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-300 font-bold text-xs transition flex items-center gap-1.5 border border-slate-700 cursor-pointer shadow-sm">
                         <i data-lucide="printer" class="w-3.5 h-3.5 text-cyan-400"></i>
                         <span>Print Usage</span>
                       </button>
-                      <button type="button" onclick="event.stopPropagation(); exportUsageCsv('${s.hwid}', 0)" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition flex items-center gap-1.5 border border-slate-700 cursor-pointer shadow-sm">
+                      <button type="button" onclick="event.stopPropagation(); exportUsageCsv('${s.hwid}', ${isTrialTray ? -1 : 0})" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition flex items-center gap-1.5 border border-slate-700 cursor-pointer shadow-sm">
                         <i data-lucide="download" class="w-3.5 h-3.5 text-emerald-400"></i>
                         <span>Export CSV</span>
                       </button>
                     </div>
-                    <button type="button" onclick="event.stopPropagation(); printInvoiceForStation('${s.hwid}', 0)" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition flex items-center gap-1.5 shadow-sm cursor-pointer">
-                      <i data-lucide="receipt" class="w-3.5 h-3.5"></i>
-                      <span>Print Tax Invoice</span>
-                    </button>
+                    ${!isTrialTray ? `
+                      <button type="button" onclick="event.stopPropagation(); printInvoiceForStation('${s.hwid}', 0)" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition flex items-center gap-1.5 shadow-sm cursor-pointer">
+                        <i data-lucide="receipt" class="w-3.5 h-3.5"></i>
+                        <span>Print Tax Invoice</span>
+                      </button>
+                    ` : ''}
                   </div>
                 ` : `
                   <div class="py-3 text-center text-xs text-slate-400">
-                    No payment history recorded for this station yet. (Trial or unbilled station)
+                    No print or payment activity recorded for this station yet.
                   </div>
                 `}
               </div>
@@ -3059,6 +3074,32 @@
         }];
       }
       return list;
+    }
+
+    function getStationTrialUsageRecord(s) {
+      if (!s || !s.notes) return null;
+      try {
+        const parsed = JSON.parse(s.notes);
+        const tu = parsed.trial_usage;
+        if (!tu) return null;
+        return {
+          id: tu.paymentId || `trial_${s.hwid}`,
+          isTrialUsage: true,
+          invoice_number: 'FREE-TRIAL',
+          date: tu.purchaseDate || s.issued_at || s.created_at || new Date().toISOString(),
+          plan_code: 'TRIAL',
+          plan_name: tu.planName || 'Free Trial Evaluation',
+          amount: 0,
+          pages: tu.totalQuotaGranted !== undefined ? tu.totalQuotaGranted : (s.pages_granted || 300),
+          duration_days: tu.totalDurationDays || 14,
+          payment_mode: 'TRIAL',
+          payment_reference: 'EVALUATION',
+          status: 'TRIAL_ACTIVE',
+          usage: tu
+        };
+      } catch (e) {
+        return null;
+      }
     }
 
     function openDrawerWithHwid(hwid) {
