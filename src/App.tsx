@@ -1943,6 +1943,14 @@ export default function App() {
               <span className="text-[10px] uppercase tracking-wider bg-indigo-900/70 text-indigo-300 border border-indigo-700/60 px-2 py-0.5 rounded-full font-semibold">
                 {(!licenseState || licenseState.planType === 'TRIAL') ? 'Demo Station' : 'Shopkeeper Station'}
               </span>
+              {status?.version && (
+                <span
+                  className="text-[10px] font-mono bg-slate-800/90 text-slate-300 border border-slate-700/80 px-1.5 py-0.5 rounded-md font-semibold"
+                  title={`PrintDrop v${status.version}`}
+                >
+                  v{status.version}
+                </span>
+              )}
             </h1>
             <p className="text-[11px] text-slate-400 group-hover:text-slate-300 transition-colors">Batch Print Automation &amp; Custom Print Workflow</p>
           </div>
@@ -4975,7 +4983,7 @@ export default function App() {
 
       {/* Footer */}
       <footer className="flex-shrink-0 border-t border-slate-800/80 bg-slate-950 px-4 sm:px-6 py-2 sm:py-2.5 text-xs text-slate-500 flex justify-between items-center">
-        <span>PrintDrop Windows 11 Desktop &copy; 2026</span>
+        <span>PrintDrop Windows 11 Desktop {status?.version ? `v${status.version} ` : ''}&copy; 2026</span>
         <span>Phase-I: Intelligent Multi-Printer Sequential Batch Spooling Engine & Real-Time Animated UI</span>
       </footer>
 

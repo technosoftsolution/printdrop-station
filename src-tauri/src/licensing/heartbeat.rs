@@ -202,7 +202,7 @@ pub async fn perform_heartbeat(
             "is_active": true,
             "is_installed": true,
             "uninstalled_at": serde_json::Value::Null,
-            "client_version": "1.0.0",
+            "client_version": env!("CARGO_PKG_VERSION"),
             "notes": notes_json,
             "last_ping_at": now_iso
         });
@@ -426,7 +426,7 @@ pub async fn perform_heartbeat(
                 "is_installed": true,
                 "uninstalled_at": serde_json::Value::Null,
                 "removal_reason": serde_json::Value::Null,
-                "client_version": "1.0.0",
+                "client_version": env!("CARGO_PKG_VERSION"),
                 "notes": notes_json
             })
         } else {
@@ -439,7 +439,7 @@ pub async fn perform_heartbeat(
                 "is_installed": true,
                 "uninstalled_at": serde_json::Value::Null,
                 "removal_reason": serde_json::Value::Null,
-                "client_version": "1.0.0",
+                "client_version": env!("CARGO_PKG_VERSION"),
                 "notes": notes_json
             })
         }
@@ -453,7 +453,7 @@ pub async fn perform_heartbeat(
             "is_installed": true,
             "uninstalled_at": serde_json::Value::Null,
             "removal_reason": serde_json::Value::Null,
-            "client_version": "1.0.0",
+            "client_version": env!("CARGO_PKG_VERSION"),
             "notes": notes_json
         })
     };

@@ -1845,6 +1845,29 @@
     let serverKpis = null;
     let searchDebounceTimer = null;
     let activeFleetTab = 'ACTIVE_FLEET';
+    let latestAppVersion = null;
+
+    function compareSemver(a, b) {
+      const pa = String(a || '0.0.0').replace(/^v/i, '').split('.').map(n => parseInt(n, 10) || 0);
+      const pb = String(b || '0.0.0').replace(/^v/i, '').split('.').map(n => parseInt(n, 10) || 0);
+      for (let i = 0; i < 3; i++) {
+        if ((pa[i] || 0) < (pb[i] || 0)) return -1;
+        if ((pa[i] || 0) > (pb[i] || 0)) return 1;
+      }
+      return 0;
+    }
+
+    async function fetchLatestAppVersion() {
+      try {
+        const res = await fetch('https://github.com/technosoftsolution/printdrop-station/releases/latest/download/latest.json', { cache: 'no-store' });
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.version) {
+            latestAppVersion = String(data.version).replace(/^v/i, '').trim();
+          }
+        }
+      } catch (_) {}
+    }
 
     function switchFleetTab(tab) {
       activeFleetTab = tab;
@@ -1975,7 +1998,8 @@
               'Prefer': 'count=exact'
             }
           }),
-          loadKpisFromServer()
+          loadKpisFromServer(),
+          fetchLatestAppVersion()
         ]);
 
         // Fallback if Supabase schema hasn't run 20261118_uninstall_tracking_and_scale.sql yet
@@ -2110,7 +2134,12 @@
 
         const tr = document.createElement('tr');
         const isUninstalledRow = s.is_installed === false;
-        tr.className = `${isUninstalledRow ? 'opacity-65 bg-slate-950/30 ' : ''}hover:bg-slate-800/40 transition cursor-pointer select-none border-t border-slate-800/60`;
+        const clientVersion = String(s.client_version || '1.0.0').replace(/^v/i, '').trim();
+        const isOutdatedVersion = !isUninstalledRow && latestAppVersion && compareSemver(clientVersion, latestAppVersion) < 0;
+        const versionBadgeHtml = isOutdatedVersion
+          ? `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-bold mt-1" title="Station is running v${escapeHtml(clientVersion)} — Latest is v${escapeHtml(latestAppVersion)}">⚠️ v${escapeHtml(clientVersion)} • Outdated (Latest: v${escapeHtml(latestAppVersion)})</span>`
+          : `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-800/90 text-emerald-300/90 border border-slate-700 text-[10px] font-mono font-semibold mt-1" title="App version v${escapeHtml(clientVersion)}">v${escapeHtml(clientVersion)}${latestAppVersion && compareSemver(clientVersion, latestAppVersion) >= 0 ? ' ✓' : ''}</span>`;
+        tr.className = `${isUninstalledRow ? 'opacity-65 bg-slate-950/30 ' : isOutdatedVersion ? 'bg-amber-950/15 border-l-2 border-l-amber-500/70 ' : ''}hover:bg-slate-800/40 transition cursor-pointer select-none border-t border-slate-800/60`;
         tr.onclick = (e) => {
           // If clicked a button or link inside row, don't toggle tray
           if (e.target.closest('button') || e.target.closest('a')) return;
@@ -2190,7 +2219,8 @@
             </div>
           </td>
           <td class="py-3 px-4 font-mono text-xs text-indigo-300 font-bold select-all">
-            ${escapeHtml(s.hwid)}
+            <div>${escapeHtml(s.hwid)}</div>
+            ${versionBadgeHtml}
           </td>
           <td class="py-3 px-4">
             ${isHybrid ? `
