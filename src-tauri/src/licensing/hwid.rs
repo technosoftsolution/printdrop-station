@@ -2,12 +2,19 @@ use sha2::{Digest, Sha256};
 use std::process::Command;
 use tracing::info;
 
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+
+#[cfg(target_os = "windows")]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
+
 /// Extracts the Windows MachineGuid from the local machine registry.
-fn get_windows_machine_guid() -> Option<String> {
+pub fn get_windows_machine_guid() -> Option<String> {
     #[cfg(target_os = "windows")]
     {
-        let output = Command::new("cmd")
-            .args(&["/c", "reg query HKLM\\SOFTWARE\\Microsoft\\Cryptography /v MachineGuid"])
+        let output = Command::new("reg")
+            .args(["query", r"HKLM\SOFTWARE\Microsoft\Cryptography", "/v", "MachineGuid"])
+            .creation_flags(CREATE_NO_WINDOW)
             .output()
             .ok()?;
 
@@ -26,21 +33,27 @@ fn get_windows_machine_guid() -> Option<String> {
     None
 }
 
-/// Extracts the motherboard or computer system product UUID.
-fn get_system_uuid() -> Option<String> {
+/// Extracts deterministic motherboard/BIOS product info from Windows Registry (no WMIC dependency).
+fn get_system_board_id() -> Option<String> {
     #[cfg(target_os = "windows")]
     {
-        let output = Command::new("cmd")
-            .args(&["/c", "wmic csproduct get uuid"])
+        let output = Command::new("reg")
+            .args(["query", r"HKLM\HARDWARE\DESCRIPTION\System\BIOS", "/v", "SystemProductName"])
+            .creation_flags(CREATE_NO_WINDOW)
             .output()
             .ok()?;
 
         if output.status.success() {
             let stdout = String::from_utf8_lossy(&output.stdout);
             for line in stdout.lines() {
-                let trimmed = line.trim();
-                if !trimmed.is_empty() && !trimmed.eq_ignore_ascii_case("uuid") {
-                    return Some(trimmed.to_string());
+                if line.contains("SystemProductName") {
+                    let parts: Vec<&str> = line.split("REG_SZ").collect();
+                    if parts.len() >= 2 {
+                        let val = parts[1].trim();
+                        if !val.is_empty() {
+                            return Some(val.to_string());
+                        }
+                    }
                 }
             }
         }
@@ -52,8 +65,9 @@ fn get_system_uuid() -> Option<String> {
 fn get_cpu_identifier() -> Option<String> {
     #[cfg(target_os = "windows")]
     {
-        let output = Command::new("cmd")
-            .args(&["/c", "reg query HKLM\\HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0 /v ProcessorNameString"])
+        let output = Command::new("reg")
+            .args(["query", r"HKLM\HARDWARE\DESCRIPTION\System\CentralProcessor\0", "/v", "ProcessorNameString"])
+            .creation_flags(CREATE_NO_WINDOW)
             .output()
             .ok()?;
 
@@ -85,13 +99,13 @@ fn get_fallback_entropy() -> String {
 /// Formats as: PD-XXXX-XXXX-XXXX-XXXX (e.g. PD-6C0C-9825-4BAB-7DE2)
 pub fn generate_hardware_id() -> String {
     let guid = get_windows_machine_guid().unwrap_or_default();
-    let uuid = get_system_uuid().unwrap_or_default();
+    let board = get_system_board_id().unwrap_or_default();
     let cpu = get_cpu_identifier().unwrap_or_default();
     let fallback = get_fallback_entropy();
 
     let raw_payload = format!(
-        "PRINTDROP_V1:GUID={}:UUID={}:CPU={}:SYS={}",
-        guid, uuid, cpu, fallback
+        "PRINTDROP_V2:GUID={}:BOARD={}:CPU={}:SYS={}",
+        guid, board, cpu, fallback
     );
 
     let mut hasher = Sha256::new();

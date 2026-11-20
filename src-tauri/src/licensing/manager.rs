@@ -8,7 +8,7 @@ use crate::db::Database;
 use super::crypto::{
     create_signed_trial_license, parse_and_verify_activation_key, verify_license_signature,
 };
-use super::hwid::generate_hardware_id;
+use super::hwid::{generate_hardware_id, get_windows_machine_guid};
 use super::models::{
     ActivationRequest, DailyPrintUsageRecord, LicensePayload, LicensePaymentRecord, LicensePlanType,
     LicenseStateDto, LicenseStatus, PaymentUsageSummaryDto,
@@ -23,11 +23,46 @@ impl LicenseManager {
     /// Initializes the LicenseManager, ensuring the SQLite table exists and
     /// auto-provisions a signed 14-day trial if no license exists yet.
     pub fn new(db: Arc<Database>) -> Result<Self, String> {
-        let hwid = generate_hardware_id();
-        info!("Initializing LicenseManager with Hardware ID: {}", hwid);
-
-        let manager = Self { db, hwid };
+        let mut manager = Self {
+            db: db.clone(),
+            hwid: String::new(),
+        };
         manager.init_schema()?;
+
+        let current_guid = get_windows_machine_guid().unwrap_or_default();
+        let saved_guid = db.get_config("machine_guid_anchor").ok().flatten();
+        let existing_db_hwid: Option<String> = db
+            .with_conn(|conn| {
+                let mut stmt = conn.prepare("SELECT hwid FROM app_licenses WHERE id = 1")?;
+                let res: Option<String> = stmt.query_row([], |r| r.get(0)).ok();
+                Ok(res)
+            })
+            .ok()
+            .flatten();
+
+        let is_same_windows_install = match (&saved_guid, current_guid.is_empty()) {
+            (Some(sg), false) => sg.eq_ignore_ascii_case(&current_guid),
+            (None, _) => true, // Upgrade from older build without anchor: preserve existing station HWID
+            _ => true,
+        };
+
+        let hwid = if is_same_windows_install {
+            if let Some(db_hwid) = existing_db_hwid.filter(|s| s.starts_with("PD-") && s.len() >= 19) {
+                db_hwid
+            } else {
+                generate_hardware_id()
+            }
+        } else {
+            warn!("MachineGuid changed (DB moved to another PC); regenerating HWID.");
+            generate_hardware_id()
+        };
+
+        if !current_guid.is_empty() && saved_guid.is_none() {
+            let _ = db.set_config("machine_guid_anchor", &current_guid);
+        }
+
+        info!("Initializing LicenseManager with Hardware ID: {}", hwid);
+        manager.hwid = hwid;
         manager.ensure_license_exists()?;
 
         Ok(manager)
