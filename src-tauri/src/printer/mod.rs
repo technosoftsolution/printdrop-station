@@ -2304,12 +2304,15 @@ fn list_system_printers() -> Vec<PrinterInfo> {
 
     #[cfg(windows)]
     {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
         let ps_cmd = r#"
             Get-CimInstance Win32_Printer | Select-Object Name, Default, PortName | ConvertTo-Json -Compress
         "#;
 
         let output = Command::new("powershell")
             .args(["-NoProfile", "-NonInteractive", "-Command", ps_cmd])
+            .creation_flags(CREATE_NO_WINDOW)
             .output();
 
         if let Ok(out) = output {
