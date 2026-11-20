@@ -1845,6 +1845,256 @@ pub async fn set_auto_renew_enabled(
     state.license_mgr.get_license_state()
 }
 
+// ==========================================
+// OTA DISASTER RECOVERY: ROLLBACK & CANARY POLICY
+// ==========================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OtaRolloutPolicy {
+    #[serde(default = "default_rollout_pct")]
+    pub rollout_percentage: u8,
+    #[serde(default)]
+    pub canary_hwids: Vec<String>,
+    #[serde(default)]
+    pub blocked_versions: Vec<String>,
+}
+
+fn default_rollout_pct() -> u8 {
+    100
+}
+
+impl Default for OtaRolloutPolicy {
+    fn default() -> Self {
+        Self {
+            rollout_percentage: 100,
+            canary_hwids: Vec::new(),
+            blocked_versions: Vec::new(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OtaRollbackInfo {
+    pub available: bool,
+    pub previous_version: Option<String>,
+    pub created_at: Option<String>,
+    pub restore_script_path: Option<String>,
+}
+
+fn rollback_base_dir() -> std::path::PathBuf {
+    if let Ok(local_app_data) = std::env::var("LOCALAPPDATA") {
+        std::path::PathBuf::from(local_app_data).join("PrintDrop").join("rollback")
+    } else {
+        std::env::current_dir().unwrap_or_default().join("printdrop_rollback")
+    }
+}
+
+#[tauri::command]
+pub async fn get_ota_rollout_policy(
+    state: State<'_, AppState>,
+) -> Result<OtaRolloutPolicy, String> {
+    let cloud_config = crate::licensing::heartbeat::get_cloud_config(&state.db);
+    let base_url = cloud_config.supabase_url.trim().trim_end_matches('/');
+    let anon_key = cloud_config.supabase_anon_key.trim();
+
+    if cloud_config.sync_enabled && !base_url.is_empty() && !anon_key.is_empty() {
+        if let Ok(client) = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(5))
+            .build()
+        {
+            let query_url = format!("{}/rest/v1/system_config?key=eq.ota_rollout_policy&select=value", base_url);
+            if let Ok(resp) = client
+                .get(&query_url)
+                .header("apikey", anon_key)
+                .header("Authorization", format!("Bearer {}", anon_key))
+                .header("Cache-Control", "no-cache, no-store, must-revalidate")
+                .send()
+                .await
+            {
+                if resp.status().is_success() {
+                    #[derive(Deserialize)]
+                    struct ConfigRow {
+                        value: serde_json::Value,
+                    }
+                    if let Ok(rows) = resp.json::<Vec<ConfigRow>>().await {
+                        if let Some(first) = rows.first() {
+                            if let Ok(policy) = serde_json::from_value::<OtaRolloutPolicy>(first.value.clone()) {
+                                if let Ok(s) = serde_json::to_string(&policy) {
+                                    let _ = state.db.set_config("ota_rollout_policy", &s);
+                                }
+                                return Ok(policy);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if let Ok(Some(cached)) = state.db.get_config("ota_rollout_policy") {
+        if let Ok(policy) = serde_json::from_str::<OtaRolloutPolicy>(&cached) {
+            return Ok(policy);
+        }
+    }
+
+    Ok(OtaRolloutPolicy::default())
+}
+
+#[tauri::command]
+pub fn prepare_ota_rollback_snapshot(state: State<'_, AppState>) -> Result<OtaRollbackInfo, String> {
+    let base_dir = rollback_base_dir();
+    let prev_dir = base_dir.join("prev");
+    std::fs::create_dir_all(&prev_dir).map_err(|e| format!("Failed to create rollback dir: {}", e))?;
+
+    let current_exe = std::env::current_exe().map_err(|e| format!("Failed to locate exe: {}", e))?;
+    let backup_exe = prev_dir.join("printdrop.exe");
+    std::fs::copy(&current_exe, &backup_exe).map_err(|e| format!("Failed to snapshot exe: {}", e))?;
+
+    // Flush SQLite WAL and snapshot printdrop.db
+    let _ = state.db.with_conn(|conn| {
+        let _ = conn.execute_batch("PRAGMA wal_checkpoint(TRUNCATE);");
+        Ok(())
+    });
+
+    let app_data_db = if let Ok(local_app) = std::env::var("LOCALAPPDATA") {
+        std::path::PathBuf::from(local_app).join("PrintDrop").join("printdrop.db")
+    } else {
+        std::path::PathBuf::from("printdrop_data").join("printdrop.db")
+    };
+    let backup_db = prev_dir.join("printdrop.db");
+    if app_data_db.exists() {
+        let _ = std::fs::copy(&app_data_db, &backup_db);
+    }
+
+    let now_iso = chrono::Utc::now().to_rfc3339();
+    let version = env!("CARGO_PKG_VERSION").to_string();
+    let meta = serde_json::json!({
+        "previousVersion": version,
+        "exePath": current_exe.to_string_lossy(),
+        "dbPath": app_data_db.to_string_lossy(),
+        "createdAt": now_iso,
+    });
+    std::fs::write(prev_dir.join("metadata.json"), meta.to_string())
+        .map_err(|e| format!("Failed to write rollback metadata: {}", e))?;
+
+    // Write standalone outside-app Windows recovery script
+    let bat_path = base_dir.join("Restore_PrintDrop.bat");
+    let exe_str = current_exe.to_string_lossy();
+    let db_str = app_data_db.to_string_lossy();
+    let backup_exe_str = backup_exe.to_string_lossy();
+    let backup_db_str = backup_db.to_string_lossy();
+
+    let bat_content = format!(
+        "@echo off\r\n\
+         echo ======================================================\r\n\
+         echo   PrintDrop Emergency Restore (v{ver})\r\n\
+         echo ======================================================\r\n\
+         echo Stopping PrintDrop...\r\n\
+         taskkill /F /IM printdrop.exe >nul 2>&1\r\n\
+         timeout /t 2 /nobreak >nul\r\n\
+         echo Restoring previous application binary (v{ver})...\r\n\
+         copy /Y \"{b_exe}\" \"{t_exe}\" >nul\r\n\
+         if errorlevel 1 (\r\n\
+           echo ERROR: Could not overwrite printdrop.exe. Try running as Administrator.\r\n\
+           pause\r\n\
+           exit /b 1\r\n\
+         )\r\n\
+         if \"%1\"==\"--auto\" goto launch\r\n\
+         if exist \"{b_db}\" (\r\n\
+           choice /C YN /T 6 /D N /M \"Also restore pre-update database/settings snapshot? (Default N in 6s)\"\r\n\
+           if errorlevel 2 goto launch\r\n\
+           copy /Y \"{b_db}\" \"{t_db}\" >nul\r\n\
+           echo Database snapshot restored.\r\n\
+         )\r\n\
+         :launch\r\n\
+         echo Launching restored PrintDrop v{ver}...\r\n\
+         start \"\" \"{t_exe}\"\r\n\
+         exit /b 0\r\n",
+        ver = version,
+        b_exe = backup_exe_str,
+        t_exe = exe_str,
+        b_db = backup_db_str,
+        t_db = db_str,
+    );
+    std::fs::write(&bat_path, &bat_content)
+        .map_err(|e| format!("Failed to write Restore_PrintDrop.bat: {}", e))?;
+
+    // Place a Start Menu recovery launcher so shopkeepers can restore even if the app won't open
+    if let Ok(appdata) = std::env::var("APPDATA") {
+        let start_menu_dir = std::path::PathBuf::from(appdata)
+            .join("Microsoft")
+            .join("Windows")
+            .join("Start Menu")
+            .join("Programs")
+            .join("PrintDrop");
+        if std::fs::create_dir_all(&start_menu_dir).is_ok() {
+            let launcher_path = start_menu_dir.join("PrintDrop - Emergency Restore Previous Version.bat");
+            let launcher_body = format!("@echo off\r\ncall \"{}\"\r\n", bat_path.to_string_lossy());
+            let _ = std::fs::write(&launcher_path, launcher_body);
+        }
+    }
+
+    Ok(OtaRollbackInfo {
+        available: true,
+        previous_version: Some(version),
+        created_at: Some(now_iso),
+        restore_script_path: Some(bat_path.to_string_lossy().to_string()),
+    })
+}
+
+#[tauri::command]
+pub fn get_ota_rollback_info() -> OtaRollbackInfo {
+    let base_dir = rollback_base_dir();
+    let prev_dir = base_dir.join("prev");
+    let backup_exe = prev_dir.join("printdrop.exe");
+    let meta_path = prev_dir.join("metadata.json");
+    let bat_path = base_dir.join("Restore_PrintDrop.bat");
+
+    if !backup_exe.exists() || !meta_path.exists() || !bat_path.exists() {
+        return OtaRollbackInfo {
+            available: false,
+            previous_version: None,
+            created_at: None,
+            restore_script_path: None,
+        };
+    }
+
+    let meta_val: serde_json::Value = std::fs::read_to_string(&meta_path)
+        .ok()
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or(serde_json::Value::Null);
+
+    OtaRollbackInfo {
+        available: true,
+        previous_version: meta_val.get("previousVersion").and_then(|v| v.as_str()).map(|s| s.to_string()),
+        created_at: meta_val.get("createdAt").and_then(|v| v.as_str()).map(|s| s.to_string()),
+        restore_script_path: Some(bat_path.to_string_lossy().to_string()),
+    }
+}
+
+#[tauri::command]
+pub fn trigger_local_rollback() -> Result<(), String> {
+    let info = get_ota_rollback_info();
+    let script = info
+        .restore_script_path
+        .ok_or_else(|| "No previous version snapshot available for rollback.".to_string())?;
+
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        std::process::Command::new("cmd")
+            .args(["/C", &script, "--auto"])
+            .creation_flags(CREATE_NO_WINDOW)
+            .spawn()
+            .map_err(|e| format!("Failed to launch rollback script: {}", e))?;
+    }
+
+    Ok(())
+}
+
 #[tauri::command]
 pub fn get_license_payment_history(
     state: State<'_, AppState>,

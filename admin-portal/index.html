@@ -103,6 +103,13 @@
                 <div class="text-[10px] text-slate-400">Provision new station license</div>
               </div>
             </button>
+            <button type="button" onclick="closeAdminSettingsMenu(); openOtaPolicyModal()" class="w-full px-3.5 py-2.5 text-left text-xs font-semibold text-slate-200 hover:bg-slate-800/90 flex items-center gap-2.5 transition cursor-pointer">
+              <i data-lucide="rocket" class="w-4 h-4 text-rose-400 shrink-0"></i>
+              <div>
+                <div class="text-white font-bold">OTA Rollout &amp; Rollback</div>
+                <div class="text-[10px] text-slate-400">Canary %, pause &amp; block versions</div>
+              </div>
+            </button>
             <div class="my-1 border-t border-slate-800"></div>
             <button type="button" onclick="closeAdminSettingsMenu(); openAdminSecurityModal()" class="w-full px-3.5 py-2.5 text-left text-xs font-semibold text-slate-200 hover:bg-slate-800/90 flex items-center gap-2.5 transition cursor-pointer">
               <i data-lucide="shield-check" class="w-4 h-4 text-cyan-400 shrink-0"></i>
@@ -1302,6 +1309,63 @@
         </button>
         <button type="button" onclick="confirmCancelLatestPlan()" id="btnConfirmCancelPlan" class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-lg transition cursor-pointer">
           Confirm Cancellation
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL 3D: OTA CANARY ROLLOUT & EMERGENCY BLOCKED-VERSIONS POLICY -->
+  <!-- ========================================================================= -->
+  <div id="otaPolicyModal" class="fixed inset-0 z-50 hidden bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 no-print">
+    <div class="w-full max-w-lg bg-slate-900 border border-rose-500/40 rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+      <div class="px-5 py-4 border-b border-slate-800 bg-slate-950/70 flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-400">
+            <i data-lucide="rocket" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-white">OTA Staged Rollout &amp; Emergency Recall</h3>
+            <p class="text-[11px] text-slate-400">Control canary rollout % and recall buggy versions across the fleet</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeOtaPolicyModal()" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <div class="p-5 space-y-4 text-xs">
+        <div>
+          <label class="block font-bold text-slate-200 mb-1.5">Staged Fleet Rollout Percentage</label>
+          <select id="otaRolloutPct" class="w-full px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white font-semibold focus:outline-none focus:border-indigo-500">
+            <option value="0">0% — PAUSED (Canary HWIDs Only)</option>
+            <option value="1">1% — Canary Ring (Initial Verification)</option>
+            <option value="10">10% — Early Adopter Ring</option>
+            <option value="50">50% — Half Fleet</option>
+            <option value="100">100% — Full Fleet Release</option>
+          </select>
+          <p class="text-[10px] text-slate-400 mt-1">Automatically gates background OTA update prompts by deterministic HWID bucket.</p>
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-200 mb-1">Canary Test HWIDs (Comma-Separated)</label>
+          <input type="text" id="otaCanaryHwids" placeholder="PD-XXXX-XXXX-XXXX-XXXX, PD-YYYY-..." class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 font-mono text-xs text-indigo-300 focus:outline-none focus:border-indigo-500">
+          <p class="text-[10px] text-slate-400 mt-1">These stations always receive updates even when Rollout is at 0% or 1%.</p>
+        </div>
+
+        <div>
+          <label class="block font-bold text-rose-300 mb-1">Blocked / Recalled Versions (Comma-Separated)</label>
+          <input type="text" id="otaBlockedVersions" placeholder="e.g. 1.0.15, 1.0.16" class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-rose-500/40 font-mono text-xs text-rose-300 focus:outline-none focus:border-rose-400">
+          <p class="text-[10px] text-slate-400 mt-1">Any station running a recalled version sees a red Emergency Restore banner immediately.</p>
+        </div>
+      </div>
+
+      <div class="px-5 py-3.5 border-t border-slate-800 bg-slate-950/70 flex items-center justify-end gap-2">
+        <button type="button" onclick="closeOtaPolicyModal()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold cursor-pointer">
+          Cancel
+        </button>
+        <button type="button" onclick="saveOtaPolicy()" class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-lg transition cursor-pointer">
+          Save &amp; Publish Rollout Policy
         </button>
       </div>
     </div>
@@ -2606,6 +2670,73 @@
       } catch (_) {
         return 0;
       }
+    }
+
+    async function openOtaPolicyModal() {
+      document.getElementById('otaPolicyModal').classList.remove('hidden');
+      lucide.createIcons();
+      const cleanUrl = (cloudConfig?.url || '').trim().replace(/\/$/, '');
+      if (!cleanUrl || !cloudConfig?.key) return;
+      try {
+        const res = await fetch(`${cleanUrl}/rest/v1/system_config?key=eq.ota_rollout_policy&select=value`, {
+          headers: { 'apikey': cloudConfig.key, 'Authorization': `Bearer ${cloudConfig.key}` }
+        });
+        if (res.ok) {
+          const rows = await res.json();
+          const val = rows?.[0]?.value;
+          if (val) {
+            document.getElementById('otaRolloutPct').value = String(val.rolloutPercentage ?? 100);
+            document.getElementById('otaCanaryHwids').value = (val.canaryHwids || []).join(', ');
+            document.getElementById('otaBlockedVersions').value = (val.blockedVersions || []).join(', ');
+          }
+        }
+      } catch (_) {}
+    }
+
+    function closeOtaPolicyModal() {
+      document.getElementById('otaPolicyModal')?.classList.add('hidden');
+    }
+
+    async function saveOtaPolicy() {
+      const cleanUrl = (cloudConfig?.url || '').trim().replace(/\/$/, '');
+      if (!cleanUrl || !cloudConfig?.key) {
+        alert('Cloud configuration missing.');
+        return;
+      }
+      const rolloutPercentage = parseInt(document.getElementById('otaRolloutPct')?.value || '100', 10);
+      const canaryHwids = (document.getElementById('otaCanaryHwids')?.value || '')
+        .split(',')
+        .map(s => s.trim().toUpperCase())
+        .filter(Boolean);
+      const blockedVersions = (document.getElementById('otaBlockedVersions')?.value || '')
+        .split(',')
+        .map(s => s.trim().replace(/^v/i, ''))
+        .filter(Boolean);
+
+      const payload = {
+        key: 'ota_rollout_policy',
+        value: { rolloutPercentage, canaryHwids, blockedVersions }
+      };
+
+      const res = await fetch(`${cleanUrl}/rest/v1/system_config?on_conflict=key`, {
+        method: 'POST',
+        headers: {
+          'apikey': cloudConfig.key,
+          'Authorization': `Bearer ${cloudConfig.key}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'resolution=merge-duplicates'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) {
+        const err = await res.text();
+        alert('Failed to publish OTA rollout policy: ' + err);
+        return;
+      }
+
+      closeOtaPolicyModal();
+      alert(`✓ OTA Policy Published!\nRollout: ${rolloutPercentage}%\nCanary HWIDs: ${canaryHwids.length}\nBlocked Versions: ${blockedVersions.join(', ') || 'None'}`);
     }
 
     let cancelTargetHwid = null;

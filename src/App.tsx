@@ -522,12 +522,66 @@ export default function App() {
   const [isInstallingUpdate, setIsInstallingUpdate] = useState(false);
   const [updateProgressPct, setUpdateProgressPct] = useState<number | null>(null);
   const [isUpdateDismissed, setIsUpdateDismissed] = useState(false);
+  const [rollbackInfo, setRollbackInfo] = useState<{ available: boolean; previousVersion?: string | null } | null>(null);
+  const [isBlockedVersion, setIsBlockedVersion] = useState(false);
+
+  const getHwidRolloutBucket = (hwid: string) => {
+    let hash = 0;
+    for (let i = 0; i < hwid.length; i++) {
+      hash = (hash * 31 + hwid.charCodeAt(i)) >>> 0;
+    }
+    return hash % 100;
+  };
+
+  const handleLocalRollback = async () => {
+    if (!rollbackInfo?.available) return;
+    try {
+      await invoke("trigger_local_rollback");
+    } catch (err) {
+      setErrorMsg(`Rollback failed: ${err}`);
+    }
+  };
 
   const checkForAppUpdates = async (manual = false) => {
     setIsCheckingUpdate(true);
     try {
+      const [policy, rbInfo] = await Promise.all([
+        invoke<{ rolloutPercentage: number; canaryHwids: string[]; blockedVersions: string[] }>("get_ota_rollout_policy").catch(() => ({
+          rolloutPercentage: 100,
+          canaryHwids: [] as string[],
+          blockedVersions: [] as string[],
+        })),
+        invoke<{ available: boolean; previousVersion?: string | null }>("get_ota_rollback_info").catch(() => null),
+      ]);
+
+      if (rbInfo) setRollbackInfo(rbInfo);
+
+      const curVer = status?.version || "";
+      if (curVer && Array.isArray(policy.blockedVersions) && policy.blockedVersions.includes(curVer)) {
+        setIsBlockedVersion(true);
+      } else {
+        setIsBlockedVersion(false);
+      }
+
       const update = await check();
       if (update?.available) {
+        if (Array.isArray(policy.blockedVersions) && policy.blockedVersions.includes(update.version)) {
+          if (manual) {
+            setErrorMsg(`Update v${update.version} is currently paused/blocked by administrator.`);
+            setTimeout(() => setErrorMsg(null), 5000);
+          }
+          return;
+        }
+
+        const pct = typeof policy.rolloutPercentage === "number" ? policy.rolloutPercentage : 100;
+        const hwid = (licenseState?.hwid || "").toUpperCase();
+        const isCanary = hwid !== "" && Array.isArray(policy.canaryHwids) && policy.canaryHwids.some((id) => id.trim().toUpperCase() === hwid);
+        const inRolloutBucket = pct >= 100 || (pct > 0 && (hwid ? getHwidRolloutBucket(hwid) < pct : false));
+
+        if (!manual && !isCanary && !inRolloutBucket) {
+          return;
+        }
+
         setAvailableUpdate(update);
         setIsUpdateDismissed(false);
       } else if (manual) {
@@ -549,6 +603,10 @@ export default function App() {
     setIsInstallingUpdate(true);
     setUpdateProgressPct(0);
     try {
+      // Layer 2: Snapshot current working EXE + SQLite DB + Start Menu Restore script before updating
+      await invoke("prepare_ota_rollback_snapshot").catch((e) =>
+        console.warn("Pre-update rollback snapshot warning:", e)
+      );
       let downloaded = 0;
       let totalLength = 0;
       await availableUpdate.downloadAndInstall((event) => {
@@ -2329,6 +2387,29 @@ export default function App() {
                   </div>
                 </button>
 
+                {rollbackInfo?.available && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsSettingsMenuOpen(false);
+                      handleLocalRollback();
+                    }}
+                    className="w-full flex items-center gap-3 p-2.5 rounded-xl bg-rose-950/40 hover:bg-rose-900/60 text-rose-200 hover:text-white transition group border border-rose-500/40 cursor-pointer text-left"
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-400 shrink-0">
+                      <RotateCcw className="w-4 h-4" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-bold text-rose-200">
+                        Restore Previous Version (v{rollbackInfo.previousVersion || "prev"})
+                      </div>
+                      <p className="text-[10px] text-rose-300/80 truncate mt-0.5">
+                        Instant offline rollback to pre-update snapshot
+                      </p>
+                    </div>
+                  </button>
+                )}
+
                 {/* 8. Contact Us & Software Provider Support (Last Option in Settings) */}
                 <button
                   type="button"
@@ -2466,6 +2547,35 @@ export default function App() {
 
       {/* Main Workspace */}
       <main className={`flex-1 min-h-0 w-full mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4 flex flex-col overflow-y-auto ${isViewingAllHistory ? "max-w-[1920px] space-y-6" : "max-w-[1920px]"}`}>
+        {/* Emergency Blocked-Version Rollback Banner (Layer 3) */}
+        {isBlockedVersion && (
+          <div className="p-3.5 mb-3 bg-gradient-to-r from-rose-950/95 via-slate-900 to-rose-950/95 border-2 border-rose-500 rounded-2xl text-rose-100 text-xs sm:text-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 flex-shrink-0 shadow-2xl relative z-20">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <div className="w-9 h-9 rounded-xl bg-rose-500/20 border border-rose-400/40 flex items-center justify-center text-rose-300 shrink-0">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <div className="font-extrabold text-white text-xs sm:text-sm">
+                  ⚠️ Critical Issue Detected in v{status?.version}
+                </div>
+                <div className="text-[11px] text-rose-200 mt-0.5">
+                  This release has been recalled by PrintDrop Support. Please restore the previous working version immediately.
+                </div>
+              </div>
+            </div>
+            {rollbackInfo?.available && (
+              <button
+                type="button"
+                onClick={handleLocalRollback}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-lg transition flex items-center gap-1.5 shrink-0 cursor-pointer"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Restore v{rollbackInfo.previousVersion || "Previous"} Now</span>
+              </button>
+            )}
+          </div>
+        )}
+
         {/* In-App OTA Software Update Available Banner */}
         {availableUpdate && !isUpdateDismissed && (
           <div className="p-3.5 mb-3 bg-gradient-to-r from-indigo-950/95 via-slate-900 to-cyan-950/95 border border-cyan-500/60 rounded-2xl text-cyan-100 text-xs sm:text-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 flex-shrink-0 shadow-xl animate-fade-in relative z-20">
