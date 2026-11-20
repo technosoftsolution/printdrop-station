@@ -1456,9 +1456,17 @@ pub async fn update_station_profile(
     state: State<'_, AppState>,
     shop_name: String,
     owner_name: Option<String>,
+    city: Option<String>,
     phone: Option<String>,
+    mark_configured: Option<bool>,
 ) -> Result<crate::licensing::LicenseStateDto, String> {
-    let updated = state.license_mgr.update_station_profile(&shop_name, owner_name, phone)?;
+    let updated = state.license_mgr.update_station_profile(
+        &shop_name,
+        owner_name,
+        city,
+        phone,
+        mark_configured.unwrap_or(true),
+    )?;
     let mgr_clone = state.license_mgr.clone();
     let db_clone = state.db.clone();
     tokio::spawn(async move {

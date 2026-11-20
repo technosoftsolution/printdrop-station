@@ -249,7 +249,16 @@
           >
         </div>
 
-        <div class="flex items-center gap-2 w-full sm:w-auto">
+        <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+          <select
+            id="filterCity"
+            onchange="onFilterChange()"
+            class="px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 max-w-[150px]"
+            title="Filter by Location / City"
+          >
+            <option value="ALL">All Locations</option>
+          </select>
+
           <select
             id="filterPlan"
             onchange="onFilterChange()"
@@ -278,6 +287,19 @@
             <option value="REVOKED">Revoked / Suspended</option>
             <option value="DORMANT">😴 Dormant (&gt; 30 Days Offline)</option>
             <option value="UNINSTALLED">🗑️ Uninstalled (Archived)</option>
+          </select>
+
+          <select
+            id="sortBy"
+            onchange="onFilterChange()"
+            class="px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
+            title="Sort Stations"
+          >
+            <option value="NEWEST">Sort: Newest</option>
+            <option value="NAME_ASC">Sort: Shop A–Z</option>
+            <option value="CITY_ASC">Sort: Location A–Z</option>
+            <option value="EXPIRING_SOON">Sort: Expiring Soon</option>
+            <option value="MOST_PRINTS">Sort: Most Prints</option>
           </select>
 
           <button onclick="refreshData()" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 transition" title="Refresh Stations">
@@ -556,17 +578,58 @@
     <div class="flex-1 overflow-y-auto p-5 space-y-4 text-xs">
       <!-- Identity card (Shared across both tabs) -->
       <div class="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2">
-        <div class="flex justify-between items-center text-slate-400">
-          <span>Owner / Manager</span>
-          <span class="text-white font-semibold" id="drwOwner">Rajesh Patel</span>
+        <div class="flex items-center justify-between pb-1.5 border-b border-slate-800/70">
+          <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Station Identity</span>
+          <button type="button" onclick="toggleDrawerIdentityEdit()" class="text-[11px] font-semibold text-indigo-400 hover:text-indigo-300 flex items-center gap-1 cursor-pointer">
+            <i data-lucide="edit-3" class="w-3 h-3"></i>
+            <span id="drwIdentityEditBtnText">Edit</span>
+          </button>
         </div>
-        <div class="flex justify-between items-center text-slate-400">
-          <span>WhatsApp Phone</span>
-          <span class="text-emerald-400 font-semibold flex items-center gap-1" id="drwPhone">+91 98765 43210</span>
+        <div id="drwIdentityView" class="space-y-2">
+          <div class="flex justify-between items-center text-slate-400 gap-2">
+            <span>Station Name</span>
+            <span class="text-white font-bold text-right" id="drwIdentityShopName">Retail Station</span>
+          </div>
+          <div class="flex justify-between items-center text-slate-400 gap-2">
+            <span>Owner / Manager</span>
+            <span class="text-white font-semibold text-right" id="drwOwner">Rajesh Patel</span>
+          </div>
+          <div class="flex justify-between items-center text-slate-400 gap-2">
+            <span>Location</span>
+            <span class="text-slate-200 font-medium text-right" id="drwLocation">N/A</span>
+          </div>
+          <div class="flex justify-between items-center text-slate-400 gap-2">
+            <span>WhatsApp Phone</span>
+            <span class="text-emerald-400 font-semibold flex items-center gap-1" id="drwPhone">+91 98765 43210</span>
+          </div>
+          <div class="flex justify-between items-center text-slate-400 gap-2 pt-1 border-t border-slate-800/60">
+            <span>Station HWID</span>
+            <span class="font-mono text-indigo-300 font-bold select-all" id="drwHwid">PD-XXXX-XXXX</span>
+          </div>
         </div>
-        <div class="flex justify-between items-center text-slate-400">
-          <span>Station HWID</span>
-          <span class="font-mono text-indigo-300 font-bold select-all" id="drwHwid">PD-XXXX-XXXX</span>
+        <div id="drwIdentityEditForm" class="hidden space-y-2 pt-1">
+          <div>
+            <label class="block text-[10px] font-semibold text-slate-400 mb-0.5">Station Name</label>
+            <input type="text" id="drwEditShopName" class="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-indigo-500">
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-[10px] font-semibold text-slate-400 mb-0.5">Owner / Manager</label>
+              <input type="text" id="drwEditOwner" class="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-indigo-500">
+            </div>
+            <div>
+              <label class="block text-[10px] font-semibold text-slate-400 mb-0.5">WhatsApp Phone</label>
+              <input type="text" id="drwEditPhone" class="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-indigo-500">
+            </div>
+          </div>
+          <div>
+            <label class="block text-[10px] font-semibold text-slate-400 mb-0.5">Location / City</label>
+            <input type="text" id="drwEditLocation" class="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-indigo-500">
+          </div>
+          <div class="flex items-center justify-end gap-2 pt-1">
+            <button type="button" onclick="toggleDrawerIdentityEdit()" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-semibold cursor-pointer">Cancel</button>
+            <button type="button" onclick="saveDrawerIdentity()" class="px-3 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-bold cursor-pointer">Save &amp; Sync</button>
+          </div>
         </div>
       </div>
 
@@ -2410,12 +2473,27 @@
       }
     }
 
+    function populateCityFilter() {
+      const sel = document.getElementById('filterCity');
+      if (!sel) return;
+      const currentVal = sel.value || 'ALL';
+      const cities = Array.from(new Set(
+        stations.map(s => (s.city || '').trim()).filter(Boolean)
+      )).sort((a, b) => a.localeCompare(b));
+      sel.innerHTML = `<option value="ALL">All Locations (${cities.length})</option>` +
+        cities.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+      if (cities.includes(currentVal)) sel.value = currentVal;
+    }
+
     function renderStationsTable() {
+      populateCityFilter();
       const tbody = document.getElementById('stationsTableBody');
       const empty = document.getElementById('emptyState');
       const search = (document.getElementById('searchInput')?.value || '').toLowerCase().trim();
+      const cityFilter = document.getElementById('filterCity')?.value || 'ALL';
       const planFilter = document.getElementById('filterPlan')?.value || 'ALL';
       const statusFilter = document.getElementById('filterStatus')?.value || 'ALL';
+      const sortBy = document.getElementById('sortBy')?.value || 'NEWEST';
 
       // Update pending upgrade banner count
       const pendingCount = stations.filter(s => s.payment_status === 'PAYMENT_SUBMITTED').length;
@@ -2444,6 +2522,7 @@
           if (!matchShop && !matchOwner && !matchPhone && !matchCity && !matchHwid) return false;
         }
 
+        if (cityFilter !== 'ALL' && (s.city || '').trim() !== cityFilter) return false;
         if (planFilter !== 'ALL' && s.plan_type !== planFilter) return false;
 
         const isRevoked = s.is_active === false;
@@ -2470,6 +2549,24 @@
         if (statusFilter === 'ACTIVE' && (isTrial || isRevoked || isExpired || isUninstalled)) return false;
 
         return true;
+      });
+
+      filtered.sort((a, b) => {
+        if (sortBy === 'NAME_ASC') {
+          return (a.shop_name || '').localeCompare(b.shop_name || '');
+        }
+        if (sortBy === 'CITY_ASC') {
+          return (a.city || 'zzz').localeCompare(b.city || 'zzz');
+        }
+        if (sortBy === 'EXPIRING_SOON') {
+          const da = getCalendarDaysRemaining(a.expires_at);
+          const db = getCalendarDaysRemaining(b.expires_at);
+          return (da === null ? 99999 : da) - (db === null ? 99999 : db);
+        }
+        if (sortBy === 'MOST_PRINTS') {
+          return Number(b.pages_printed_lifetime || 0) - Number(a.pages_printed_lifetime || 0);
+        }
+        return new Date(b.created_at || b.issued_at || 0) - new Date(a.created_at || a.issued_at || 0);
       });
 
       updateKpis(stations);
@@ -2562,16 +2659,22 @@
           }
         }
 
+        const isNeedsSetup = cleanShopName === 'PrintDrop Retail Station' || !s.owner_name || !s.city || !s.phone;
+        const shortTag = s.hwid ? `#${s.hwid.slice(-4)}` : '';
         tr.innerHTML = `
           <td class="py-3 px-4">
-            <div class="font-bold text-white text-xs flex items-center gap-1.5">
-              <span>${escapeHtml(cleanShopName)}</span>
+            <div class="font-bold text-white text-xs flex items-center gap-1.5 flex-wrap">
+              <span>🏪 ${escapeHtml(cleanShopName)}</span>
+              ${isNeedsSetup ? `<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40" title="Station has not completed Shop Name / Owner / Location / Mobile setup yet">⚠️ Needs Setup</span>` : ''}
               ${!isUninstalledRow && s.reinstalled_at ? `<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30" title="Previously uninstalled, reinstalled on ${new Date(s.reinstalled_at).toLocaleDateString()}">🔄 Reinstalled</span>` : ''}
             </div>
-            <div class="text-[11px] text-slate-400 flex items-center gap-1.5 mt-0.5">
-              <span>${escapeHtml(s.owner_name || 'Owner')}</span>
-              ${s.city ? `&bull; <span class="text-slate-400">${escapeHtml(s.city)}</span>` : ''}
-              ${s.phone ? `&bull; <a href="https://wa.me/${cleanPhone(s.phone)}" target="_blank" class="text-emerald-400 hover:underline">${escapeHtml(s.phone)}</a>` : ''}
+            <div class="text-[11px] text-slate-300 flex items-center gap-1.5 mt-0.5 flex-wrap">
+              <span>👤 ${escapeHtml(s.owner_name || 'Owner not set')}</span>
+              ${s.phone ? `&bull; <a href="https://wa.me/${cleanPhone(s.phone)}" target="_blank" class="text-emerald-400 hover:underline font-medium">📱 ${escapeHtml(s.phone)}</a>` : '<span class="text-slate-500">&bull; No phone</span>'}
+            </div>
+            <div class="text-[10px] text-slate-400 flex items-center gap-1.5 mt-0.5 flex-wrap">
+              <span>📍 ${escapeHtml(s.city || 'Location not set')}</span>
+              ${shortTag ? `<span class="font-mono text-[9px] px-1.5 py-0.2 rounded bg-slate-800/90 text-indigo-300 border border-slate-700">${escapeHtml(shortTag)}</span>` : ''}
             </div>
           </td>
           <td class="py-3 px-4 font-mono text-xs text-indigo-300 font-bold select-all">
@@ -3296,15 +3399,110 @@
       window.open(`https://wa.me/${cleanPhone(phone)}?text=${msg}`, '_blank');
     }
 
+    function toggleDrawerIdentityEdit() {
+      const editForm = document.getElementById('drwIdentityEditForm');
+      const viewBox = document.getElementById('drwIdentityView');
+      const editBtnText = document.getElementById('drwIdentityEditBtnText');
+      if (!editForm || !viewBox) return;
+      const isEditing = !editForm.classList.contains('hidden');
+      if (isEditing) {
+        editForm.classList.add('hidden');
+        viewBox.classList.remove('hidden');
+        if (editBtnText) editBtnText.innerText = 'Edit';
+      } else {
+        editForm.classList.remove('hidden');
+        viewBox.classList.add('hidden');
+        if (editBtnText) editBtnText.innerText = 'Cancel';
+      }
+    }
+
+    async function saveDrawerIdentity() {
+      if (!selectedStation) return;
+      const shopName = (document.getElementById('drwEditShopName')?.value || '').trim();
+      const ownerName = (document.getElementById('drwEditOwner')?.value || '').trim() || null;
+      const city = (document.getElementById('drwEditLocation')?.value || '').trim() || null;
+      const phone = (document.getElementById('drwEditPhone')?.value || '').trim() || null;
+
+      if (!shopName) {
+        alert('Station Name cannot be empty.');
+        return;
+      }
+
+      let notesObj = {};
+      try {
+        if (selectedStation.notes) notesObj = JSON.parse(selectedStation.notes);
+      } catch (_) {}
+      const profileUpdatedAt = new Date().toISOString();
+      notesObj.profile_updated_at = profileUpdatedAt;
+      const notesStr = JSON.stringify(notesObj);
+
+      const cleanUrl = (cloudConfig?.url || '').trim().replace(/\/$/, '');
+      if (!cleanUrl || !cloudConfig?.key) {
+        alert('Cloud configuration missing.');
+        return;
+      }
+
+      const res = await fetch(`${cleanUrl}/rest/v1/licenses?hwid=eq.${selectedStation.hwid}`, {
+        method: 'PATCH',
+        headers: {
+          'apikey': cloudConfig.key,
+          'Authorization': `Bearer ${cloudConfig.key}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          shop_name: shopName,
+          owner_name: ownerName,
+          city: city,
+          phone: phone,
+          notes: notesStr
+        })
+      });
+
+      if (!res.ok) {
+        const err = await res.text();
+        alert('Failed to update station identity: ' + err);
+        return;
+      }
+
+      selectedStation.shop_name = shopName;
+      selectedStation.owner_name = ownerName;
+      selectedStation.city = city;
+      selectedStation.phone = phone;
+      selectedStation.notes = notesStr;
+
+      openDrawer(selectedStation);
+      renderStationsTable();
+    }
+
     // Customer Drawer Logic
     function openDrawer(s) {
       selectedStation = s;
       const cleanShop = (s.shop_name || 'Retail Station').replace(/\s*\((Trial|Trial Mode)\)\s*/gi, '').trim();
       document.getElementById('drwShopName').innerText = cleanShop;
       document.getElementById('drwCity').innerText = s.city ? `${s.city} (Customer Station)` : 'Retail Station';
-      document.getElementById('drwOwner').innerText = s.owner_name || 'Owner';
-      document.getElementById('drwPhone').innerText = s.phone || 'N/A';
+      const idShopEl = document.getElementById('drwIdentityShopName');
+      if (idShopEl) idShopEl.innerText = cleanShop;
+      document.getElementById('drwOwner').innerText = s.owner_name || 'Not set';
+      const idLocEl = document.getElementById('drwLocation');
+      if (idLocEl) idLocEl.innerText = s.city || 'Not set';
+      document.getElementById('drwPhone').innerText = s.phone || 'Not set';
       document.getElementById('drwHwid').innerText = s.hwid;
+
+      // Reset inline identity edit form
+      const editForm = document.getElementById('drwIdentityEditForm');
+      const viewBox = document.getElementById('drwIdentityView');
+      const editBtnText = document.getElementById('drwIdentityEditBtnText');
+      if (editForm) editForm.classList.add('hidden');
+      if (viewBox) viewBox.classList.remove('hidden');
+      if (editBtnText) editBtnText.innerText = 'Edit';
+      const edShop = document.getElementById('drwEditShopName');
+      const edOwner = document.getElementById('drwEditOwner');
+      const edLoc = document.getElementById('drwEditLocation');
+      const edPhone = document.getElementById('drwEditPhone');
+      if (edShop) edShop.value = cleanShop;
+      if (edOwner) edOwner.value = s.owner_name || '';
+      if (edLoc) edLoc.value = s.city || '';
+      if (edPhone) edPhone.value = s.phone || '';
 
       const issuedDt = s.issued_at ? new Date(s.issued_at) : new Date();
       const expiresDt = s.expires_at ? new Date(s.expires_at) : null;

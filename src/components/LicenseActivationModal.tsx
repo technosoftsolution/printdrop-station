@@ -88,7 +88,10 @@ export interface LicenseStateDto {
   planDisplayName: string;
   shopName: string;
   ownerName?: string | null;
+  city?: string | null;
   phone?: string | null;
+  profileConfigured?: boolean;
+  profileUpdatedAt?: string | null;
   startDate: string;
   expiryDate?: string | null;
   daysRemaining: number;

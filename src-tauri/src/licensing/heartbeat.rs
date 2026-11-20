@@ -49,6 +49,7 @@ struct RemoteLicenseRecord {
     pub hwid: String,
     pub shop_name: String,
     pub owner_name: Option<String>,
+    pub city: Option<String>,
     pub phone: Option<String>,
     pub plan_type: String,
     pub pages_granted: Option<u64>,
@@ -185,13 +186,15 @@ pub async fn perform_heartbeat(
 
         let notes_json = serde_json::json!({
             "history": payments_with_usage,
-            "trial_usage": trial_usage
+            "trial_usage": trial_usage,
+            "profile_updated_at": local_state.profile_updated_at
         }).to_string();
 
         let new_record = serde_json::json!({
             "hwid": hwid,
             "shop_name": local_state.shop_name,
             "owner_name": local_state.owner_name,
+            "city": local_state.city,
             "phone": local_state.phone,
             "plan_type": match local_state.plan_type {
                 LicensePlanType::Trial => "TRIAL",
@@ -326,9 +329,15 @@ pub async fn perform_heartbeat(
         let _ = license_mgr.apply_verified_payload(&remote_payload);
     }
 
-    // Synchronize payment records from remote registry
+    // Synchronize payment records & profile timestamp from remote registry
+    let mut remote_profile_updated_at: Option<String> = None;
     if let Some(ref notes_str) = remote.notes {
         if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(notes_str) {
+            if let Some(ts) = parsed.get("profile_updated_at").and_then(|v| v.as_str()) {
+                if !ts.trim().is_empty() {
+                    remote_profile_updated_at = Some(ts.trim().to_string());
+                }
+            }
             if let Some(arr) = parsed.get("history").and_then(|h| h.as_array()) {
                 let mut remote_recs = Vec::new();
                 for item in arr {
@@ -342,6 +351,15 @@ pub async fn perform_heartbeat(
             }
         }
     }
+
+    // Bidirectional Last-Write-Wins profile sync
+    license_mgr.sync_remote_profile_if_newer(
+        &remote.shop_name,
+        remote.owner_name.clone(),
+        remote.city.clone(),
+        remote.phone.clone(),
+        remote_profile_updated_at,
+    );
 
     if remote.payment_status.as_deref() == Some("VERIFIED_PAID") && remote.amount_paid.unwrap_or(0.0) > 0.0 {
         let payment_ref = remote.payment_reference.clone().unwrap_or_else(|| "ONLINE-VERIFIED".to_string());
@@ -411,7 +429,8 @@ pub async fn perform_heartbeat(
 
     let notes_json = serde_json::json!({
         "history": payments_with_usage,
-        "trial_usage": trial_usage
+        "trial_usage": trial_usage,
+        "profile_updated_at": local_state.as_ref().and_then(|s| s.profile_updated_at.clone())
     }).to_string();
 
     let is_reinstall_recovery = remote.is_installed == Some(false);
@@ -429,6 +448,7 @@ pub async fn perform_heartbeat(
             serde_json::json!({
                 "shop_name": local_state.as_ref().map(|s| s.shop_name.clone()).unwrap_or_else(|| lp.shop_name.clone()),
                 "owner_name": local_state.as_ref().and_then(|s| s.owner_name.clone()).or_else(|| lp.owner_name.clone()),
+                "city": local_state.as_ref().and_then(|s| s.city.clone()),
                 "phone": local_state.as_ref().and_then(|s| s.phone.clone()).or_else(|| lp.phone.clone()),
                 "plan_type": plan_code,
                 "pages_granted": lp.pages_granted,
@@ -447,6 +467,7 @@ pub async fn perform_heartbeat(
             serde_json::json!({
                 "shop_name": local_state.as_ref().map(|s| s.shop_name.clone()),
                 "owner_name": local_state.as_ref().and_then(|s| s.owner_name.clone()),
+                "city": local_state.as_ref().and_then(|s| s.city.clone()),
                 "phone": local_state.as_ref().and_then(|s| s.phone.clone()),
                 "last_ping_at": now_iso,
                 "pages_printed_lifetime": lifetime_prints,
@@ -461,6 +482,7 @@ pub async fn perform_heartbeat(
         serde_json::json!({
             "shop_name": local_state.as_ref().map(|s| s.shop_name.clone()),
             "owner_name": local_state.as_ref().and_then(|s| s.owner_name.clone()),
+            "city": local_state.as_ref().and_then(|s| s.city.clone()),
             "phone": local_state.as_ref().and_then(|s| s.phone.clone()),
             "last_ping_at": now_iso,
             "pages_printed_lifetime": lifetime_prints,

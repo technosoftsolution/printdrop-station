@@ -81,10 +81,12 @@ pub struct SessionQuery {
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct HealthResponse {
     pub status: &'static str,
     pub service: &'static str,
     pub version: &'static str,
+    pub station_name: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -220,11 +222,20 @@ pub fn start_server(
     })
 }
 
-async fn health_check() -> Json<HealthResponse> {
+async fn health_check(State(state): State<ServerState>) -> Json<HealthResponse> {
+    let station_name = state.db.with_conn(|conn| {
+        let mut stmt = conn.prepare("SELECT shop_name FROM app_licenses WHERE id = 1")?;
+        let name: String = stmt.query_row([], |r| r.get(0))?;
+        Ok(name)
+    }).ok().and_then(|s| {
+        let clean = s.replace("(Trial Mode)", "").replace("(Trial)", "").trim().to_string();
+        if clean.is_empty() || clean == "PrintDrop Retail Station" { None } else { Some(clean) }
+    });
     Json(HealthResponse {
         status: "ok",
         service: "PrintDrop Local Receiver",
         version: env!("CARGO_PKG_VERSION"),
+        station_name,
     })
 }
 

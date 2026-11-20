@@ -15,7 +15,9 @@ import { LivePrintSpoolerModal } from "./components/LivePrintSpoolerModal";
 import { BackupRestoreModal } from "./components/BackupRestoreModal";
 import { LicenseActivationModal, LicenseStateDto, ProviderPaymentConfig } from "./components/LicenseActivationModal";
 import { HelpGuideModal } from "./components/HelpGuideModal";
+import { StationSetupModal } from "./components/StationSetupModal";
 import { 
+  Store,
   Printer, 
   Wifi, 
   QrCode as QrIcon, 
@@ -576,6 +578,9 @@ export default function App() {
     return () => clearTimeout(timer);
   }, []);
   const [isLicenseModalOpen, setIsLicenseModalOpen] = useState(false);
+  const [isStationSetupOpen, setIsStationSetupOpen] = useState(false);
+  const [isStationEditMode, setIsStationEditMode] = useState(false);
+  const [hasSkippedSetupThisSession, setHasSkippedSetupThisSession] = useState(false);
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
   const [isContactUsModalOpen, setIsContactUsModalOpen] = useState(false);
   const [providerProfile, setProviderProfile] = useState<ProviderPaymentConfig | null>(null);
@@ -585,10 +590,14 @@ export default function App() {
   const [selectedOrderBilling, setSelectedOrderBilling] = useState<OrderBilling | null>(null);
   const [expandedFilesOrderIds, setExpandedFilesOrderIds] = useState<Set<string>>(new Set());
 
-  // Dynamic App & Window Title Syncing based on License Plan
+  // Dynamic App & Window Title Syncing based on Station Name & License Plan
   useEffect(() => {
     const isTrial = !licenseState || licenseState.planType === "TRIAL";
-    const appTitle = isTrial
+    const rawShop = licenseState?.shopName?.trim() || "";
+    const hasCustomShop = rawShop !== "" && rawShop !== "PrintDrop Retail Station";
+    const appTitle = hasCustomShop
+      ? `${rawShop} • Powered by PrintDrop${isTrial ? " (Demo)" : ""}`
+      : isTrial
       ? "PrintDrop Demo Station - Shopkeeper Counter OS"
       : "PrintDrop Station - Shopkeeper Counter OS";
     document.title = appTitle;
@@ -597,7 +606,78 @@ export default function App() {
     } catch {
       // Browser preview fallback
     }
-  }, [licenseState?.planType]);
+  }, [licenseState?.planType, licenseState?.shopName]);
+
+  // First-Run Trial Prompt (skippable) & Mandatory Commercial License Station Profile Enforcement
+  useEffect(() => {
+    if (!licenseState) return;
+    const rawShop = licenseState.shopName?.trim() || "";
+    const hasCustomShop = rawShop !== "" && rawShop !== "PrintDrop Retail Station";
+    const hasAllFields =
+      hasCustomShop &&
+      Boolean(licenseState.ownerName?.trim()) &&
+      Boolean(licenseState.city?.trim()) &&
+      Boolean(licenseState.phone?.trim());
+
+    if (hasAllFields) {
+      if (isStationSetupOpen && !isStationEditMode) {
+        setIsStationSetupOpen(false);
+      }
+      return;
+    }
+
+    if (licenseState.planType !== "TRIAL") {
+      setIsStationEditMode(false);
+      setIsStationSetupOpen(true);
+    } else if (!licenseState.profileConfigured && !hasSkippedSetupThisSession) {
+      setIsStationEditMode(false);
+      setIsStationSetupOpen(true);
+    }
+  }, [licenseState, hasSkippedSetupThisSession, isStationSetupOpen, isStationEditMode]);
+
+  // If station profile is incomplete on startup, trigger an immediate cloud sync
+  // so Admin Portal updates pull down within ~1s instead of waiting 10s.
+  const hasTriggeredStartupProfileSyncRef = useRef(false);
+  useEffect(() => {
+    if (!licenseState || hasTriggeredStartupProfileSyncRef.current) return;
+    const rawShop = licenseState.shopName?.trim() || "";
+    const hasAllFields =
+      rawShop !== "" &&
+      rawShop !== "PrintDrop Retail Station" &&
+      Boolean(licenseState.ownerName?.trim()) &&
+      Boolean(licenseState.city?.trim()) &&
+      Boolean(licenseState.phone?.trim());
+    if (!hasAllFields) {
+      hasTriggeredStartupProfileSyncRef.current = true;
+      invoke<{ updatedLicense?: LicenseStateDto | null }>("sync_license_cloud")
+        .then((res) => {
+          if (res?.updatedLicense) {
+            setLicenseState(res.updatedLicense);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [licenseState]);
+
+  const handleSaveStationProfile = async (data: {
+    shopName: string;
+    ownerName: string;
+    city: string;
+    phone: string;
+  }) => {
+    const updated = await invoke<LicenseStateDto>("update_station_profile", {
+      shopName: data.shopName,
+      ownerName: data.ownerName,
+      city: data.city,
+      phone: data.phone,
+      markConfigured: true,
+    });
+    setLicenseState(updated);
+    setIsStationSetupOpen(false);
+    setIsStationEditMode(false);
+    setActionSuccessMsg(`Station profile saved: ${data.shopName} • Syncing with Cloud`);
+    setTimeout(() => setActionSuccessMsg(null), 4000);
+  };
 
   const refreshProviderProfile = async (silent = false) => {
     try {
@@ -1939,7 +2019,11 @@ export default function App() {
           </div>
           <div>
             <h1 className="text-lg font-bold tracking-tight text-white flex items-center gap-2 group-hover:text-indigo-200 transition-colors">
-              PrintDrop
+              {licenseState?.shopName &&
+              licenseState.shopName.trim() !== "" &&
+              licenseState.shopName.trim() !== "PrintDrop Retail Station"
+                ? licenseState.shopName.trim()
+                : "PrintDrop"}
               <span className="text-[10px] uppercase tracking-wider bg-indigo-900/70 text-indigo-300 border border-indigo-700/60 px-2 py-0.5 rounded-full font-semibold">
                 {(!licenseState || licenseState.planType === 'TRIAL') ? 'Demo Station' : 'Shopkeeper Station'}
               </span>
@@ -1952,7 +2036,13 @@ export default function App() {
                 </span>
               )}
             </h1>
-            <p className="text-[11px] text-slate-400 group-hover:text-slate-300 transition-colors">Batch Print Automation &amp; Custom Print Workflow</p>
+            <p className="text-[11px] text-slate-400 group-hover:text-slate-300 transition-colors">
+              {licenseState?.shopName &&
+              licenseState.shopName.trim() !== "" &&
+              licenseState.shopName.trim() !== "PrintDrop Retail Station"
+                ? `Powered by PrintDrop • Contact: ${providerProfile?.contactPhone || licenseState?.providerContactPhone || "8108101790"}`
+                : "Batch Print Automation & Custom Print Workflow"}
+            </p>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-1.5 sm:gap-2.5">
@@ -2056,6 +2146,30 @@ export default function App() {
                 </button>
 
                 <div className="border-t border-slate-800 my-1"></div>
+
+                {/* Station Profile & Identity */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsSettingsMenuOpen(false);
+                    setIsViewingAllHistory(false);
+                    setIsStationEditMode(true);
+                    setIsStationSetupOpen(true);
+                  }}
+                  className="w-full flex items-center gap-3 p-2.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-white transition group border border-slate-800 hover:border-indigo-500/50 cursor-pointer text-left"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-indigo-500/20 border border-indigo-500/40 flex items-center justify-center text-indigo-400 group-hover:scale-105 transition shrink-0">
+                    <Store className="w-4 h-4" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-bold text-indigo-200">Station Profile &amp; Identity</div>
+                    <p className="text-[10px] text-slate-400 truncate mt-0.5">
+                      {licenseState?.shopName && licenseState.shopName !== "PrintDrop Retail Station"
+                        ? `${licenseState.shopName}${licenseState.city ? ` • ${licenseState.city}` : ""}`
+                        : "Set Shop Name, Owner, Location & Mobile"}
+                    </p>
+                  </div>
+                </button>
 
                 {/* 2. Corporate Portals */}
                 <button
@@ -4991,7 +5105,13 @@ export default function App() {
       <CountertopPosterModal
         isOpen={showPosterModal}
         onClose={() => setShowPosterModal(false)}
-        shopName="TechnoSoft Solution"
+        shopName={
+          licenseState?.shopName &&
+          licenseState.shopName.trim() !== "" &&
+          licenseState.shopName.trim() !== "PrintDrop Retail Station"
+            ? `${licenseState.shopName.trim()} • Powered by PrintDrop`
+            : "PrintDrop Station"
+        }
         wifiSsid={wifiInfo?.ssid || ""}
         wifiPassword={wifiInfo?.password}
         wifiQrDataUrl={wifiInfo?.qrDataUrl}
@@ -5277,6 +5397,28 @@ export default function App() {
           </div>
         </div>
       )}
+      {/* Station First-Run & Profile Setup Modal */}
+      <StationSetupModal
+        isOpen={isStationSetupOpen}
+        isTrial={!licenseState || licenseState.planType === "TRIAL"}
+        allowSkip={(!licenseState || licenseState.planType === "TRIAL") && !isStationEditMode}
+        isEditMode={isStationEditMode}
+        initialValues={{
+          shopName: licenseState?.shopName || "",
+          ownerName: licenseState?.ownerName || "",
+          city: licenseState?.city || "",
+          phone: licenseState?.phone || "",
+        }}
+        onSave={handleSaveStationProfile}
+        onSkip={() => {
+          setHasSkippedSetupThisSession(true);
+          setIsStationSetupOpen(false);
+        }}
+        onClose={() => {
+          setIsStationSetupOpen(false);
+          setIsStationEditMode(false);
+        }}
+      />
     </div>
   );
 }

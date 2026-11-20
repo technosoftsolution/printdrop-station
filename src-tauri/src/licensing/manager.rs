@@ -82,6 +82,9 @@ impl LicenseManager {
                 .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
                 let _ = conn.execute_batch("ALTER TABLE print_jobs ADD COLUMN pages_printed INTEGER DEFAULT 0;");
                 let _ = conn.execute_batch("ALTER TABLE print_jobs ADD COLUMN is_metered INTEGER DEFAULT 0;");
+                let _ = conn.execute_batch("ALTER TABLE app_licenses ADD COLUMN city TEXT;");
+                let _ = conn.execute_batch("ALTER TABLE app_licenses ADD COLUMN profile_configured INTEGER NOT NULL DEFAULT 0;");
+                let _ = conn.execute_batch("ALTER TABLE app_licenses ADD COLUMN profile_updated_at TEXT;");
                 Ok(())
             })
             .map_err(|e| format!("Failed to initialize app_licenses table: {}", e))
@@ -159,6 +162,9 @@ impl LicenseManager {
             expires_at_str,
             signature,
             last_seen_epoch,
+            city,
+            profile_configured_int,
+            profile_updated_at,
         ) = self
             .db
             .with_conn(|conn| {
@@ -167,7 +173,8 @@ impl LicenseManager {
                     SELECT 
                         hwid, shop_name, owner_name, phone,
                         plan_type, pages_granted, pages_used, pages_printed_lifetime,
-                        issued_at, expires_at, signature, last_seen_epoch
+                        issued_at, expires_at, signature, last_seen_epoch,
+                        city, COALESCE(profile_configured, 0), profile_updated_at
                     FROM app_licenses WHERE id = 1
                     "#,
                 )
@@ -187,6 +194,9 @@ impl LicenseManager {
                         row.get::<_, Option<String>>(9)?,
                         row.get::<_, String>(10)?,
                         row.get::<_, i64>(11)?,
+                        row.get::<_, Option<String>>(12)?,
+                        row.get::<_, i64>(13)?,
+                        row.get::<_, Option<String>>(14)?,
                     ))
                 })
                 .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
@@ -553,6 +563,13 @@ impl LicenseManager {
             shop_name
         };
 
+        let is_profile_configured = profile_configured_int > 0
+            || (!clean_shop_name.trim().is_empty()
+                && clean_shop_name.trim() != "PrintDrop Retail Station"
+                && owner_name.as_deref().map(|s| !s.trim().is_empty()).unwrap_or(false)
+                && city.as_deref().map(|s| !s.trim().is_empty()).unwrap_or(false)
+                && phone.as_deref().map(|s| !s.trim().is_empty()).unwrap_or(false));
+
         Ok(LicenseStateDto {
             hwid: self.hwid.clone(),
             is_valid,
@@ -561,7 +578,10 @@ impl LicenseManager {
             plan_display_name: plan_type.display_name().to_string(),
             shop_name: clean_shop_name,
             owner_name,
+            city,
             phone,
+            profile_configured: is_profile_configured,
+            profile_updated_at,
             start_date: issued_at_str,
             expiry_date: expires_at_str,
             days_remaining,
@@ -689,9 +709,9 @@ impl LicenseManager {
                 conn.execute(
                     r#"
                     UPDATE app_licenses SET
-                        shop_name = ?1,
-                        owner_name = ?2,
-                        phone = ?3,
+                        shop_name = CASE WHEN TRIM(shop_name) = '' OR shop_name = 'PrintDrop Retail Station' THEN ?1 ELSE shop_name END,
+                        owner_name = CASE WHEN (owner_name IS NULL OR TRIM(owner_name) = '') THEN ?2 ELSE owner_name END,
+                        phone = CASE WHEN (phone IS NULL OR TRIM(phone) = '') THEN ?3 ELSE phone END,
                         plan_type = ?4,
                         pages_granted = ?5,
                         pages_used = CASE WHEN issued_at != ?6 THEN 0 ELSE pages_used END,
@@ -782,24 +802,40 @@ impl LicenseManager {
             .ok()
     }
 
-    /// Updates the customer's shop name, owner name, and phone contact in the local station registry
+    /// Updates the customer's shop name, owner name, location/city, and phone contact in the local station registry
     pub fn update_station_profile(
         &self,
         shop_name: &str,
         owner_name: Option<String>,
+        city: Option<String>,
         phone: Option<String>,
+        mark_configured: bool,
     ) -> Result<LicenseStateDto, String> {
         let clean_shop = if shop_name.trim().is_empty() {
             "PrintDrop Retail Station".to_string()
         } else {
             shop_name.trim().to_string()
         };
+        let clean_owner = owner_name.and_then(|v| {
+            let t = v.trim().to_string();
+            if t.is_empty() { None } else { Some(t) }
+        });
+        let clean_city = city.and_then(|v| {
+            let t = v.trim().to_string();
+            if t.is_empty() { None } else { Some(t) }
+        });
+        let clean_phone = phone.and_then(|v| {
+            let t = v.trim().to_string();
+            if t.is_empty() { None } else { Some(t) }
+        });
+        let now_iso = Utc::now().to_rfc3339();
+        let configured_flag: i64 = if mark_configured { 1 } else { 0 };
 
         self.db
             .with_conn(|conn| {
                 conn.execute(
-                    "UPDATE app_licenses SET shop_name = ?1, owner_name = ?2, phone = ?3 WHERE id = 1",
-                    params![clean_shop, owner_name, phone],
+                    "UPDATE app_licenses SET shop_name = ?1, owner_name = ?2, city = ?3, phone = ?4, profile_configured = CASE WHEN ?5 = 1 THEN 1 ELSE profile_configured END, profile_updated_at = ?6 WHERE id = 1",
+                    params![clean_shop, clean_owner, clean_city, clean_phone, configured_flag, now_iso],
                 )
                 .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
                 Ok(())
@@ -807,6 +843,73 @@ impl LicenseManager {
             .map_err(|e| format!("Failed to update station profile: {}", e))?;
 
         self.get_license_state()
+    }
+
+    /// Bidirectional Last-Write-Wins profile sync: applies remote station identity if it is newer
+    /// than the local profile_updated_at timestamp (or if local is still unconfigured default).
+    pub fn sync_remote_profile_if_newer(
+        &self,
+        remote_shop: &str,
+        remote_owner: Option<String>,
+        remote_city: Option<String>,
+        remote_phone: Option<String>,
+        remote_profile_updated_at: Option<String>,
+    ) -> bool {
+        let local = match self.get_license_state() {
+            Ok(s) => s,
+            Err(_) => return false,
+        };
+
+        let remote_shop_clean = remote_shop.trim();
+        let remote_has_data = (!remote_shop_clean.is_empty() && remote_shop_clean != "PrintDrop Retail Station")
+            || remote_owner.as_deref().map(|s| !s.trim().is_empty()).unwrap_or(false)
+            || remote_city.as_deref().map(|s| !s.trim().is_empty()).unwrap_or(false)
+            || remote_phone.as_deref().map(|s| !s.trim().is_empty()).unwrap_or(false);
+
+        if !remote_has_data {
+            return false;
+        }
+
+        let local_is_default = local.shop_name.trim() == "PrintDrop Retail Station"
+            || !local.profile_configured;
+
+        let should_pull_remote = if local_is_default {
+            true
+        } else {
+            match (
+                remote_profile_updated_at.as_deref().and_then(|s| DateTime::parse_from_rfc3339(s).ok()),
+                local.profile_updated_at.as_deref().and_then(|s| DateTime::parse_from_rfc3339(s).ok()),
+            ) {
+                (Some(r_dt), Some(l_dt)) => r_dt > l_dt,
+                (Some(_), None) => true,
+                _ => false,
+            }
+        };
+
+        if !should_pull_remote {
+            return false;
+        }
+
+        let final_shop = if !remote_shop_clean.is_empty() {
+            remote_shop_clean.to_string()
+        } else {
+            local.shop_name.clone()
+        };
+        let final_owner = remote_owner.filter(|s| !s.trim().is_empty()).or(local.owner_name);
+        let final_city = remote_city.filter(|s| !s.trim().is_empty()).or(local.city);
+        let final_phone = remote_phone.filter(|s| !s.trim().is_empty()).or(local.phone);
+        let ts = remote_profile_updated_at.unwrap_or_else(|| Utc::now().to_rfc3339());
+
+        self.db
+            .with_conn(|conn| {
+                conn.execute(
+                    "UPDATE app_licenses SET shop_name = ?1, owner_name = ?2, city = ?3, phone = ?4, profile_configured = 1, profile_updated_at = ?5 WHERE id = 1",
+                    params![final_shop, final_owner, final_city, final_phone, ts],
+                )
+                .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+                Ok(())
+            })
+            .is_ok()
     }
 
     /// Verifies if the station is currently licensed and authorized to print `requested_pages`

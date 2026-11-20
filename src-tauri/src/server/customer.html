@@ -543,8 +543,8 @@
   <!-- Top Header -->
   <header class="header">
     <div class="brand" onclick="switchToUploadView()" title="Back to Home / New Order">
-      <span class="brand-title">PrintDrop</span>
-      <span class="brand-badge">Express</span>
+      <span class="brand-title" id="headerBrandTitle">PrintDrop</span>
+      <span class="brand-badge" id="headerBrandBadge">Express</span>
     </div>
     <div class="header-actions">
       <button id="btnHeaderLookup" onclick="promptOrderLookup()" style="background:rgba(255,255,255,0.06); border:1px solid #334155; color:#94a3b8; font-size:0.7rem; font-weight:600; padding:0.25rem 0.5rem; border-radius:9999px; cursor:pointer;" title="Find order by #ID">
@@ -705,6 +705,15 @@
                 const inp = document.getElementById("customerNameInput");
                 const sName = localStorage.getItem("printdrop_customer_name");
                 if (inp && sName) inp.value = sName;
+                fetch("/api/health").then(r => r.ok ? r.json() : null).then(d => {
+                  if (d && d.stationName) {
+                    const bt = document.getElementById("headerBrandTitle");
+                    const bb = document.getElementById("headerBrandBadge");
+                    if (bt) bt.textContent = d.stationName;
+                    if (bb) bb.textContent = "Powered by PrintDrop";
+                    document.title = d.stationName + " • Powered by PrintDrop";
+                  }
+                }).catch(() => {});
               } catch (_) {}
             })();
           </script>
