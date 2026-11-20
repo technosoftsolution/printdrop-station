@@ -662,6 +662,8 @@ impl LicenseManager {
             provider_whatsapp_number: provider_config.whatsapp_number,
             provider_support_email: provider_config.support_email,
             status_message,
+            credit_balance: self.get_credit_balance(),
+            auto_renew_enabled: self.get_auto_renew_enabled(),
         })
     }
 
@@ -927,6 +929,55 @@ impl LicenseManager {
                 Ok(res)
             })
             .ok()
+    }
+
+    /// Returns the station's Rupee Credit Wallet balance (in INR)
+    pub fn get_credit_balance(&self) -> f64 {
+        self.db
+            .get_config("station_credit_balance")
+            .ok()
+            .flatten()
+            .and_then(|s| s.trim().parse::<f64>().ok())
+            .map(|v| if v.is_finite() && v > 0.0 { v } else { 0.0 })
+            .unwrap_or(0.0)
+    }
+
+    /// Persists the station's Rupee Credit Wallet balance (in INR)
+    pub fn set_credit_balance(&self, amount: f64) {
+        let clean = if amount.is_finite() && amount > 0.0 {
+            (amount * 100.0).round() / 100.0
+        } else {
+            0.0
+        };
+        let _ = self.db.set_config("station_credit_balance", &format!("{:.2}", clean));
+    }
+
+    /// Returns whether Auto-Renew on Expiry is enabled for this station
+    pub fn get_auto_renew_enabled(&self) -> bool {
+        self.db
+            .get_config("auto_renew_enabled")
+            .ok()
+            .flatten()
+            .map(|v| v == "true" || v == "1")
+            .unwrap_or(false)
+    }
+
+    /// Sets whether Auto-Renew on Expiry is enabled for this station
+    pub fn set_auto_renew_enabled(&self, enabled: bool) {
+        let _ = self
+            .db
+            .set_config("auto_renew_enabled", if enabled { "true" } else { "false" });
+    }
+
+    /// Returns the most recent paid commercial plan (excluding WALLET_TOPUP and CANCELLED) for Auto-Renew
+    pub fn get_last_renewable_plan(&self) -> Option<LicensePaymentRecord> {
+        self.get_payment_history().ok().and_then(|list| {
+            list.into_iter().find(|p| {
+                p.status == "VERIFIED_PAID"
+                    && p.plan_code != "WALLET_TOPUP"
+                    && p.amount_paid > 0.0
+            })
+        })
     }
 
     /// Updates the customer's shop name, owner name, location/city, and phone contact in the local station registry

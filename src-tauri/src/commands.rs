@@ -1672,6 +1672,11 @@ pub async fn submit_license_payment_claim(
 
     let inv_sfx = if claim.hwid.len() >= 4 { &claim.hwid[claim.hwid.len() - 4..] } else { "0001" };
     let now_iso = chrono::Utc::now().to_rfc3339();
+    let credit_used = claim.wallet_credit_used.unwrap_or(0.0).max(0.0);
+    if credit_used > 0.0 {
+        let cur_bal = state.license_mgr.get_credit_balance();
+        state.license_mgr.set_credit_balance((cur_bal - credit_used).max(0.0));
+    }
     let rec = crate::licensing::LicensePaymentRecord {
         id: format!("claim_{}_{}", claim.hwid.trim(), &claim.payment_reference.trim()),
         hwid: claim.hwid.trim().to_string(),
@@ -1680,7 +1685,7 @@ pub async fn submit_license_payment_claim(
         amount_paid: claim.amount_paid,
         pages_granted: claim.requested_pages,
         duration_days: None,
-        payment_mode: claim.payment_mode.clone(),
+        payment_mode: if credit_used > 0.0 { format!("{}+WALLET", claim.payment_mode) } else { claim.payment_mode.clone() },
         payment_reference: claim.payment_reference.clone(),
         invoice_number: format!("PD-INV-{}", inv_sfx),
         status: if claim.payment_mode == "RAZORPAY_CHECKOUT" { "VERIFIED_PAID".to_string() } else { "PENDING_VERIFICATION".to_string() },
@@ -1698,6 +1703,146 @@ pub async fn submit_license_payment_claim(
         "Payment of ₹{:.2} for {} submitted successfully! Reference / UTR: {}",
         claim.amount_paid, claim.requested_plan, claim.payment_reference
     ))
+}
+
+#[tauri::command]
+pub async fn activate_plan_with_wallet_credit(
+    state: State<'_, AppState>,
+    plan_code: String,
+    plan_name: String,
+    pages_granted: Option<u64>,
+    duration_days: Option<i64>,
+    plan_amount: f64,
+) -> Result<crate::licensing::LicenseStateDto, String> {
+    crate::licensing::heartbeat::redeem_wallet_credit_for_plan(
+        &state.license_mgr,
+        &state.db,
+        &plan_code,
+        &plan_name,
+        pages_granted,
+        duration_days,
+        plan_amount,
+    )
+    .await
+}
+
+#[tauri::command]
+pub async fn topup_wallet_credit(
+    state: State<'_, AppState>,
+    amount: f64,
+    payment_mode: String,
+    payment_reference: String,
+) -> Result<crate::licensing::LicenseStateDto, String> {
+    if !amount.is_finite() || amount <= 0.0 {
+        return Err("Top-up amount must be greater than ₹0.".to_string());
+    }
+
+    let cloud_config = crate::licensing::heartbeat::get_cloud_config(&state.db);
+    let base_url = cloud_config.supabase_url.trim().trim_end_matches('/');
+    let anon_key = cloud_config.supabase_anon_key.trim();
+    if base_url.is_empty() || anon_key.is_empty() {
+        return Err("Cloud registry is not configured.".to_string());
+    }
+
+    let hwid = state.license_mgr.get_hwid().to_string();
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(12))
+        .build()
+        .map_err(|e| format!("HTTP client error: {}", e))?;
+
+    let get_url = format!("{}/rest/v1/licenses?hwid=eq.{}&select=notes&limit=1", base_url, hwid);
+    let resp = client
+        .get(&get_url)
+        .header("apikey", anon_key)
+        .header("Authorization", format!("Bearer {}", anon_key))
+        .send()
+        .await
+        .map_err(|e| format!("Internet connection required for Wallet Top-Up: {}", e))?;
+
+    let rows: Vec<serde_json::Value> = if resp.status().is_success() {
+        resp.json().await.unwrap_or_default()
+    } else {
+        Vec::new()
+    };
+
+    let mut notes_obj: serde_json::Value = rows
+        .first()
+        .and_then(|r| r.get("notes"))
+        .and_then(|v| v.as_str())
+        .and_then(|s| serde_json::from_str(s).ok())
+        .unwrap_or_else(|| serde_json::json!({}));
+
+    let current_credit = notes_obj
+        .get("credit_balance")
+        .and_then(|v| v.as_f64())
+        .unwrap_or_else(|| state.license_mgr.get_credit_balance());
+    let new_credit = ((current_credit + amount) * 100.0).round() / 100.0;
+
+    let now = chrono::Utc::now();
+    let now_iso = now.to_rfc3339();
+    let inv_sfx = if hwid.len() >= 4 { &hwid[hwid.len() - 4..] } else { "0001" };
+    let ts_tail: String = now.timestamp().to_string().chars().rev().take(4).collect();
+
+    let rec = crate::licensing::LicensePaymentRecord {
+        id: format!("topup_{}_{}", hwid, now.timestamp()),
+        hwid: hwid.clone(),
+        plan_code: "WALLET_TOPUP".to_string(),
+        plan_name: format!("Credit Wallet Top-Up (₹{:.0})", amount),
+        amount_paid: amount,
+        pages_granted: None,
+        duration_days: None,
+        payment_mode,
+        payment_reference,
+        invoice_number: format!("PD-TOP-{}-{}", ts_tail, inv_sfx),
+        status: "VERIFIED_PAID".to_string(),
+        created_at: now_iso,
+    };
+
+    let mut history_arr = notes_obj
+        .get("history")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+    history_arr.insert(0, serde_json::to_value(&rec).unwrap_or(serde_json::Value::Null));
+
+    if let Some(obj) = notes_obj.as_object_mut() {
+        obj.insert("history".to_string(), serde_json::Value::Array(history_arr));
+        obj.insert("credit_balance".to_string(), serde_json::json!(new_credit));
+        obj.insert("auto_renew_enabled".to_string(), serde_json::json!(state.license_mgr.get_auto_renew_enabled()));
+    }
+
+    let patch_url = format!("{}/rest/v1/licenses?hwid=eq.{}", base_url, hwid);
+    let patch_res = client
+        .patch(&patch_url)
+        .header("apikey", anon_key)
+        .header("Authorization", format!("Bearer {}", anon_key))
+        .header("Content-Type", "application/json")
+        .json(&serde_json::json!({ "notes": notes_obj.to_string() }))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to sync Wallet Top-Up to cloud: {}", e))?;
+
+    if !patch_res.status().is_success() {
+        return Err("Cloud registry rejected Wallet Top-Up.".to_string());
+    }
+
+    state.license_mgr.set_credit_balance(new_credit);
+    let _ = state.license_mgr.record_payment(rec);
+    state.license_mgr.get_license_state()
+}
+
+#[tauri::command]
+pub async fn set_auto_renew_enabled(
+    state: State<'_, AppState>,
+    enabled: bool,
+) -> Result<crate::licensing::LicenseStateDto, String> {
+    state.license_mgr.set_auto_renew_enabled(enabled);
+    let mgr_clone = state.license_mgr.clone();
+    let db_clone = state.db.clone();
+    tokio::spawn(async move {
+        crate::licensing::heartbeat::perform_heartbeat(mgr_clone, db_clone).await;
+    });
+    state.license_mgr.get_license_state()
 }
 
 #[tauri::command]

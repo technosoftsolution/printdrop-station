@@ -335,10 +335,13 @@ pub async fn perform_heartbeat(
         let _ = license_mgr.apply_verified_payload(&remote_payload);
     }
 
-    // Synchronize payment records & profile timestamp from remote registry
+    // Synchronize payment records, credit wallet & profile timestamp from remote registry
     let mut remote_profile_updated_at: Option<String> = None;
     if let Some(ref notes_str) = remote.notes {
         if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(notes_str) {
+            if let Some(cb) = parsed.get("credit_balance").and_then(|v| v.as_f64()) {
+                license_mgr.set_credit_balance(cb);
+            }
             if let Some(ts) = parsed.get("profile_updated_at").and_then(|v| v.as_str()) {
                 if !ts.trim().is_empty() {
                     remote_profile_updated_at = Some(ts.trim().to_string());
@@ -436,7 +439,9 @@ pub async fn perform_heartbeat(
     let notes_json = serde_json::json!({
         "history": payments_with_usage,
         "trial_usage": trial_usage,
-        "profile_updated_at": local_state.as_ref().and_then(|s| s.profile_updated_at.clone())
+        "profile_updated_at": local_state.as_ref().and_then(|s| s.profile_updated_at.clone()),
+        "credit_balance": license_mgr.get_credit_balance(),
+        "auto_renew_enabled": license_mgr.get_auto_renew_enabled()
     }).to_string();
 
     let is_reinstall_recovery = remote.is_installed == Some(false);
@@ -522,6 +527,32 @@ pub async fn perform_heartbeat(
     sync_provider_profile_config(&client, base_url, anon_key, &db).await;
     record_successful_sync(&db, &now_iso);
 
+    // Auto-Renew on Expiry using Credit Wallet if enabled
+    if license_mgr.get_auto_renew_enabled() {
+        if let Ok(cur) = license_mgr.get_license_state() {
+            let needs_renewal = cur.plan_type != LicensePlanType::Trial
+                && (!cur.is_valid
+                    || cur.is_license_grace_active
+                    || (cur.plan_type == LicensePlanType::WalletPages && cur.wallet_pages_remaining == Some(0)));
+            if needs_renewal {
+                if let Some(last_plan) = license_mgr.get_last_renewable_plan() {
+                    if license_mgr.get_credit_balance() + 0.01 >= last_plan.amount_paid {
+                        info!("Auto-Renew triggered on expiry for plan {} (₹{:.2})", last_plan.plan_code, last_plan.amount_paid);
+                        let _ = redeem_wallet_credit_for_plan(
+                            &license_mgr,
+                            &db,
+                            &last_plan.plan_code,
+                            &last_plan.plan_name,
+                            last_plan.pages_granted,
+                            last_plan.duration_days,
+                            last_plan.amount_paid,
+                        ).await;
+                    }
+                }
+            }
+        }
+    }
+
     let updated_state = license_mgr.get_license_state().ok();
     let sync_msg = if let Some(ref st) = updated_state {
         format!(
@@ -550,6 +581,220 @@ pub async fn perform_heartbeat(
         hours_until_grace_expires: None,
         updated_license: updated_state,
     }
+}
+
+/// Shared helper to redeem Rupee Credit Wallet balance for a commercial plan (used by manual checkout & Auto-Renew).
+pub async fn redeem_wallet_credit_for_plan(
+    license_mgr: &Arc<LicenseManager>,
+    db: &Arc<Database>,
+    plan_code: &str,
+    plan_name: &str,
+    pages_granted: Option<u64>,
+    duration_days: Option<i64>,
+    plan_amount: f64,
+) -> Result<LicenseStateDto, String> {
+    if plan_amount <= 0.0 {
+        return Err("Invalid plan amount".to_string());
+    }
+    let local_credit = license_mgr.get_credit_balance();
+    if local_credit + 0.01 < plan_amount {
+        return Err(format!(
+            "Insufficient Credit Wallet balance (₹{:.2} available, ₹{:.2} required).",
+            local_credit, plan_amount
+        ));
+    }
+
+    let cloud_config = get_cloud_config(db);
+    let base_url = cloud_config.supabase_url.trim().trim_end_matches('/');
+    let anon_key = cloud_config.supabase_anon_key.trim();
+    if base_url.is_empty() || anon_key.is_empty() {
+        return Err("Cloud registry is not configured.".to_string());
+    }
+
+    let hwid = license_mgr.get_hwid().to_string();
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(12))
+        .build()
+        .map_err(|e| format!("HTTP client error: {}", e))?;
+
+    let get_url = format!("{}/rest/v1/licenses?hwid=eq.{}&select=*&limit=1", base_url, hwid);
+    let resp = client
+        .get(&get_url)
+        .header("apikey", anon_key)
+        .header("Authorization", format!("Bearer {}", anon_key))
+        .send()
+        .await
+        .map_err(|e| format!("Internet connection required to redeem Wallet Credit: {}", e))?;
+
+    if !resp.status().is_success() {
+        return Err("Failed to verify Wallet Credit with cloud registry.".to_string());
+    }
+
+    let rows: Vec<serde_json::Value> = resp.json().await.map_err(|e| e.to_string())?;
+    let remote = rows.first().ok_or_else(|| "Station record not found in cloud registry.".to_string())?;
+
+    let mut notes_obj: serde_json::Value = remote
+        .get("notes")
+        .and_then(|v| v.as_str())
+        .and_then(|s| serde_json::from_str(s).ok())
+        .unwrap_or_else(|| serde_json::json!({}));
+
+    let remote_credit = notes_obj
+        .get("credit_balance")
+        .and_then(|v| v.as_f64())
+        .unwrap_or(local_credit);
+
+    if remote_credit + 0.01 < plan_amount {
+        license_mgr.set_credit_balance(remote_credit);
+        return Err(format!(
+            "Insufficient cloud Credit Wallet balance (₹{:.2} available, ₹{:.2} required).",
+            remote_credit, plan_amount
+        ));
+    }
+
+    let new_credit = ((remote_credit - plan_amount).max(0.0) * 100.0).round() / 100.0;
+    let now = Utc::now();
+    let issued_at = now.to_rfc3339();
+    let remote_plan_type = remote.get("plan_type").and_then(|v| v.as_str()).unwrap_or("TRIAL");
+    let is_from_trial = remote_plan_type == "TRIAL";
+    let existing_pages = if is_from_trial {
+        0
+    } else {
+        remote.get("pages_granted").and_then(|v| v.as_u64()).unwrap_or(0)
+    };
+    let existing_exp_opt = if !is_from_trial {
+        remote
+            .get("expires_at")
+            .and_then(|v| v.as_str())
+            .and_then(|s| DateTime::parse_from_rfc3339(s).ok())
+            .map(|dt| dt.with_timezone(&Utc))
+    } else {
+        None
+    };
+
+    let (target_plan_enum, target_plan_str, final_pages, final_expires) = if let Some(add_pgs) = pages_granted {
+        let total_pgs = existing_pages + add_pgs;
+        if let Some(exp) = existing_exp_opt.filter(|e| *e > now) {
+            let p_enum = match remote_plan_type {
+                "SUB_QUARTERLY" => LicensePlanType::SubQuarterly,
+                "SUB_HALF_YEARLY" => LicensePlanType::SubHalfYearly,
+                "SUB_ANNUAL" => LicensePlanType::SubAnnual,
+                _ => LicensePlanType::SubMonthly,
+            };
+            (p_enum, remote_plan_type.to_string(), Some(total_pgs), Some(exp.to_rfc3339()))
+        } else {
+            (LicensePlanType::WalletPages, "WALLET_PAGES".to_string(), Some(total_pgs), None)
+        }
+    } else {
+        let days = duration_days.unwrap_or(30).max(1);
+        let base_dt = existing_exp_opt.filter(|e| *e > now).unwrap_or(now);
+        let exp_iso = (base_dt + chrono::Duration::days(days)).to_rfc3339();
+        let (p_enum, p_str) = match plan_code {
+            "SUB_QUARTERLY" => (LicensePlanType::SubQuarterly, "SUB_QUARTERLY"),
+            "SUB_HALF_YEARLY" => (LicensePlanType::SubHalfYearly, "SUB_HALF_YEARLY"),
+            "SUB_ANNUAL" => (LicensePlanType::SubAnnual, "SUB_ANNUAL"),
+            _ => (LicensePlanType::SubMonthly, "SUB_MONTHLY"),
+        };
+        let kept_pages = if is_from_trial { None } else { remote.get("pages_granted").and_then(|v| v.as_u64()) };
+        (p_enum, p_str.to_string(), kept_pages, Some(exp_iso))
+    };
+
+    let canonical = super::crypto::format_canonical_license_string(
+        &hwid,
+        &target_plan_enum,
+        final_pages,
+        &issued_at,
+        final_expires.as_deref(),
+    );
+    let signature = super::crypto::sign_license_data(&canonical);
+
+    let inv_sfx = if hwid.len() >= 4 { &hwid[hwid.len() - 4..] } else { "0001" };
+    let ts_tail: String = now.timestamp().to_string().chars().rev().take(6).collect();
+    let pay_ref = format!("WALLET-{}", ts_tail);
+    let inv_no = format!("PD-WLT-{}-{}", &ts_tail.chars().take(4).collect::<String>(), inv_sfx);
+
+    let pay_rec = super::models::LicensePaymentRecord {
+        id: format!("wallet_{}_{}", hwid, now.timestamp()),
+        hwid: hwid.clone(),
+        plan_code: plan_code.to_string(),
+        plan_name: plan_name.to_string(),
+        amount_paid: plan_amount,
+        pages_granted,
+        duration_days,
+        payment_mode: "WALLET_CREDIT".to_string(),
+        payment_reference: pay_ref.clone(),
+        invoice_number: inv_no.clone(),
+        status: "VERIFIED_PAID".to_string(),
+        created_at: issued_at.clone(),
+    };
+
+    let mut history_arr = notes_obj
+        .get("history")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+    history_arr.insert(0, serde_json::to_value(&pay_rec).unwrap_or(serde_json::Value::Null));
+
+    if let Some(obj) = notes_obj.as_object_mut() {
+        obj.insert("history".to_string(), serde_json::Value::Array(history_arr));
+        obj.insert("credit_balance".to_string(), serde_json::json!(new_credit));
+        obj.insert("auto_renew_enabled".to_string(), serde_json::json!(license_mgr.get_auto_renew_enabled()));
+    }
+
+    let patch_url = format!("{}/rest/v1/licenses?hwid=eq.{}", base_url, hwid);
+    let patch_body = serde_json::json!({
+        "plan_type": target_plan_str,
+        "pages_granted": final_pages,
+        "issued_at": issued_at,
+        "expires_at": final_expires,
+        "signature": signature,
+        "is_active": true,
+        "amount_paid": plan_amount,
+        "payment_mode": "WALLET_CREDIT",
+        "payment_reference": pay_ref,
+        "invoice_number": inv_no,
+        "payment_status": "VERIFIED_PAID",
+        "notes": notes_obj.to_string()
+    });
+
+    let patch_res = client
+        .patch(&patch_url)
+        .header("apikey", anon_key)
+        .header("Authorization", format!("Bearer {}", anon_key))
+        .header("Content-Type", "application/json")
+        .json(&patch_body)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to update cloud license: {}", e))?;
+
+    if !patch_res.status().is_success() {
+        return Err("Cloud registry rejected wallet activation.".to_string());
+    }
+
+    license_mgr.set_credit_balance(new_credit);
+    let _ = db.set_config("active_plan_display_name", plan_name);
+    let _ = license_mgr.record_payment(pay_rec);
+
+    let local_state = license_mgr.get_license_state()?;
+    let payload = LicensePayload {
+        hwid,
+        shop_name: local_state.shop_name,
+        owner_name: local_state.owner_name,
+        city: local_state.city,
+        phone: local_state.phone,
+        plan_type: target_plan_enum,
+        pages_granted: final_pages,
+        issued_at,
+        expires_at: final_expires,
+        signature,
+        plan_name: Some(plan_name.to_string()),
+        amount_paid: Some(plan_amount),
+        payment_mode: Some("WALLET_CREDIT".to_string()),
+        payment_reference: Some(pay_ref),
+        invoice_number: Some(inv_no),
+    };
+
+    license_mgr.apply_verified_payload(&payload)
 }
 
 async fn sync_provider_profile_config(

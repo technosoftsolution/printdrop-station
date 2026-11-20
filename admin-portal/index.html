@@ -602,6 +602,10 @@
             <span>WhatsApp Phone</span>
             <span class="text-emerald-400 font-semibold flex items-center gap-1" id="drwPhone">+91 98765 43210</span>
           </div>
+          <div class="flex justify-between items-center text-slate-400 gap-2">
+            <span>Credit Wallet (₹)</span>
+            <span class="text-amber-300 font-bold" id="drwCreditBalance">₹0.00</span>
+          </div>
           <div class="flex justify-between items-center text-slate-400 gap-2 pt-1 border-t border-slate-800/60">
             <span>Station HWID</span>
             <span class="font-mono text-indigo-300 font-bold select-all" id="drwHwid">PD-XXXX-XXXX</span>
@@ -1213,6 +1217,86 @@
             <span>Print / Save as PDF</span>
           </button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL 3C: CANCEL PLAN (NO CREDIT VS CREDIT WALLET) -->
+  <!-- ========================================================================= -->
+  <div id="cancelPlanModal" class="fixed inset-0 z-50 hidden bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 no-print">
+    <div class="w-full max-w-md bg-slate-900 border border-rose-500/40 rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+      <div class="px-5 py-4 border-b border-slate-800 bg-slate-950/70 flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-400">
+            <i data-lucide="x-circle" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-white">Cancel Latest Plan</h3>
+            <p class="text-[11px] text-slate-400" id="cancelModalSubtitle">Station details</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeCancelPlanModal()" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <div class="p-5 space-y-4 text-xs">
+        <div class="p-3 rounded-xl bg-slate-950/80 border border-slate-800 space-y-1">
+          <div class="flex justify-between text-slate-400">
+            <span>Plan to Cancel:</span>
+            <span class="font-bold text-white" id="cancelModalPlanName">Plan</span>
+          </div>
+          <div class="flex justify-between text-slate-400">
+            <span>Recorded Amount:</span>
+            <span class="font-bold text-emerald-400" id="cancelModalRecordedAmt">₹0.00</span>
+          </div>
+          <div class="flex justify-between text-slate-400">
+            <span>Pages Printed:</span>
+            <span class="font-bold text-cyan-300">0 pages (Eligible)</span>
+          </div>
+        </div>
+
+        <div class="space-y-2.5">
+          <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400">Choose Cancellation Action:</label>
+
+          <!-- Option 1: Cancel Only (₹0 Credit) -->
+          <label id="cancelOptNoCreditLabel" onclick="setCancelPlanMode('NO_CREDIT')" class="flex items-start gap-3 p-3 rounded-xl bg-slate-950/70 border border-slate-800 hover:border-rose-500/50 cursor-pointer transition">
+            <input type="radio" name="cancelPlanMode" id="cancelRadioNoCredit" value="NO_CREDIT" class="mt-0.5 accent-rose-500">
+            <div>
+              <div class="font-bold text-white text-xs">1. Cancel Plan Only (₹0 Wallet Credit)</div>
+              <div class="text-[11px] text-slate-400 mt-0.5">Use if payment failed or plan was activated by mistake. No ₹ added to wallet.</div>
+            </div>
+          </label>
+
+          <!-- Option 2: Cancel & Credit Wallet (Editable ₹) -->
+          <label id="cancelOptCreditLabel" onclick="setCancelPlanMode('CREDIT_WALLET')" class="flex items-start gap-3 p-3 rounded-xl bg-slate-950/70 border border-amber-500/40 cursor-pointer transition">
+            <input type="radio" name="cancelPlanMode" id="cancelRadioCredit" value="CREDIT_WALLET" checked class="mt-0.5 accent-amber-500">
+            <div class="flex-1 space-y-2">
+              <div>
+                <div class="font-bold text-white text-xs">2. Cancel Plan &amp; Credit Shopkeeper Wallet (₹)</div>
+                <div class="text-[11px] text-slate-400 mt-0.5">Shifts the paid amount (editable) into the station's Rupee Credit Wallet.</div>
+              </div>
+              <div id="cancelCreditInputWrap" class="flex items-center gap-2">
+                <span class="text-amber-400 font-bold text-sm">₹</span>
+                <input type="number" id="cancelCreditAmountInput" min="0" step="1" class="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-amber-500/50 text-white font-bold text-sm focus:outline-none focus:border-amber-400">
+              </div>
+            </div>
+          </label>
+        </div>
+
+        <div class="p-2.5 rounded-lg bg-slate-950 border border-slate-800 text-[11px] text-slate-400">
+          Active license will automatically roll back to the previous valid plan (or Trial if none).
+        </div>
+      </div>
+
+      <div class="px-5 py-3.5 border-t border-slate-800 bg-slate-950/70 flex items-center justify-end gap-2">
+        <button type="button" onclick="closeCancelPlanModal()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold cursor-pointer">
+          Keep Plan
+        </button>
+        <button type="button" onclick="confirmCancelLatestPlan()" id="btnConfirmCancelPlan" class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-lg transition cursor-pointer">
+          Confirm Cancellation
+        </button>
       </div>
     </div>
   </div>
@@ -2507,6 +2591,177 @@
       }
     }
 
+    function getStationCreditBalance(s) {
+      if (!s || !s.notes) return 0;
+      try {
+        const parsed = typeof s.notes === 'string' ? JSON.parse(s.notes) : s.notes;
+        const val = Number(parsed?.credit_balance || 0);
+        return Number.isFinite(val) && val > 0 ? val : 0;
+      } catch (_) {
+        return 0;
+      }
+    }
+
+    let cancelTargetHwid = null;
+    let cancelMode = 'CREDIT_WALLET';
+
+    function setCancelPlanMode(mode) {
+      cancelMode = mode;
+      const rNo = document.getElementById('cancelRadioNoCredit');
+      const rCr = document.getElementById('cancelRadioCredit');
+      const wrap = document.getElementById('cancelCreditInputWrap');
+      const lblNo = document.getElementById('cancelOptNoCreditLabel');
+      const lblCr = document.getElementById('cancelOptCreditLabel');
+      if (rNo) rNo.checked = mode === 'NO_CREDIT';
+      if (rCr) rCr.checked = mode === 'CREDIT_WALLET';
+      if (wrap) wrap.classList.toggle('opacity-40', mode === 'NO_CREDIT');
+      const inp = document.getElementById('cancelCreditAmountInput');
+      if (inp) inp.disabled = mode === 'NO_CREDIT';
+      if (lblNo) lblNo.classList.toggle('border-rose-500/60', mode === 'NO_CREDIT');
+      if (lblCr) lblCr.classList.toggle('border-amber-500/60', mode === 'CREDIT_WALLET');
+    }
+
+    function closeCancelPlanModal() {
+      cancelTargetHwid = null;
+      document.getElementById('cancelPlanModal')?.classList.add('hidden');
+    }
+
+    function cancelLatestPlan(hwid) {
+      const s = stations.find(item => item.hwid === hwid);
+      if (!s) return;
+      const history = getStationPaymentHistory(s);
+      if (!history.length) {
+        alert('No paid plan found to cancel.');
+        return;
+      }
+      const latest = history[0];
+      if (latest.status === 'CANCELLED') {
+        alert('This plan is already cancelled.');
+        return;
+      }
+      const latestPrints = latest.usage
+        ? Number(latest.usage.totalPagesConsumed !== undefined ? latest.usage.totalPagesConsumed : (latest.usage.pagesPrintedTotal || 0))
+        : 0;
+      if (latestPrints > 0) {
+        alert(`Cannot cancel: ${latestPrints.toLocaleString()} page(s) have already been printed from this plan.`);
+        return;
+      }
+      const purchaseMs = latest.date ? new Date(latest.date).getTime() : 0;
+      if (!purchaseMs || (Date.now() - purchaseMs) > 24 * 60 * 60 * 1000) {
+        alert('Cannot cancel: More than 24 hours have passed since this plan was purchased.');
+        return;
+      }
+
+      cancelTargetHwid = hwid;
+      const cleanShop = (s.shop_name || s.hwid).replace(/\s*\((Trial|Trial Mode)\)\s*/gi, '').trim();
+      const recordedAmt = Number(latest.amount || 0);
+      document.getElementById('cancelModalSubtitle').innerText = `${cleanShop} (${s.hwid})`;
+      document.getElementById('cancelModalPlanName').innerText = latest.plan_name || latest.plan_code;
+      document.getElementById('cancelModalRecordedAmt').innerText = `₹${recordedAmt.toFixed(2)}`;
+      const amtInp = document.getElementById('cancelCreditAmountInput');
+      if (amtInp) amtInp.value = recordedAmt.toString();
+      setCancelPlanMode('CREDIT_WALLET');
+      document.getElementById('cancelPlanModal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    async function confirmCancelLatestPlan() {
+      if (!cancelTargetHwid) return;
+      const s = stations.find(item => item.hwid === cancelTargetHwid);
+      if (!s) return;
+      const history = getStationPaymentHistory(s);
+      if (!history.length) return;
+
+      let creditAmt = 0;
+      if (cancelMode === 'CREDIT_WALLET') {
+        const raw = parseFloat(document.getElementById('cancelCreditAmountInput')?.value || '0');
+        if (!Number.isFinite(raw) || raw < 0) {
+          alert('Please enter a valid Rupee amount (0 or greater).');
+          return;
+        }
+        creditAmt = Math.round(raw * 100) / 100;
+      }
+
+      let notesObj = {};
+      try {
+        if (s.notes) notesObj = typeof s.notes === 'string' ? JSON.parse(s.notes) : s.notes;
+      } catch (_) {}
+
+      const updatedHistory = history.map((rec, idx) =>
+        idx === 0 ? { ...rec, status: 'CANCELLED' } : rec
+      );
+      const prevCredit = getStationCreditBalance(s);
+      const newCredit = Math.round((prevCredit + creditAmt) * 100) / 100;
+
+      // Determine fallback plan (#2 active verified plan, or TRIAL)
+      const fallback = updatedHistory.find(
+        (rec, idx) => idx > 0 && (rec.status === 'VERIFIED_PAID' || rec.status === 'COMPLETED')
+      );
+
+      let targetPlanType = 'TRIAL';
+      let targetPages = 300;
+      let targetIssued = new Date().toISOString();
+      let targetExpires = new Date().toISOString();
+      if (fallback) {
+        const fc = fallback.plan_code || 'SUB_MONTHLY';
+        if (fc.startsWith('WALLET')) {
+          targetPlanType = 'WALLET_PAGES';
+          targetPages = Number(fallback.pages || 0) || null;
+          targetExpires = null;
+        } else {
+          targetPlanType = ['SUB_MONTHLY', 'SUB_QUARTERLY', 'SUB_HALF_YEARLY', 'SUB_ANNUAL'].includes(fc)
+            ? fc
+            : 'SUB_MONTHLY';
+          targetPages = null;
+          const baseDt = fallback.date ? new Date(fallback.date) : new Date();
+          const days = Number(fallback.duration_days || 30);
+          targetExpires = new Date(baseDt.getTime() + days * 86400000).toISOString();
+        }
+        targetIssued = fallback.date || targetIssued;
+      }
+
+      const pagesStr = targetPages !== null ? targetPages.toString() : 'UNLIMITED';
+      const expStr = targetExpires !== null ? targetExpires : 'NONE';
+      const canonical = `HWID=${s.hwid}|PLAN=${targetPlanType}|PAGES=${pagesStr}|ISSUED=${targetIssued}|EXPIRES=${expStr}`;
+      const signature = await signHmacSha256(canonical, MASTER_SIGNING_SECRET);
+
+      notesObj.history = updatedHistory;
+      notesObj.credit_balance = newCredit;
+      notesObj.profile_updated_at = new Date().toISOString();
+
+      const cleanUrl = (cloudConfig?.url || '').trim().replace(/\/$/, '');
+      const res = await fetch(`${cleanUrl}/rest/v1/licenses?hwid=eq.${s.hwid}`, {
+        method: 'PATCH',
+        headers: {
+          'apikey': cloudConfig.key,
+          'Authorization': `Bearer ${cloudConfig.key}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          plan_type: targetPlanType,
+          pages_granted: targetPages,
+          issued_at: targetIssued,
+          expires_at: targetExpires,
+          signature,
+          notes: JSON.stringify(notesObj)
+        })
+      });
+
+      if (!res.ok) {
+        const err = await res.text();
+        alert('Failed to cancel plan: ' + err);
+        return;
+      }
+
+      closeCancelPlanModal();
+      alert(
+        creditAmt > 0
+          ? `✓ Plan cancelled! ₹${creditAmt.toFixed(2)} credited to Shopkeeper Wallet (Total Wallet Balance: ₹${newCredit.toFixed(2)}).`
+          : `✓ Plan cancelled with ₹0.00 wallet credit. Station rolled back to previous plan.`
+      );
+      await loadStations();
+    }
+
     function togglePastPlanDetail(hwidSafe, pIdx) {
       const panel = document.getElementById(`pastPlanDetail_${hwidSafe}_${pIdx}`);
       const chev = document.getElementById(`pastPlanChevron_${hwidSafe}_${pIdx}`);
@@ -2817,10 +3072,13 @@
           ? Number(activeTrayRec.usage.totalPagesConsumed !== undefined ? activeTrayRec.usage.totalPagesConsumed : (activeTrayRec.usage.pagesPrintedTotal || 0))
           : 0;
         const isTrialTray = Boolean(activeTrayRec && activeTrayRec.isTrialUsage);
+        const isCancelled = activeTrayRec && activeTrayRec.status === 'CANCELLED';
         const isVerified = activeTrayRec && (activeTrayRec.status === 'VERIFIED_PAID' || activeTrayRec.status === 'COMPLETED');
         const isPending = activeTrayRec && (activeTrayRec.status === 'PAYMENT_SUBMITTED' || activeTrayRec.status === 'PENDING_VERIFICATION');
         const latestStatusBadge = isTrialTray
           ? `<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">🧪 Free Trial</span>`
+          : isCancelled
+          ? `<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/40">✕ Cancelled (Credited)</span>`
           : isVerified
           ? `<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">✓ Verified</span>`
           : isPending
@@ -3030,10 +3288,23 @@
                       </button>
                     </div>
                     ${!isTrialTray ? `
-                      <button type="button" onclick="event.stopPropagation(); printInvoiceForStation('${s.hwid}', 0)" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition flex items-center gap-1.5 shadow-sm cursor-pointer">
-                        <i data-lucide="receipt" class="w-3.5 h-3.5"></i>
-                        <span>Print Tax Invoice</span>
-                      </button>
+                      <div class="flex items-center gap-2">
+                        ${(() => {
+                          const purchaseMs = activeTrayRec.date ? new Date(activeTrayRec.date).getTime() : 0;
+                          const within24Hours = purchaseMs > 0 && (Date.now() - purchaseMs) <= 24 * 60 * 60 * 1000;
+                          const canCancelPlan = activeTrayRec.status !== 'CANCELLED' && latestTotalPrints === 0 && within24Hours;
+                          return canCancelPlan ? `
+                            <button type="button" onclick="event.stopPropagation(); cancelLatestPlan('${s.hwid}')" class="px-3 py-1.5 rounded-lg bg-rose-950/70 hover:bg-rose-900 border border-rose-500/40 text-rose-200 font-bold text-xs transition flex items-center gap-1.5 shadow-sm cursor-pointer">
+                              <i data-lucide="x-circle" class="w-3.5 h-3.5 text-rose-400"></i>
+                              <span>Cancel Plan</span>
+                            </button>
+                          ` : '';
+                        })()}
+                        <button type="button" onclick="event.stopPropagation(); printInvoiceForStation('${s.hwid}', 0)" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition flex items-center gap-1.5 shadow-sm cursor-pointer">
+                          <i data-lucide="receipt" class="w-3.5 h-3.5"></i>
+                          <span>Print Tax Invoice</span>
+                        </button>
+                      </div>
                     ` : ''}
                       </div>
                     </div>
@@ -3554,6 +3825,8 @@
       const idLocEl = document.getElementById('drwLocation');
       if (idLocEl) idLocEl.innerText = s.city || 'Not set';
       document.getElementById('drwPhone').innerText = s.phone || 'Not set';
+      const cbEl = document.getElementById('drwCreditBalance');
+      if (cbEl) cbEl.innerText = `₹${getStationCreditBalance(s).toFixed(2)}`;
       document.getElementById('drwHwid').innerText = s.hwid;
 
       // Reset inline identity edit form

@@ -93,6 +93,10 @@ pub struct LicenseStateDto {
     pub provider_whatsapp_number: Option<String>,
     pub provider_support_email: Option<String>,
     pub status_message: String,
+    #[serde(default)]
+    pub credit_balance: f64,
+    #[serde(default)]
+    pub auto_renew_enabled: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -113,6 +117,8 @@ pub struct LicensePaymentClaim {
     pub amount_paid: f64,
     pub payment_mode: String,
     pub payment_reference: String,
+    #[serde(default)]
+    pub wallet_credit_used: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -110,6 +110,8 @@ export interface LicenseStateDto {
   providerWhatsappNumber?: string | null;
   providerSupportEmail?: string | null;
   statusMessage: string;
+  creditBalance?: number;
+  autoRenewEnabled?: boolean;
 }
 
 export interface CloudConfig {
@@ -778,7 +780,27 @@ export const LicenseActivationModal: React.FC<LicenseActivationModalProps> = ({
 
         if (licenseState?.hwid) {
           try {
+            if (plan === 'WALLET_TOPUP') {
+              const topupAmt = Number(amount) || topupAmount || 300;
+              const updatedWallet = await invoke<LicenseStateDto>('topup_wallet_credit', {
+                amount: topupAmt,
+                paymentMode: 'RAZORPAY_CHECKOUT',
+                paymentReference: paymentId,
+              });
+              setLicenseState(updatedWallet);
+              setIsPaymentSensing(false);
+              setActivePaymentUrl(null);
+              setShowWalletTopup(false);
+              setSuccessMsg(`✅ ₹${topupAmt.toFixed(2)} added to your Credit Wallet! New Balance: ₹${(updatedWallet.creditBalance || 0).toFixed(2)}`);
+              loadPaymentHistory();
+              if (onLicenseUpdated) onLicenseUpdated(updatedWallet);
+              return;
+            }
+
             setUtrInput(paymentId);
+            const creditUsedInCheckout = selectedPlan
+              ? Math.min(licenseState.creditBalance || 0, selectedPlan.amount)
+              : 0;
             const msg = await invoke<string>('submit_license_payment_claim', {
               claim: {
                 hwid: licenseState.hwid,
@@ -787,6 +809,7 @@ export const LicenseActivationModal: React.FC<LicenseActivationModalProps> = ({
                 amountPaid: amount || selectedPlan?.amount || 75,
                 paymentMode: 'RAZORPAY_CHECKOUT',
                 paymentReference: paymentId,
+                walletCreditUsed: creditUsedInCheckout,
               },
             });
             setClaimSuccessMsg(msg);
@@ -989,13 +1012,91 @@ export const LicenseActivationModal: React.FC<LicenseActivationModalProps> = ({
 
       // Launch payment via verified domain registered in Razorpay KYC profile: technosoftsolution.github.io
       const planDisplayName = formatPlanDisplayName(selectedPlan);
-      const paymentUrl = `https://technosoftsolution.github.io/printdrop-station/pay.html?hwid=${encodeURIComponent(licenseState.hwid)}&plan=${encodeURIComponent(selectedPlan.code)}&plan_name=${encodeURIComponent(planDisplayName)}&pages=${selectedPlan.pages || 0}&amount=${selectedPlan.amount}&name=${encodeURIComponent(ownerNameInput.trim() || shopNameInput.trim() || '')}&contact=${encodeURIComponent(phoneInput.trim())}&key_id=${encodeURIComponent(keyId)}`;
+      const netAmt = selectedPlan ? Math.max(0, Math.round((selectedPlan.amount - Math.min(licenseState?.creditBalance || 0, selectedPlan.amount)) * 100) / 100) : 0;
+      const creditUsedNow = selectedPlan ? Math.min(licenseState?.creditBalance || 0, selectedPlan.amount) : 0;
+      const paymentUrl = `https://technosoftsolution.github.io/printdrop-station/pay.html?hwid=${encodeURIComponent(licenseState.hwid)}&plan=${encodeURIComponent(selectedPlan.code)}&plan_name=${encodeURIComponent(planDisplayName)}&pages=${selectedPlan.pages || 0}&amount=${netAmt}&name=${encodeURIComponent(ownerNameInput.trim() || shopNameInput.trim() || '')}&contact=${encodeURIComponent(phoneInput.trim())}&key_id=${encodeURIComponent(keyId)}`;
 
       setActivePaymentUrl(paymentUrl);
       setIsPaymentSensing(true);
-      setSuccessMsg(`Opening secure online payment checkout for ₹${selectedPlan.amount}...`);
+      setSuccessMsg(
+        creditUsedNow > 0
+          ? `Applying ₹${creditUsedNow.toFixed(2)} Wallet Credit — opening payment checkout for ₹${netAmt}...`
+          : `Opening secure online payment checkout for ₹${netAmt}...`
+      );
     } catch (err: any) {
       setErrorMsg(typeof err === 'string' ? err : err?.message || 'Failed to initiate payment');
+    }
+  };
+
+  const [isActivatingWithCredit, setIsActivatingWithCredit] = useState(false);
+  const [showWalletTopup, setShowWalletTopup] = useState(false);
+  const [topupAmount, setTopupAmount] = useState<number>(300);
+  const [isTogglingAutoRenew, setIsTogglingAutoRenew] = useState(false);
+
+  const handleTopupWalletPay = async () => {
+    if (!licenseState?.hwid || !topupAmount || topupAmount < 10) {
+      setErrorMsg('Please enter a valid top-up amount (minimum ₹10).');
+      return;
+    }
+    try {
+      setErrorMsg(null);
+      setSuccessMsg(null);
+      const HARDCODED_PROVIDER_KEY = 'rzp_live_TvfyWRnZVTnIbK';
+      const keyId = (providerPaymentConfig?.razorpayKeyId || (providerPaymentConfig as any)?.razorpay_key_id || HARDCODED_PROVIDER_KEY).trim() || HARDCODED_PROVIDER_KEY;
+      const paymentUrl = `https://technosoftsolution.github.io/printdrop-station/pay.html?hwid=${encodeURIComponent(licenseState.hwid)}&plan=WALLET_TOPUP&plan_name=${encodeURIComponent(`Credit Wallet Top-Up (₹${topupAmount})`)}&pages=0&amount=${topupAmount}&name=${encodeURIComponent(ownerNameInput.trim() || shopNameInput.trim() || '')}&contact=${encodeURIComponent(phoneInput.trim())}&key_id=${encodeURIComponent(keyId)}`;
+      setActivePaymentUrl(paymentUrl);
+      setIsPaymentSensing(true);
+      setSuccessMsg(`Opening secure checkout to add ₹${topupAmount} to your Credit Wallet...`);
+    } catch (err: any) {
+      setErrorMsg(typeof err === 'string' ? err : err?.message || 'Failed to launch Wallet Top-Up');
+    }
+  };
+
+  const handleToggleAutoRenew = async () => {
+    if (!licenseState) return;
+    try {
+      setIsTogglingAutoRenew(true);
+      setErrorMsg(null);
+      const nextVal = !licenseState.autoRenewEnabled;
+      const updated = await invoke<LicenseStateDto>('set_auto_renew_enabled', { enabled: nextVal });
+      setLicenseState(updated);
+      setSuccessMsg(
+        nextVal
+          ? '🔄 Auto-Renew on Expiry enabled! Your station will automatically renew from your Credit Wallet when expired.'
+          : 'Auto-Renew on Expiry disabled.'
+      );
+      if (onLicenseUpdated) onLicenseUpdated(updated);
+    } catch (err: any) {
+      setErrorMsg(typeof err === 'string' ? err : err?.message || 'Failed to update Auto-Renew setting');
+    } finally {
+      setIsTogglingAutoRenew(false);
+    }
+  };
+
+  const handleActivateWithWalletCredit = async () => {
+    if (!selectedPlan || !licenseState?.hwid) return;
+    try {
+      setIsActivatingWithCredit(true);
+      setErrorMsg(null);
+      setSuccessMsg(null);
+      const planDisplayName = formatPlanDisplayName(selectedPlan);
+      const updated = await invoke<LicenseStateDto>('activate_plan_with_wallet_credit', {
+        planCode: selectedPlan.code,
+        planName: planDisplayName,
+        pagesGranted: selectedPlan.pages || null,
+        durationDays: selectedPlan.durationDays || null,
+        planAmount: selectedPlan.amount,
+      });
+      setLicenseState(updated);
+      setSelectedPlan(null);
+      setQrDataUrl(null);
+      setSuccessMsg(`✅ Activated "${planDisplayName}" using your Credit Wallet! Remaining Wallet Balance: ₹${(updated.creditBalance || 0).toFixed(2)}`);
+      loadPaymentHistory();
+      if (onLicenseUpdated) onLicenseUpdated(updated);
+    } catch (err: any) {
+      setErrorMsg(typeof err === 'string' ? err : err?.message || 'Wallet activation failed');
+    } finally {
+      setIsActivatingWithCredit(false);
     }
   };
 
@@ -1004,12 +1105,14 @@ export const LicenseActivationModal: React.FC<LicenseActivationModalProps> = ({
     try {
       setIsGeneratingQr(true);
       setErrorMsg(null);
+      const creditUsedNow = Math.min(licenseState?.creditBalance || 0, selectedPlan.amount);
+      const netAmt = Math.max(0, Math.round((selectedPlan.amount - creditUsedNow) * 100) / 100);
       const pngUrl = await invoke<string>('generate_license_payment_qr', {
-        amount: selectedPlan.amount,
+        amount: netAmt,
         planName: formatPlanDisplayName(selectedPlan),
       });
       setQrDataUrl(pngUrl);
-      setSuccessMsg(`Scan official QR with PhonePe, Google Pay, or Paytm to pay ₹${selectedPlan.amount}.`);
+      setSuccessMsg(`Scan official QR with PhonePe, Google Pay, or Paytm to pay ₹${netAmt}.`);
     } catch (err: any) {
       setErrorMsg(typeof err === 'string' ? err : err?.message || 'Failed to generate payment QR');
     } finally {
@@ -1030,14 +1133,17 @@ export const LicenseActivationModal: React.FC<LicenseActivationModalProps> = ({
       setErrorMsg(null);
       setClaimSuccessMsg(null);
 
+      const creditUsedInClaim = Math.min(licenseState?.creditBalance || 0, selectedPlan.amount);
+      const netClaimAmount = Math.max(0, Math.round((selectedPlan.amount - creditUsedInClaim) * 100) / 100);
       const msg = await invoke<string>('submit_license_payment_claim', {
         claim: {
           hwid: licenseState.hwid,
           requestedPlan: selectedPlan.code,
           requestedPages: selectedPlan.pages || null,
-          amountPaid: selectedPlan.amount,
+          amountPaid: netClaimAmount,
           paymentMode: qrDataUrl ? 'RAZORPAY_QR' : 'ONLINE',
           paymentReference: utrInput.trim(),
+          walletCreditUsed: creditUsedInClaim,
         },
       });
 
@@ -1297,6 +1403,11 @@ export const LicenseActivationModal: React.FC<LicenseActivationModalProps> = ({
                   </div>
 
                   <div className="flex items-center gap-2 shrink-0">
+                    {(licenseState?.creditBalance || 0) > 0 && (
+                      <span className="px-3 py-2 rounded-lg bg-amber-500/15 border border-amber-500/40 text-amber-300 text-xs font-bold flex items-center gap-1.5">
+                        <span>💰 Wallet Credit: ₹{(licenseState?.creditBalance || 0).toFixed(2)}</span>
+                      </span>
+                    )}
                     <button
                       type="button"
                       onClick={handleCopyHwid}
@@ -1317,6 +1428,101 @@ export const LicenseActivationModal: React.FC<LicenseActivationModalProps> = ({
                     </button>
                   </div>
                 </div>
+              </div>
+
+              {/* Section 1B: Rupee Credit Wallet & Auto-Renew on Expiry */}
+              <div className="p-4 rounded-xl bg-slate-950/60 border border-amber-500/30 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2 text-xs font-bold text-amber-300">
+                      <CreditCard className="w-4 h-4 text-amber-400" />
+                      <span>CREDIT WALLET BALANCE (₹) &amp; AUTO-RENEW</span>
+                    </div>
+                    <div className="mt-1 flex items-baseline gap-2.5">
+                      <span className="text-xl font-black text-white">
+                        ₹{(licenseState?.creditBalance || 0).toFixed(2)}
+                      </span>
+                      <span className="text-[11px] text-slate-400">
+                        Pre-load ₹ anytime to auto-renew on expiry or get instant checkout deduction
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setShowWalletTopup((prev) => !prev)}
+                      className="px-3.5 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-slate-950 text-xs font-extrabold transition shadow-md cursor-pointer flex items-center gap-1.5"
+                    >
+                      <Zap className="w-3.5 h-3.5" />
+                      <span>{showWalletTopup ? 'Close Top-Up' : '+ Top-Up Wallet (₹)'}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleToggleAutoRenew}
+                      disabled={isTogglingAutoRenew}
+                      className={`px-3 py-2 rounded-lg border text-xs font-bold transition cursor-pointer flex items-center gap-2 ${
+                        licenseState?.autoRenewEnabled
+                          ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300'
+                          : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-slate-200'
+                      }`}
+                      title="Automatically renew your last plan from your Credit Wallet when it expires"
+                    >
+                      <span
+                        className={`w-2 h-2 rounded-full ${
+                          licenseState?.autoRenewEnabled ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'
+                        }`}
+                      />
+                      <span>Auto-Renew: {licenseState?.autoRenewEnabled ? 'ON' : 'OFF'}</span>
+                    </button>
+                  </div>
+                </div>
+
+                {showWalletTopup && (
+                  <div className="p-3.5 rounded-xl bg-slate-900/90 border border-amber-500/30 space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-xs font-bold text-white">Select or Enter Top-Up Amount (₹):</span>
+                      <div className="flex items-center gap-1.5">
+                        {[100, 300, 500, 1000].map((amt) => (
+                          <button
+                            key={amt}
+                            type="button"
+                            onClick={() => setTopupAmount(amt)}
+                            className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition cursor-pointer ${
+                              topupAmount === amt
+                                ? 'bg-amber-500/25 border-amber-400 text-amber-200'
+                                : 'bg-slate-950 border-slate-700 text-slate-300 hover:border-slate-500'
+                            }`}
+                          >
+                            +₹{amt}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+                      <div className="flex items-center bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 flex-1">
+                        <span className="text-amber-400 font-bold mr-1.5">₹</span>
+                        <input
+                          type="number"
+                          min={10}
+                          max={50000}
+                          value={topupAmount}
+                          onChange={(e) => setTopupAmount(Math.max(0, Number(e.target.value)))}
+                          className="w-full bg-transparent text-white font-bold text-sm outline-none"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleTopupWalletPay}
+                        className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg transition cursor-pointer flex items-center justify-center gap-1.5 shrink-0"
+                      >
+                        <Zap className="w-4 h-4 text-amber-300" />
+                        <span>Add ₹{topupAmount || 0} via UPI / Razorpay &rarr;</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Dual-Plan Coexistence: Visual 2-Step Consumption Flow */}
@@ -1957,70 +2163,115 @@ export const LicenseActivationModal: React.FC<LicenseActivationModalProps> = ({
               {/* Selected Plan Checkout Box */}
               {selectedPlan && (
                 <div className="p-5 rounded-2xl bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border border-indigo-500/40 shadow-2xl space-y-5 animate-fade-in">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
-                    <div>
-                      <span className="text-[11px] uppercase tracking-wider font-bold text-indigo-400">Order Summary</span>
-                      <h4 className="text-base font-bold text-white flex items-center gap-2">
-                        <span>{formatPlanDisplayName(selectedPlan)}</span>
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                          {selectedPlan.category === 'UNLIMITED' ? 'Unlimited Prints' : `${selectedPlan.pages} Pages`}
-                        </span>
-                      </h4>
-                    </div>
+                  {(() => {
+                    const creditBal = licenseState?.creditBalance || 0;
+                    const creditApplied = Math.min(creditBal, selectedPlan.amount);
+                    const netPayable = Math.max(0, Math.round((selectedPlan.amount - creditApplied) * 100) / 100);
 
-                    <div className="text-left sm:text-right">
-                      <span className="text-[11px] text-slate-400 block">Total Payable to Provider</span>
-                      <span className="text-2xl font-black text-emerald-400">₹{selectedPlan.amount}.00</span>
-                    </div>
-                  </div>
+                    return (
+                      <>
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+                          <div>
+                            <span className="text-[11px] uppercase tracking-wider font-bold text-indigo-400">Order Summary</span>
+                            <h4 className="text-base font-bold text-white flex items-center gap-2 flex-wrap">
+                              <span>{formatPlanDisplayName(selectedPlan)}</span>
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                                {selectedPlan.category === 'UNLIMITED' ? 'Unlimited Prints' : `${selectedPlan.pages} Pages`}
+                              </span>
+                              {creditBal > 0 && (
+                                <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold">
+                                  💰 Credit Wallet: ₹{creditBal.toFixed(2)}
+                                </span>
+                              )}
+                            </h4>
+                            {creditApplied > 0 && (
+                              <p className="text-xs text-emerald-300 font-semibold mt-1">
+                                Plan ₹{selectedPlan.amount}.00 &minus; Wallet Credit ₹{creditApplied.toFixed(2)} = <span className="text-white font-bold">Net Payable ₹{netPayable.toFixed(2)}</span>
+                              </p>
+                            )}
+                          </div>
 
-                  {/* Two Payment Options */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Method 1: Instant UPI Intent */}
-                    <div className="p-4 rounded-xl bg-slate-900/90 border border-slate-800 space-y-3 flex flex-col justify-between">
-                      <div>
-                        <div className="flex items-center gap-2 text-xs font-bold text-white">
-                          <Zap className="w-4 h-4 text-amber-400" />
-                          <span>Method 1: Pay Online (Instant UPI Intent)</span>
+                          <div className="text-left sm:text-right">
+                            <span className="text-[11px] text-slate-400 block">
+                              {creditApplied > 0 ? 'Net Payable After Wallet Credit' : 'Total Payable to Provider'}
+                            </span>
+                            <span className="text-2xl font-black text-emerald-400">₹{netPayable.toFixed(2)}</span>
+                          </div>
                         </div>
-                        <p className="text-[11px] text-slate-400 mt-1">
-                          Launches Razorpay checkout for instant payment via PhonePe, GPay, Paytm, BHIM or Net Banking.
-                        </p>
-                      </div>
 
-                      <button
-                        type="button"
-                        onClick={handlePayOnline}
-                        className="w-full py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg transition active:scale-95 cursor-pointer flex items-center justify-center gap-2"
-                      >
-                        <Zap className="w-4 h-4 text-amber-300" />
-                        <span>Pay ₹{selectedPlan.amount} via UPI / Apps &rarr;</span>
-                      </button>
-                    </div>
+                        {netPayable === 0 ? (
+                          <div className="p-4 rounded-xl bg-emerald-950/50 border border-emerald-500/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div>
+                              <div className="text-sm font-bold text-emerald-300 flex items-center gap-2">
+                                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                                <span>Full Amount Covered by Your Credit Wallet!</span>
+                              </div>
+                              <p className="text-xs text-emerald-200/80 mt-0.5">
+                                ₹{selectedPlan.amount}.00 will be deducted from your ₹{creditBal.toFixed(2)} Wallet Balance. No online payment needed.
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={handleActivateWithWalletCredit}
+                              disabled={isActivatingWithCredit}
+                              className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white font-bold text-xs shadow-lg transition cursor-pointer shrink-0 flex items-center gap-2"
+                            >
+                              <Zap className="w-4 h-4 text-amber-300" />
+                              <span>{isActivatingWithCredit ? 'Activating...' : 'Activate Using Wallet Credit (₹0)'}</span>
+                            </button>
+                          </div>
+                        ) : (
+                          /* Two Payment Options */
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* Method 1: Instant UPI Intent */}
+                            <div className="p-4 rounded-xl bg-slate-900/90 border border-slate-800 space-y-3 flex flex-col justify-between">
+                              <div>
+                                <div className="flex items-center gap-2 text-xs font-bold text-white">
+                                  <Zap className="w-4 h-4 text-amber-400" />
+                                  <span>Method 1: Pay Online (Instant UPI Intent)</span>
+                                </div>
+                                <p className="text-[11px] text-slate-400 mt-1">
+                                  Launches Razorpay checkout for instant payment via PhonePe, GPay, Paytm, BHIM or Net Banking.
+                                </p>
+                              </div>
 
-                    {/* Method 2: Razorpay Official Fixed BharatQR */}
-                    <div className="p-4 rounded-xl bg-slate-900/90 border border-slate-800 space-y-3 flex flex-col justify-between">
-                      <div>
-                        <div className="flex items-center gap-2 text-xs font-bold text-white">
-                          <QrCode className="w-4 h-4 text-emerald-400" />
-                          <span>Method 2: Razorpay Official BharatQR</span>
-                        </div>
-                        <p className="text-[11px] text-slate-400 mt-1">
-                          Displays official merchant payment QR. Scan with PhonePe, GPay, Paytm or BHIM; no timer.
-                        </p>
-                      </div>
+                              <button
+                                type="button"
+                                onClick={handlePayOnline}
+                                className="w-full py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg transition active:scale-95 cursor-pointer flex items-center justify-center gap-2"
+                              >
+                                <Zap className="w-4 h-4 text-amber-300" />
+                                <span>Pay ₹{netPayable} via UPI / Apps &rarr;</span>
+                              </button>
+                            </div>
 
-                      <button
-                        type="button"
-                        onClick={handleShowQr}
-                        disabled={isGeneratingQr}
-                        className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold text-xs transition active:scale-95 cursor-pointer flex items-center justify-center gap-2"
-                      >
-                        <QrCode className="w-4 h-4 text-emerald-400" />
-                        <span>{isGeneratingQr ? 'Loading QR...' : `Show QR Code (₹${selectedPlan.amount})`}</span>
-                      </button>
-                    </div>
-                  </div>
+                            {/* Method 2: Razorpay Official Fixed BharatQR */}
+                            <div className="p-4 rounded-xl bg-slate-900/90 border border-slate-800 space-y-3 flex flex-col justify-between">
+                              <div>
+                                <div className="flex items-center gap-2 text-xs font-bold text-white">
+                                  <QrCode className="w-4 h-4 text-emerald-400" />
+                                  <span>Method 2: Razorpay Official BharatQR</span>
+                                </div>
+                                <p className="text-[11px] text-slate-400 mt-1">
+                                  Displays official merchant payment QR. Scan with PhonePe, GPay, Paytm or BHIM; no timer.
+                                </p>
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={handleShowQr}
+                                disabled={isGeneratingQr}
+                                className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold text-xs transition active:scale-95 cursor-pointer flex items-center justify-center gap-2"
+                              >
+                                <QrCode className="w-4 h-4 text-emerald-400" />
+                                <span>{isGeneratingQr ? 'Loading QR...' : `Show QR Code (₹${netPayable})`}</span>
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
 
                   {/* QR Display Container */}
                   {qrDataUrl && (
@@ -2254,6 +2505,10 @@ export const LicenseActivationModal: React.FC<LicenseActivationModalProps> = ({
                                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1">
                                     <Clock className="w-2.5 h-2.5" />
                                     <span>Verification Pending</span>
+                                  </span>
+                                ) : rec.status === 'CANCELLED' ? (
+                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40">
+                                    ✕ Cancelled (Credited to Wallet)
                                   </span>
                                 ) : (
                                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300">
