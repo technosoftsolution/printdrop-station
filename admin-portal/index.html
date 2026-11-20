@@ -626,9 +626,15 @@
               <input type="text" id="drwEditPhone" class="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-indigo-500">
             </div>
           </div>
-          <div>
-            <label class="block text-[10px] font-semibold text-slate-400 mb-0.5">Location / City</label>
-            <input type="text" id="drwEditLocation" class="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-indigo-500">
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-[10px] font-semibold text-slate-400 mb-0.5">Location / City</label>
+              <input type="text" id="drwEditLocation" class="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-indigo-500">
+            </div>
+            <div>
+              <label class="block text-[10px] font-semibold text-amber-300 mb-0.5">Credit Wallet (₹)</label>
+              <input type="number" id="drwEditCreditBalance" min="0" step="0.01" class="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-amber-500/40 text-xs text-amber-300 font-bold focus:outline-none focus:border-amber-400">
+            </div>
           </div>
           <div class="flex items-center justify-end gap-2 pt-1">
             <button type="button" onclick="toggleDrawerIdentityEdit()" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-semibold cursor-pointer">Cancel</button>
@@ -3761,6 +3767,8 @@
       const ownerName = (document.getElementById('drwEditOwner')?.value || '').trim() || null;
       const city = (document.getElementById('drwEditLocation')?.value || '').trim() || null;
       const phone = (document.getElementById('drwEditPhone')?.value || '').trim() || null;
+      const rawCredit = parseFloat(document.getElementById('drwEditCreditBalance')?.value || '0');
+      const creditBal = Number.isFinite(rawCredit) && rawCredit >= 0 ? Math.round(rawCredit * 100) / 100 : 0;
 
       if (!shopName) {
         alert('Station Name cannot be empty.');
@@ -3769,10 +3777,11 @@
 
       let notesObj = {};
       try {
-        if (selectedStation.notes) notesObj = JSON.parse(selectedStation.notes);
+        if (selectedStation.notes) notesObj = typeof selectedStation.notes === 'string' ? JSON.parse(selectedStation.notes) : selectedStation.notes;
       } catch (_) {}
       const profileUpdatedAt = new Date().toISOString();
       notesObj.profile_updated_at = profileUpdatedAt;
+      notesObj.credit_balance = creditBal;
       const notesStr = JSON.stringify(notesObj);
 
       const cleanUrl = (cloudConfig?.url || '').trim().replace(/\/$/, '');
@@ -3844,6 +3853,8 @@
       if (edOwner) edOwner.value = s.owner_name || '';
       if (edLoc) edLoc.value = s.city || '';
       if (edPhone) edPhone.value = s.phone || '';
+      const edCredit = document.getElementById('drwEditCreditBalance');
+      if (edCredit) edCredit.value = getStationCreditBalance(s).toString();
 
       const issuedDt = s.issued_at ? new Date(s.issued_at) : new Date();
       const expiresDt = s.expires_at ? new Date(s.expires_at) : null;

@@ -2217,7 +2217,7 @@ export const LicenseActivationModal: React.FC<LicenseActivationModalProps> = ({
                               className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white font-bold text-xs shadow-lg transition cursor-pointer shrink-0 flex items-center gap-2"
                             >
                               <Zap className="w-4 h-4 text-amber-300" />
-                              <span>{isActivatingWithCredit ? 'Activating...' : 'Activate Using Wallet Credit (₹0)'}</span>
+                              <span>{isActivatingWithCredit ? 'Activating...' : `Activate Using Wallet Credit (₹${selectedPlan.amount})`}</span>
                             </button>
                           </div>
                         ) : (
