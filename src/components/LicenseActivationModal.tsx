@@ -716,7 +716,7 @@ export const LicenseActivationModal: React.FC<LicenseActivationModalProps> = ({
       // Load local state immediately and auto-sync with cloud once on window open
       (async () => {
         await fetchLicenseState();
-        await handleSyncCloud();
+        await handleSyncCloud(true);
       })();
     }
   }, [isOpen]);
@@ -843,8 +843,15 @@ export const LicenseActivationModal: React.FC<LicenseActivationModalProps> = ({
       });
 
       setLicenseState(updated);
-      setSuccessMsg(`License successfully activated! Plan upgraded to: ${updated.planDisplayName}`);
+      const quotaDetail =
+        updated.walletPagesRemaining != null
+          ? `${updated.walletPagesRemaining.toLocaleString()} Pages in Wallet`
+          : updated.daysRemaining > 0
+          ? `${updated.daysRemaining} Days Validity`
+          : 'Active';
+      setSuccessMsg(`✅ License Activated! Plan: ${updated.planDisplayName} (${quotaDetail})`);
       setRawKeyInput('');
+      loadPaymentHistory();
       if (onLicenseUpdated) {
         onLicenseUpdated(updated);
       }
@@ -879,11 +886,13 @@ export const LicenseActivationModal: React.FC<LicenseActivationModalProps> = ({
     }
   };
 
-  const handleSyncCloud = async () => {
+  const handleSyncCloud = async (silentOnOffline = false) => {
     try {
       setIsSyncingCloud(true);
       setErrorMsg(null);
-      setSuccessMsg(null);
+      if (!silentOnOffline) {
+        setSuccessMsg(null);
+      }
 
       const res = await invoke<HeartbeatResult>('sync_license_cloud');
       if (res.updatedLicense) {
@@ -891,11 +900,14 @@ export const LicenseActivationModal: React.FC<LicenseActivationModalProps> = ({
         if (onLicenseUpdated) onLicenseUpdated(res.updatedLicense);
       }
 
+      const isOfflineMsg =
+        res.message.includes('Offline Mode Active') ||
+        res.message.includes('Offline Grace') ||
+        res.message.includes('local offline mode');
+
       if (res.isRevoked) {
         setErrorMsg(res.message);
-      } else if (res.isGraceActive) {
-        setSuccessMsg(res.message);
-      } else {
+      } else if (!(silentOnOffline && isOfflineMsg)) {
         setSuccessMsg(res.message);
       }
 
@@ -1096,7 +1108,8 @@ export const LicenseActivationModal: React.FC<LicenseActivationModalProps> = ({
           <div className="flex items-center gap-2">
             {/* Sync Cloud Button */}
             <button
-              onClick={handleSyncCloud}
+              type="button"
+              onClick={() => handleSyncCloud(false)}
               disabled={isSyncingCloud}
               title="Synchronize License with Cloud Registry"
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/50 border border-indigo-500/40 text-indigo-200 text-xs font-semibold transition"
@@ -2571,6 +2584,34 @@ export const LicenseActivationModal: React.FC<LicenseActivationModalProps> = ({
               <p className="text-xs text-slate-400">
                 Share your Hardware ID (<span className="font-mono text-indigo-300">{licenseState?.hwid}</span>) with PrintDrop Support on WhatsApp to receive your activation key.
               </p>
+
+              {successMsg && (
+                <div className="p-4 rounded-xl bg-emerald-950/70 border border-emerald-500/60 text-emerald-200 space-y-2 shadow-lg">
+                  <div className="flex items-center gap-2 font-bold text-sm text-emerald-300">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+                    <span>{successMsg}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-2 pt-1">
+                    <span className="text-[11px] text-emerald-200/80">
+                      Station is now unlocked and ready for printing.
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('OVERVIEW')}
+                      className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition cursor-pointer shrink-0"
+                    >
+                      View Station Overview
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {errorMsg && (
+                <div className="p-3.5 rounded-xl bg-red-950/70 border border-red-500/50 text-red-200 text-xs font-semibold flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
+                  <span>{errorMsg}</span>
+                </div>
+              )}
 
               <form onSubmit={handleActivate} className="space-y-4">
                 <div>

@@ -41,12 +41,24 @@ pub struct LicensePayload {
     pub hwid: String,
     pub shop_name: String,
     pub owner_name: Option<String>,
+    #[serde(default)]
+    pub city: Option<String>,
     pub phone: Option<String>,
     pub plan_type: LicensePlanType,
     pub pages_granted: Option<u64>,
     pub issued_at: String,
     pub expires_at: Option<String>,
     pub signature: String,
+    #[serde(default)]
+    pub plan_name: Option<String>,
+    #[serde(default)]
+    pub amount_paid: Option<f64>,
+    #[serde(default)]
+    pub payment_mode: Option<String>,
+    #[serde(default)]
+    pub payment_reference: Option<String>,
+    #[serde(default)]
+    pub invoice_number: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -883,6 +883,67 @@
           </div>
         </div>
 
+        <!-- Transfer License (OS Reinstall / New PC) Accordion -->
+        <div id="drwTransferCard" class="rounded-xl bg-slate-950/80 border border-cyan-500/40 overflow-hidden">
+          <div
+            onclick="toggleTransferAccordion()"
+            class="p-3.5 flex items-center justify-between cursor-pointer hover:bg-slate-900/60 transition select-none"
+          >
+            <div class="flex items-center gap-2">
+              <div class="w-7 h-7 rounded-lg bg-cyan-500/20 text-cyan-400 flex items-center justify-center shrink-0">
+                <i data-lucide="arrow-right-left" class="w-4 h-4"></i>
+              </div>
+              <div>
+                <span class="font-bold text-white text-xs block">Transfer License (OS Reinstall / New PC)</span>
+                <span class="text-[10px] text-slate-400 block">Move remaining plan, pages &amp; expiry date to new HWID</span>
+              </div>
+            </div>
+            <i id="drwTransferChevron" data-lucide="chevron-down" class="w-4 h-4 text-slate-400 transition-transform"></i>
+          </div>
+
+          <div id="drwTransferBody" class="hidden px-4 pb-4 pt-2 border-t border-slate-800 space-y-3">
+            <div class="p-2.5 rounded-lg bg-cyan-950/30 border border-cyan-800/40 text-[11px] text-cyan-200 leading-relaxed">
+              Copies exact <strong>Plan, Remaining Pages, Expiry Date &amp; Identity</strong> to the new HWID, re-signs it, and archives this old HWID so it cannot be reused.
+            </div>
+            <div>
+              <label class="block text-[10px] font-semibold text-slate-300 mb-1">New Station Hardware ID (HWID)</label>
+              <div class="flex items-center gap-2">
+                <input
+                  type="text"
+                  id="drwTransferNewHwid"
+                  placeholder="PD-XXXX-XXXX-XXXX-XXXX"
+                  class="flex-1 px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 font-mono text-xs text-cyan-300 uppercase tracking-wider focus:outline-none focus:border-cyan-500"
+                >
+                <button type="button" onclick="pasteTransferHwid()" class="px-2.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-semibold border border-slate-700 cursor-pointer">
+                  Paste
+                </button>
+              </div>
+            </div>
+            <button type="button" onclick="transferLicenseToNewHwid()" class="w-full py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs shadow-md transition flex items-center justify-center gap-1.5 cursor-pointer">
+              <i data-lucide="arrow-right-left" class="w-3.5 h-3.5"></i>
+              <span>Transfer &amp; Re-Sign License</span>
+            </button>
+
+            <div id="drwTransferKeyBox" class="hidden p-3 rounded-xl bg-slate-900 border border-emerald-500/50 space-y-2">
+              <div class="flex items-center justify-between text-[11px] font-bold text-emerald-400">
+                <span>Transferred &amp; Synced! Offline Key Ready</span>
+                <span class="text-[10px] text-slate-400">For offline PCs</span>
+              </div>
+              <textarea id="drwTransferKeyOutput" rows="3" readonly class="w-full p-2 rounded-lg bg-slate-950 border border-slate-800 font-mono text-[10px] text-emerald-300 select-all"></textarea>
+              <div class="grid grid-cols-2 gap-2">
+                <button type="button" onclick="copyTransferOfflineKey()" class="py-1.5 px-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-bold border border-slate-700 flex items-center justify-center gap-1 cursor-pointer">
+                  <i data-lucide="copy" class="w-3 h-3"></i>
+                  <span id="drwTransferCopyBtnText">Copy Key</span>
+                </button>
+                <button type="button" onclick="dispatchTransferWhatsAppKey()" class="py-1.5 px-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-bold flex items-center justify-center gap-1 cursor-pointer">
+                  <i data-lucide="message-square" class="w-3 h-3"></i>
+                  <span>Send on WhatsApp</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Quick Operations -->
         <div class="space-y-2 pt-1 border-t border-slate-800/80">
           <div class="text-slate-400 text-[10px] font-semibold uppercase tracking-wider">Quick Extensions &amp; Security</div>
@@ -3304,16 +3365,23 @@
       const canonical = `HWID=${hwid}|PLAN=${planType}|PAGES=${pagesStr}|ISSUED=${issuedAt}|EXPIRES=${expStr}`;
       const signature = await signHmacSha256(canonical, MASTER_SIGNING_SECRET);
 
+      const wizPlanLabel = (selectedOpt && selectedOpt.text) ? selectedOpt.text.trim() : formatPlanName(preset);
       const licensePayload = {
         hwid,
         shopName,
         ownerName,
+        city,
         phone,
         planType,
         pagesGranted,
         issuedAt,
         expiresAt,
-        signature
+        signature,
+        planName: wizPlanLabel,
+        amountPaid,
+        paymentMode,
+        paymentReference: paymentRef || paymentMode,
+        invoiceNumber: invoiceNo
       };
 
       const base64Key = btoa(unescape(encodeURIComponent(JSON.stringify(licensePayload))));
@@ -3616,11 +3684,20 @@
       const drwOfflineKeyBox = document.getElementById('drwOfflineKeyBox');
       if (drwOfflineKeyBox) drwOfflineKeyBox.classList.add('hidden');
 
-      // Collapse manual upgrade box by default
+      // Collapse manual upgrade & transfer boxes by default
       const drwUpgradeBody = document.getElementById('drwUpgradeBody');
       const drwUpgradeChevron = document.getElementById('drwUpgradeChevron');
       if (drwUpgradeBody) drwUpgradeBody.classList.add('hidden');
       if (drwUpgradeChevron) drwUpgradeChevron.setAttribute('data-lucide', 'chevron-down');
+
+      const drwTransferBody = document.getElementById('drwTransferBody');
+      const drwTransferChevron = document.getElementById('drwTransferChevron');
+      const drwTransferKeyBox = document.getElementById('drwTransferKeyBox');
+      const drwTransferNewHwid = document.getElementById('drwTransferNewHwid');
+      if (drwTransferBody) drwTransferBody.classList.add('hidden');
+      if (drwTransferChevron) drwTransferChevron.setAttribute('data-lucide', 'chevron-down');
+      if (drwTransferKeyBox) drwTransferKeyBox.classList.add('hidden');
+      if (drwTransferNewHwid) drwTransferNewHwid.value = '';
 
       const killBtn = document.getElementById('drwKillSwitchText');
       killBtn.innerText = s.is_active !== false ? 'Remotely Suspend Station' : 'Reactivate Station';
@@ -3763,6 +3840,181 @@
     function closeDrawer() {
       document.getElementById('drawerOverlay').classList.add('hidden');
       document.getElementById('customerDrawer').classList.add('translate-x-full');
+    }
+
+    function toggleTransferAccordion() {
+      const body = document.getElementById('drwTransferBody');
+      const chev = document.getElementById('drwTransferChevron');
+      if (!body) return;
+      const isHidden = body.classList.contains('hidden');
+      if (isHidden) {
+        body.classList.remove('hidden');
+        if (chev) chev.setAttribute('data-lucide', 'chevron-up');
+      } else {
+        body.classList.add('hidden');
+        if (chev) chev.setAttribute('data-lucide', 'chevron-down');
+      }
+      lucide.createIcons();
+    }
+
+    async function pasteTransferHwid() {
+      try {
+        const text = await navigator.clipboard.readText();
+        const inp = document.getElementById('drwTransferNewHwid');
+        if (inp && text) inp.value = text.trim().toUpperCase();
+      } catch (_) {}
+    }
+
+    function copyTransferOfflineKey() {
+      const out = document.getElementById('drwTransferKeyOutput');
+      const btnText = document.getElementById('drwTransferCopyBtnText');
+      if (!out || !out.value) return;
+      navigator.clipboard.writeText(out.value);
+      if (btnText) {
+        btnText.innerText = 'Copied!';
+        setTimeout(() => { btnText.innerText = 'Copy Key'; }, 2000);
+      }
+    }
+
+    function dispatchTransferWhatsAppKey() {
+      if (!selectedStation) return;
+      const out = document.getElementById('drwTransferKeyOutput')?.value || '';
+      const newHwid = (document.getElementById('drwTransferNewHwid')?.value || '').trim().toUpperCase();
+      const phone = selectedStation.phone || '';
+      const shop = (selectedStation.shop_name || 'Shopkeeper').replace(/\s*\((Trial|Trial Mode)\)\s*/gi, '').trim();
+      const msg = `*PrintDrop License Transferred!*%0A%0AHello ${encodeURIComponent(shop)},%0AYour existing PrintDrop plan & balance has been transferred to your new PC/OS (*${newHwid}*).%0A%0A*If PC is Online:* Click *Settings > Station License & HWID > Sync Cloud*.%0A*If PC is Offline:* Paste this key under *Offline Key* tab:%0A%0A\`\`\`${encodeURIComponent(out)}\`\`\``;
+      window.open(`https://wa.me/${cleanPhone(phone)}?text=${msg}`, '_blank');
+    }
+
+    async function transferLicenseToNewHwid() {
+      if (!selectedStation) return;
+      const s = selectedStation;
+      const newHwid = (document.getElementById('drwTransferNewHwid')?.value || '').trim().toUpperCase();
+      if (!newHwid || !newHwid.startsWith('PD-') || newHwid.length < 19) {
+        alert('Please enter a valid New Station HWID starting with PD-XXXX-XXXX-XXXX-XXXX.');
+        return;
+      }
+      if (newHwid === s.hwid) {
+        alert('New HWID must be different from the current station HWID.');
+        return;
+      }
+
+      const cleanShop = (s.shop_name || 'PrintDrop Retail Station').replace(/\s*\((Trial|Trial Mode)\)\s*/gi, '').trim();
+      const expLabel = s.expires_at ? new Date(s.expires_at).toLocaleDateString('en-IN') : 'No Expiry (Lifetime Wallet)';
+      const pagesLabel = s.pages_granted != null ? `${Number(s.pages_granted).toLocaleString()} pages` : 'Unlimited';
+
+      if (!confirm(`Transfer license from:\nOLD: ${s.hwid}\nNEW: ${newHwid}\n\nStation: ${cleanShop}\nPlan: ${formatPlanName(s.plan_type)}\nPages: ${pagesLabel}\nExpiry: ${expLabel}\n\nThis will activate the New HWID with exact remaining plan/date and archive the Old HWID. Continue?`)) {
+        return;
+      }
+
+      const cleanUrl = (cloudConfig?.url || '').trim().replace(/\/$/, '');
+      if (!cleanUrl || !cloudConfig?.key) {
+        alert('Cloud configuration missing.');
+        return;
+      }
+
+      const planType = s.plan_type || 'TRIAL';
+      const pagesGranted = s.pages_granted != null ? Number(s.pages_granted) : null;
+      const issuedAt = s.issued_at || new Date().toISOString();
+      const expiresAt = s.expires_at || null;
+      const pagesStr = pagesGranted !== null ? pagesGranted.toString() : 'UNLIMITED';
+      const expStr = expiresAt !== null ? expiresAt : 'NONE';
+
+      const canonical = `HWID=${newHwid}|PLAN=${planType}|PAGES=${pagesStr}|ISSUED=${issuedAt}|EXPIRES=${expStr}`;
+      const signature = await signHmacSha256(canonical, MASTER_SIGNING_SECRET);
+
+      const licensePayload = {
+        hwid: newHwid,
+        shopName: cleanShop,
+        ownerName: s.owner_name || null,
+        city: s.city || null,
+        phone: s.phone || null,
+        planType,
+        pagesGranted,
+        issuedAt,
+        expiresAt,
+        signature,
+        planName: formatPlanName(planType),
+        amountPaid: s.amount_paid || 0,
+        paymentMode: s.payment_mode || 'TRANSFERRED',
+        paymentReference: s.payment_reference || `XFER-${s.hwid.slice(-4)}`,
+        invoiceNumber: s.invoice_number || null
+      };
+      const base64Key = btoa(unescape(encodeURIComponent(JSON.stringify(licensePayload))));
+
+      let notesObj = {};
+      try {
+        if (s.notes) notesObj = JSON.parse(s.notes);
+      } catch (_) {}
+      notesObj.profile_updated_at = new Date().toISOString();
+      notesObj.transferred_from = s.hwid;
+
+      const newRecord = {
+        hwid: newHwid,
+        shop_name: cleanShop,
+        owner_name: s.owner_name || null,
+        city: s.city || null,
+        phone: s.phone || null,
+        email: s.email || null,
+        plan_type: planType,
+        pages_granted: pagesGranted,
+        pages_printed_lifetime: Number(s.pages_printed_lifetime || 0),
+        issued_at: issuedAt,
+        expires_at: expiresAt,
+        signature,
+        is_active: true,
+        is_installed: true,
+        uninstalled_at: null,
+        removal_reason: null,
+        amount_paid: s.amount_paid || 0,
+        payment_mode: s.payment_mode || 'TRANSFERRED',
+        payment_reference: s.payment_reference || `XFER-${s.hwid.slice(-4)}`,
+        invoice_number: s.invoice_number || null,
+        payment_status: s.payment_status || 'VERIFIED_PAID',
+        notes: JSON.stringify(notesObj)
+      };
+
+      // 1. Upsert New HWID record
+      const upsertRes = await fetch(`${cleanUrl}/rest/v1/licenses?on_conflict=hwid`, {
+        method: 'POST',
+        headers: {
+          'apikey': cloudConfig.key,
+          'Authorization': `Bearer ${cloudConfig.key}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'resolution=merge-duplicates'
+        },
+        body: JSON.stringify(newRecord)
+      });
+
+      if (!upsertRes.ok) {
+        const err = await upsertRes.text();
+        alert('Failed to create/update New HWID license: ' + err);
+        return;
+      }
+
+      // 2. Deactivate & archive Old HWID
+      await fetch(`${cleanUrl}/rest/v1/licenses?hwid=eq.${s.hwid}`, {
+        method: 'PATCH',
+        headers: {
+          'apikey': cloudConfig.key,
+          'Authorization': `Bearer ${cloudConfig.key}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          is_active: false,
+          is_installed: false,
+          uninstalled_at: new Date().toISOString(),
+          removal_reason: `Transferred to ${newHwid}`
+        })
+      });
+
+      const out = document.getElementById('drwTransferKeyOutput');
+      const box = document.getElementById('drwTransferKeyBox');
+      if (out) out.value = base64Key;
+      if (box) box.classList.remove('hidden');
+
+      await loadStations();
+      lucide.createIcons();
     }
 
     function handleDrwPlanSelectChange() {
@@ -3958,16 +4210,23 @@
       const canonical = `HWID=${s.hwid}|PLAN=${planType}|PAGES=${pagesStr}|ISSUED=${issuedAt}|EXPIRES=${expStr}`;
       const signature = await signHmacSha256(canonical, MASTER_SIGNING_SECRET);
 
+      const drwPlanLabel = (selectedOpt && selectedOpt.text) ? selectedOpt.text.trim() : formatPlanName(planCode);
       const licensePayload = {
         hwid: s.hwid,
         shopName: cleanShopName,
         ownerName: s.owner_name || null,
+        city: s.city || null,
         phone: s.phone || null,
         planType,
         pagesGranted,
         issuedAt,
         expiresAt,
-        signature
+        signature,
+        planName: drwPlanLabel,
+        amountPaid: amount,
+        paymentMode: ref ? 'UPI' : 'CASH',
+        paymentReference: ref || 'CASH',
+        invoiceNumber: invNo
       };
       const base64Key = btoa(unescape(encodeURIComponent(JSON.stringify(licensePayload))));
 

@@ -124,14 +124,20 @@ pub fn create_signed_trial_license(hwid: &str) -> LicensePayload {
 
     LicensePayload {
         hwid: hwid.to_string(),
-        shop_name: "PrintDrop Retail Station (Trial)".to_string(),
+        shop_name: "PrintDrop Retail Station".to_string(),
         owner_name: None,
+        city: None,
         phone: None,
         plan_type: LicensePlanType::Trial,
         pages_granted: Some(300),
         issued_at,
         expires_at: Some(expires_at),
         signature,
+        plan_name: None,
+        amount_paid: None,
+        payment_mode: None,
+        payment_reference: None,
+        invoice_number: None,
     }
 }
 
@@ -223,12 +229,18 @@ mod tests {
             hwid: "PD-2EF1-E08B-255C-D6F4".to_string(),
             shop_name: "PrintDrop Retail Station".to_string(),
             owner_name: None,
+            city: None,
             phone: None,
             plan_type: LicensePlanType::SubMonthly,
             pages_granted: Some(1355),
             issued_at: "2026-11-18T13:16:35.63+05:30".to_string(),
             expires_at: Some("2026-12-18T13:16:35.63+05:30".to_string()),
             signature: sig,
+            plan_name: None,
+            amount_paid: None,
+            payment_mode: None,
+            payment_reference: None,
+            invoice_number: None,
         };
         assert!(verify_license_signature(&payload));
     }

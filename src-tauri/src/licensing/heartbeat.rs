@@ -300,12 +300,18 @@ pub async fn perform_heartbeat(
         hwid: remote.hwid.clone(),
         shop_name: remote.shop_name.clone(),
         owner_name: remote.owner_name.clone(),
+        city: remote.city.clone(),
         phone: remote.phone.clone(),
         plan_type: remote_plan.clone(),
         pages_granted: remote.pages_granted,
         issued_at: remote.issued_at.clone(),
         expires_at: remote.expires_at.clone(),
         signature: remote.signature.clone(),
+        plan_name: None,
+        amount_paid: remote.amount_paid,
+        payment_mode: remote.payment_mode.clone(),
+        payment_reference: remote.payment_reference.clone(),
+        invoice_number: remote.invoice_number.clone(),
     };
 
     let local_raw = license_mgr.get_local_signed_payload();
@@ -601,11 +607,12 @@ fn handle_network_failure(db: &Arc<Database>, error_detail: String) -> Heartbeat
 
             if elapsed_hours < DEFAULT_OFFLINE_GRACE_HOURS {
                 let remaining_hours = DEFAULT_OFFLINE_GRACE_HOURS - elapsed_hours;
+                let _ = error_detail;
                 return HeartbeatResult {
                     success: true,
                     message: format!(
-                        "Offline Grace Period Active: Server unreachable ({}). You have {} hour(s) of offline printing remaining.",
-                        error_detail, remaining_hours
+                        "Offline Mode Active: Printing unlocked via local cryptographic license ({}h offline grace remaining).",
+                        remaining_hours
                     ),
                     is_revoked: false,
                     is_grace_active: true,
@@ -712,7 +719,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_live_supabase_heartbeat_sync() {
-        if std::env::var("CI").is_ok() {
+        if std::env::var("CI").is_ok()
+            || std::env::var("GITHUB_ACTIONS").is_ok()
+            || std::env::var("PRINTDROP_LIVE_TEST").is_err()
+        {
             return;
         }
         let db = Arc::new(Database::new_in_memory().unwrap());

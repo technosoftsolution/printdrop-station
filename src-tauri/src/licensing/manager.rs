@@ -256,12 +256,18 @@ impl LicenseManager {
             hwid: db_hwid.clone(),
             shop_name: shop_name.clone(),
             owner_name: owner_name.clone(),
+            city: city.clone(),
             phone: phone.clone(),
             plan_type: plan_type.clone(),
             pages_granted,
             issued_at: issued_at_str.clone(),
             expires_at: expires_at_str.clone(),
             signature: signature.clone(),
+            plan_name: None,
+            amount_paid: None,
+            payment_mode: None,
+            payment_reference: None,
+            invoice_number: None,
         };
 
         let is_signature_valid = verify_license_signature(&payload);
@@ -605,12 +611,33 @@ impl LicenseManager {
                 && city.as_deref().map(|s| !s.trim().is_empty()).unwrap_or(false)
                 && phone.as_deref().map(|s| !s.trim().is_empty()).unwrap_or(false));
 
+        let custom_plan_display = self
+            .db
+            .get_config("active_plan_display_name")
+            .ok()
+            .flatten()
+            .filter(|s| !s.trim().is_empty());
+
+        let plan_display_name = if plan_type == LicensePlanType::Trial {
+            plan_type.display_name().to_string()
+        } else if let Some(custom) = custom_plan_display {
+            custom
+        } else if plan_type == LicensePlanType::WalletPages {
+            if let Some(pgs) = pages_granted {
+                format!("Pay-As-You-Go Page Wallet ({} Pages)", pgs)
+            } else {
+                plan_type.display_name().to_string()
+            }
+        } else {
+            plan_type.display_name().to_string()
+        };
+
         Ok(LicenseStateDto {
             hwid: self.hwid.clone(),
             is_valid,
             status,
             plan_type: plan_type.clone(),
-            plan_display_name: plan_type.display_name().to_string(),
+            plan_display_name,
             shop_name: clean_shop_name,
             owner_name,
             city,
@@ -650,9 +677,10 @@ impl LicenseManager {
         let shop = request
             .shop_name
             .filter(|s| !s.trim().is_empty())
-            .unwrap_or(payload.shop_name);
-        let owner = request.owner_name.or(payload.owner_name);
-        let phone = request.phone.or(payload.phone);
+            .unwrap_or(payload.shop_name.clone());
+        let owner = request.owner_name.or(payload.owner_name.clone());
+        let phone = request.phone.or(payload.phone.clone());
+        let city = payload.city.clone();
 
         let plan_str = match payload.plan_type {
             LicensePlanType::Trial => "TRIAL",
@@ -671,22 +699,25 @@ impl LicenseManager {
                 conn.execute(
                     r#"
                     UPDATE app_licenses SET
-                        shop_name = ?1,
-                        owner_name = ?2,
-                        phone = ?3,
-                        plan_type = ?4,
-                        pages_granted = ?5,
+                        shop_name = CASE WHEN ?1 != '' AND ?1 != 'PrintDrop Retail Station' THEN ?1 ELSE shop_name END,
+                        owner_name = COALESCE(?2, owner_name),
+                        city = COALESCE(?3, city),
+                        phone = COALESCE(?4, phone),
+                        plan_type = ?5,
+                        pages_granted = ?6,
                         pages_used = 0,
-                        issued_at = ?6,
-                        expires_at = ?7,
-                        signature = ?8,
-                        last_seen_epoch = ?9,
-                        last_verified_at = ?10
+                        issued_at = ?7,
+                        expires_at = ?8,
+                        signature = ?9,
+                        last_seen_epoch = ?10,
+                        last_verified_at = ?11,
+                        profile_configured = CASE WHEN ?1 != '' AND ?1 != 'PrintDrop Retail Station' THEN 1 ELSE profile_configured END
                     WHERE id = 1
                     "#,
                     params![
                         shop,
                         owner,
+                        city,
                         phone,
                         plan_str,
                         payload.pages_granted,
@@ -701,6 +732,61 @@ impl LicenseManager {
                 Ok(())
             })
             .map_err(|e| format!("Failed to update license activation record: {}", e))?;
+
+        let resolved_plan_name = payload
+            .plan_name
+            .clone()
+            .filter(|s| !s.trim().is_empty())
+            .unwrap_or_else(|| {
+                if payload.plan_type == LicensePlanType::WalletPages {
+                    if let Some(pgs) = payload.pages_granted {
+                        format!("Pay-As-You-Go Page Wallet ({} Pages)", pgs)
+                    } else {
+                        payload.plan_type.display_name().to_string()
+                    }
+                } else {
+                    payload.plan_type.display_name().to_string()
+                }
+            });
+        let _ = self.db.set_config("active_plan_display_name", &resolved_plan_name);
+
+        if payload.plan_type != LicensePlanType::Trial {
+            let pay_mode = payload
+                .payment_mode
+                .clone()
+                .filter(|s| !s.trim().is_empty())
+                .unwrap_or_else(|| "OFFLINE_KEY".to_string());
+            let pay_ref = payload
+                .payment_reference
+                .clone()
+                .filter(|s| !s.trim().is_empty())
+                .unwrap_or_else(|| pay_mode.clone());
+            let inv_sfx = if self.hwid.len() >= 4 {
+                &self.hwid[self.hwid.len() - 4..]
+            } else {
+                "0001"
+            };
+            let inv_no = payload
+                .invoice_number
+                .clone()
+                .filter(|s| !s.trim().is_empty())
+                .unwrap_or_else(|| format!("PD-INV-{}", inv_sfx));
+            let pay_rec = LicensePaymentRecord {
+                id: format!("offline_{}_{}", self.hwid, now_epoch),
+                hwid: self.hwid.clone(),
+                plan_code: plan_str.to_string(),
+                plan_name: resolved_plan_name.clone(),
+                amount_paid: payload.amount_paid.unwrap_or(0.0),
+                pages_granted: payload.pages_granted,
+                duration_days: None,
+                payment_mode: pay_mode,
+                payment_reference: pay_ref,
+                invoice_number: inv_no,
+                status: "VERIFIED_PAID".to_string(),
+                created_at: payload.issued_at.clone(),
+            };
+            let _ = self.record_payment(pay_rec);
+        }
 
         info!(
             "Successfully activated license! Plan: {:?}, Expires: {:?}",
@@ -823,12 +909,18 @@ impl LicenseManager {
                             hwid: row.get(0)?,
                             shop_name: row.get(1)?,
                             owner_name: row.get(2)?,
+                            city: None,
                             phone: row.get(3)?,
                             plan_type,
                             pages_granted: row.get(5)?,
                             issued_at: row.get(6)?,
                             expires_at: row.get(7)?,
                             signature: row.get(8)?,
+                            plan_name: None,
+                            amount_paid: None,
+                            payment_mode: None,
+                            payment_reference: None,
+                            invoice_number: None,
                         })
                     })
                     .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
@@ -1566,12 +1658,18 @@ mod tests {
             hwid: hwid.to_string(),
             shop_name: "Mahalaxmi Xerox & Print Hub".to_string(),
             owner_name: Some("Ramesh Patel".to_string()),
+            city: None,
             phone: Some("+91 98765 43210".to_string()),
             plan_type: LicensePlanType::WalletPages,
             pages_granted: Some(5000),
             issued_at: now,
             expires_at: None,
             signature: sig,
+            plan_name: None,
+            amount_paid: None,
+            payment_mode: None,
+            payment_reference: None,
+            invoice_number: None,
         };
 
         let key_json = serde_json::to_string(&commercial_payload).unwrap();
