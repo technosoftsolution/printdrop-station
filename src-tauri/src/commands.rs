@@ -1883,12 +1883,18 @@ pub struct OtaRollbackInfo {
     pub restore_script_path: Option<String>,
 }
 
-fn rollback_base_dir() -> std::path::PathBuf {
-    if let Ok(local_app_data) = std::env::var("LOCALAPPDATA") {
-        std::path::PathBuf::from(local_app_data).join("PrintDrop").join("rollback")
+fn printdrop_data_dir() -> std::path::PathBuf {
+    if let Ok(app_data) = std::env::var("APPDATA") {
+        std::path::PathBuf::from(app_data).join("PrintDrop")
+    } else if let Ok(local_app_data) = std::env::var("LOCALAPPDATA") {
+        std::path::PathBuf::from(local_app_data).join("PrintDrop")
     } else {
-        std::env::current_dir().unwrap_or_default().join("printdrop_rollback")
+        std::path::PathBuf::from("printdrop_data")
     }
+}
+
+fn rollback_base_dir() -> std::path::PathBuf {
+    printdrop_data_dir().join("rollback")
 }
 
 #[tauri::command]
@@ -1944,6 +1950,10 @@ pub async fn get_ota_rollout_policy(
 
 #[tauri::command]
 pub fn prepare_ota_rollback_snapshot(state: State<'_, AppState>) -> Result<OtaRollbackInfo, String> {
+    create_rollback_snapshot_internal(&state.db)
+}
+
+pub fn create_rollback_snapshot_internal(db: &std::sync::Arc<crate::db::Database>) -> Result<OtaRollbackInfo, String> {
     let base_dir = rollback_base_dir();
     let prev_dir = base_dir.join("prev");
     std::fs::create_dir_all(&prev_dir).map_err(|e| format!("Failed to create rollback dir: {}", e))?;
@@ -1952,17 +1962,13 @@ pub fn prepare_ota_rollback_snapshot(state: State<'_, AppState>) -> Result<OtaRo
     let backup_exe = prev_dir.join("printdrop.exe");
     std::fs::copy(&current_exe, &backup_exe).map_err(|e| format!("Failed to snapshot exe: {}", e))?;
 
-    // Flush SQLite WAL and snapshot printdrop.db
-    let _ = state.db.with_conn(|conn| {
+    // Flush SQLite WAL and snapshot printdrop.db from %APPDATA%\PrintDrop\printdrop.db
+    let _ = db.with_conn(|conn| {
         let _ = conn.execute_batch("PRAGMA wal_checkpoint(TRUNCATE);");
         Ok(())
     });
 
-    let app_data_db = if let Ok(local_app) = std::env::var("LOCALAPPDATA") {
-        std::path::PathBuf::from(local_app).join("PrintDrop").join("printdrop.db")
-    } else {
-        std::path::PathBuf::from("printdrop_data").join("printdrop.db")
-    };
+    let app_data_db = printdrop_data_dir().join("printdrop.db");
     let backup_db = prev_dir.join("printdrop.db");
     if app_data_db.exists() {
         let _ = std::fs::copy(&app_data_db, &backup_db);

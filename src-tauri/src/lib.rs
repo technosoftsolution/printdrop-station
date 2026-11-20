@@ -109,12 +109,16 @@ pub fn run() {
     let bg_order_mgr_startup = app_state.order_mgr.clone();
     let bg_storage_startup = app_state.storage_mgr.clone();
     let bg_pricing_startup = app_state.pricing_mgr.clone();
+    let bg_db_startup = app_state.db.clone();
     let _ = std::thread::Builder::new()
         .name("printdrop-startup-worker".to_string())
         .spawn(move || {
             let _ = bg_storage_startup.cleanup_orphaned_staging(std::time::Duration::from_secs(2 * 3600));
             let _ = bg_order_mgr_startup.clean_dustbin_previous_days(bg_storage_startup.base_dir());
             bg_pricing_startup.recalculate_all_unpaid_orders(&bg_storage_startup);
+            if !commands::get_ota_rollback_info().available {
+                let _ = commands::create_rollback_snapshot_internal(&bg_db_startup);
+            }
         });
 
     // Schedule background periodic check every 30 minutes to automatically empty Dustbin and clean staging chunks
