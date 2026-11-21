@@ -50,6 +50,7 @@ dist-installer/*.exe
 
 # Local Provider Remote Support Hub (private Root CA keys, DB & group template)
 support-hub/node_modules/
+support-hub/package-lock.json
 support-hub/meshcentral-data/
 support-hub/meshcentral-files/
 support-hub/meshcentral-backups/
