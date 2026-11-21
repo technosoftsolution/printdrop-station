@@ -6,6 +6,7 @@
     "aliasPort": 443,
     "redirPort": 0,
     "tlsOffload": "127.0.0.1",
+    "ignoreAgentHashCheck": true,
     "allowLoginToken": false,
     "allowFraming": false,
     "agentPing": 30,

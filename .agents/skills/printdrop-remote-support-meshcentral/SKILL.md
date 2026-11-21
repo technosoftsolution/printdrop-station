@@ -74,7 +74,7 @@ npm run support:hub                           system_config                     
 
 - **Pinned Root CA (`ServerID`)**: `PrintDropSupportAgent.exe` verifies the server's cryptographic `ServerID` hash during the WebSocket handshake — even if DNS or a tunnel URL were spoofed, the agent refuses to connect to any untrusted server.
 - **Zero Inbound Ports**: Shopkeeper PCs only make outbound TLS port `443` connections.
-- **Explicit Consent & Zero Persistent Backdoor**: Uses `-connect` on-demand mode — no permanent background service is installed, no UAC Admin prompt is required for standard support, and the shopkeeper can terminate the session in 1 click.
+- **Explicit Consent & Zero Persistent Backdoor**: Uses `connect` (no hyphen) temporary on-demand mode — no permanent background service is installed, no UAC Admin prompt is required for standard support, and the shopkeeper can terminate the session in 1 click.
 - **Git Secret Hygiene**: `support-hub/meshcentral-data/`, `support-hub/station-template.msh`, and `support-hub/node_modules/` are strictly `.gitignore`d so private Root CA keys never enter GitHub.
 - **Mandatory Hardening**:
   - Always set `"newAccounts": false` after creating your admin user.

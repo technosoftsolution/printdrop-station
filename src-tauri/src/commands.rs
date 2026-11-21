@@ -2371,7 +2371,11 @@ pub async fn start_remote_support_session(
     let _ = stop_remote_support_session();
 
     let mut cmd = std::process::Command::new(&agent_exe);
-    cmd.arg("-connect").current_dir(&support_dir);
+    // MeshAgent temporary console mode uses `connect` (without a leading hyphen)
+    cmd.arg("connect")
+        .current_dir(&support_dir)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null());
     #[cfg(target_os = "windows")]
     {
         use std::os::windows::process::CommandExt;
@@ -2379,9 +2383,18 @@ pub async fn start_remote_support_session(
         cmd.creation_flags(CREATE_NO_WINDOW);
     }
 
-    let child = cmd
+    let mut child = cmd
         .spawn()
         .map_err(|e| format!("Failed to launch PrintDrop Support Agent: {}", e))?;
+
+    // Brief liveness check so we never report "Connected" if the agent exits immediately
+    tokio::time::sleep(std::time::Duration::from_millis(1200)).await;
+    if let Ok(Some(exit_status)) = child.try_wait() {
+        return Err(format!(
+            "PrintDrop Support Agent exited unexpectedly (code {:?}). Please ensure Support Hub is running.",
+            exit_status.code()
+        ));
+    }
 
     let tunnel_host = cfg
         .tunnel_url
