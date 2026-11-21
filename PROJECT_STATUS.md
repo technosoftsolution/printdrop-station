@@ -9,7 +9,7 @@
 | **Current Phase** | **Phase-J: Live Customer Status Synchronization (SSE), Desktop Auto-Tunnel & Dual-Source Connection Resilience** (COMPLETED) |
 | **Current Status** | Windows 11 Desktop station auto-starts 4G/5G Cloudflare remote tunnel on boot, monitors internet reachability via 5s non-blocking TCP heartbeat, displays offline recovery UI with 1-click retry/stop controls, and auto-reconnects tunnel upon WAN resumption; Mobile web customer portal features persistent 3.0s station heartbeat, dual-source fault discrimination (phone offline vs shop PC offline), sticky glassmorphic notifications, zero-data-loss printed job card preservation during 502 outages, instant device detection, and self-healing bidirectional auto-reconnection. |
 | **Repository State** | Active Git repository |
-| **Last Updated** | 2026-11-19 |
+| **Last Updated** | 2026-11-22 |
 
 ---
 
@@ -1937,6 +1937,30 @@
   - `cargo test --manifest-path src-tauri/Cargo.toml --no-default-features`: **66/66** tests pass.
   - `npm run build`: **0 errors** (6.70s).
   - GitHub Actions `v1.0.6` release workflow completed green with both `latest.json` and `virtual-latest.json` published.
+
+---
+
+## 77. 3-Layer OTA Disaster Recovery Hardening & Zero-Cost White-Labeled Remote Desktop Support (`v1.0.13` – `v1.0.16`)
+
+- [x] **Layer 3 — Staged Canary Rollout & Cloud Recall Hardening (`src/App.tsx` & `admin-portal/index.html`)**:
+  - Fixed stale React closure in the 5s startup `useEffect` by introducing `statusRef` and `licenseStateRef` so automatic startup checks read the live app version and station HWID (enabling automatic red recall banners and canary/bucket rollouts without manual checks).
+  - Added 30-minute background policy polling, version normalization (`v1.0.16` → `1.0.16`), and `cache: 'no-store'` in Admin Portal's `openOtaPolicyModal()`.
+- [x] **Layer 2 — Local Binary + DB Snapshot & Windows Start Menu `.lnk` Recovery (`src-tauri/src/commands.rs`, `src-tauri/src/lib.rs`, `docs/DISASTER_RECOVERY_RUNBOOK.md`)**:
+  - Fixed Windows Start Menu visibility by generating a genuine **`.lnk`** shortcut (`PrintDrop - Emergency Restore Previous Version.lnk`) via `WScript.Shell` (`CREATE_NO_WINDOW`) and cleaning up legacy `.bat` launchers (Windows Start Menu ignores raw `.bat` files).
+  - Added `ensure_start_menu_restore_shortcut()` on startup so existing stations immediately receive the `.lnk` shortcut after updating.
+  - Added SQLite `-wal` / `-shm` cleanup before DB restore in `Restore_PrintDrop.bat`, `cmd /C call` path-space safety in `trigger_local_rollback()`, and a `cfg!(debug_assertions)` guard so `tauri dev` debug builds never pollute production `%APPDATA%\PrintDrop\rollback\` snapshots.
+  - Hid the in-app "Restore Previous Version" button whenever `previousVersion === currentVersion`.
+- [x] **Layer 1 — Fleet-Wide Emergency Forward-Rollback Script Hardening (`scripts/rollback-release.ps1`)**:
+  - Added `git rm -rf` clean restore before `git checkout` (removing orphaned files added in bad releases), strict SemVer `>` and duplicate-tag checks, UTF-8 without BOM file writes, dual-edition Cargo test verification, and `-DryRun` simulation mode (verified passing).
+- [x] **Zero-Cost White-Labeled Remote Desktop Support (`support-hub/`, `commands.rs`, `lib.rs`, `src/App.tsx`, `admin-portal/index.html`)**:
+  - Built **PrintDrop Support Hub** (`npm run support:hub`) running local white-labeled **MeshCentral** (`127.0.0.1:4430`, `tlsOffload` + `ignoreAgentHashCheck: true`, `"newAccounts": false`) behind a free **Cloudflare Quick Tunnel** (`cloudflared.exe`) with automatic live tunnel signaling to Supabase `system_config` (`provider_remote_support_tunnel`).
+  - Added Rust commands `get_remote_support_status`, `start_remote_support_session`, and `stop_remote_support_session` — downloads & validates `PrintDropSupportAgent.exe` (`MZ` PE check) to `%APPDATA%\PrintDrop\support\`, writes pinned `.msh` (verified public-key SHA-384 `ServerID`), launches temporary on-demand `connect` mode (no hyphen, no persistent service, no UAC prompt) with a 1.2s liveness check, and cleanly kills on disconnect.
+  - Added **Settings → Connect to Remote Support** + active green **PrintDrop Remote Support Session Active** banner with 1-click **Disconnect Support** in Desktop UI, and **Settings → PrintDrop Support Hub** shortcut in Admin Portal.
+  - Documented Tailscale unattended provisioning in [docs/TAILSCALE_UNATTENDED_PROVISIONING.md](file:///C:/Flutter_src/PrintDrop/docs/TAILSCALE_UNATTENDED_PROVISIONING.md) and saved the full MeshCentral Remote Support skill at both project (`.agents/skills/printdrop-remote-support-meshcentral/SKILL.md`) and global (`~/.gemini/config/skills/printdrop-remote-support-meshcentral/SKILL.md`) levels.
+- [x] **Live Verification (`v1.0.16`)**:
+  - `cargo test --manifest-path src-tauri/Cargo.toml`: **68/68** tests pass; `npx tsc --noEmit`: **0 errors**.
+  - **Live Remote Desktop Control Verified**: Upgraded **Awesome Xerox Center** to `v1.0.16`, clicked **Connect to Remote Support**, confirmed instant appearance in **PrintDrop Support Hub (`http://127.0.0.1:4430`)**, and verified smooth full Remote Desktop control over Cloudflare Quick Tunnel (`104.16.x.x:443`).
+  - Layer-2 rollback live drill scheduled for next session.
 
 
 
