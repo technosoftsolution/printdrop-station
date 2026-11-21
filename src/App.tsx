@@ -525,6 +525,18 @@ export default function App() {
   const [rollbackInfo, setRollbackInfo] = useState<{ available: boolean; previousVersion?: string | null } | null>(null);
   const [isBlockedVersion, setIsBlockedVersion] = useState(false);
 
+  const statusRef = useRef(status);
+  useEffect(() => {
+    statusRef.current = status;
+  }, [status]);
+
+  const licenseStateRef = useRef(licenseState);
+  useEffect(() => {
+    licenseStateRef.current = licenseState;
+  }, [licenseState]);
+
+  const normalizeVer = (v?: string | null) => (v || "").trim().replace(/^v/i, "");
+
   const getHwidRolloutBucket = (hwid: string) => {
     let hash = 0;
     for (let i = 0; i < hwid.length; i++) {
@@ -556,8 +568,14 @@ export default function App() {
 
       if (rbInfo) setRollbackInfo(rbInfo);
 
-      const curVer = status?.version || "";
-      if (curVer && Array.isArray(policy.blockedVersions) && policy.blockedVersions.includes(curVer)) {
+      const blockedSet = new Set(
+        (Array.isArray(policy.blockedVersions) ? policy.blockedVersions : [])
+          .map((v) => normalizeVer(v))
+          .filter(Boolean)
+      );
+
+      const curVer = normalizeVer(statusRef.current?.version);
+      if (curVer && curVer !== "0.1.0" && blockedSet.has(curVer)) {
         setIsBlockedVersion(true);
       } else {
         setIsBlockedVersion(false);
@@ -565,17 +583,21 @@ export default function App() {
 
       const update = await check();
       if (update?.available) {
-        if (Array.isArray(policy.blockedVersions) && policy.blockedVersions.includes(update.version)) {
+        const nextVer = normalizeVer(update.version);
+        if (nextVer && blockedSet.has(nextVer)) {
           if (manual) {
-            setErrorMsg(`Update v${update.version} is currently paused/blocked by administrator.`);
+            setErrorMsg(`Update v${nextVer} is currently paused/blocked by administrator.`);
             setTimeout(() => setErrorMsg(null), 5000);
           }
           return;
         }
 
         const pct = typeof policy.rolloutPercentage === "number" ? policy.rolloutPercentage : 100;
-        const hwid = (licenseState?.hwid || "").toUpperCase();
-        const isCanary = hwid !== "" && Array.isArray(policy.canaryHwids) && policy.canaryHwids.some((id) => id.trim().toUpperCase() === hwid);
+        const hwid = (licenseStateRef.current?.hwid || "").trim().toUpperCase();
+        const isCanary =
+          hwid !== "" &&
+          Array.isArray(policy.canaryHwids) &&
+          policy.canaryHwids.some((id) => id.trim().toUpperCase() === hwid);
         const inRolloutBucket = pct >= 100 || (pct > 0 && (hwid ? getHwidRolloutBucket(hwid) < pct : false));
 
         if (!manual && !isCanary && !inRolloutBucket) {
@@ -633,7 +655,13 @@ export default function App() {
     const timer = setTimeout(() => {
       checkForAppUpdates(false);
     }, 5000);
-    return () => clearTimeout(timer);
+    const interval = setInterval(() => {
+      checkForAppUpdates(false);
+    }, 30 * 60 * 1000);
+    return () => {
+      clearTimeout(timer);
+      clearInterval(interval);
+    };
   }, []);
   const [isLicenseModalOpen, setIsLicenseModalOpen] = useState(false);
   const [isStationSetupOpen, setIsStationSetupOpen] = useState(false);
@@ -2387,7 +2415,8 @@ export default function App() {
                   </div>
                 </button>
 
-                {rollbackInfo?.available && (
+                {rollbackInfo?.available &&
+                  normalizeVer(rollbackInfo.previousVersion) !== normalizeVer(status?.version) && (
                   <button
                     type="button"
                     onClick={() => {
@@ -2563,7 +2592,8 @@ export default function App() {
                 </div>
               </div>
             </div>
-            {rollbackInfo?.available && (
+            {rollbackInfo?.available &&
+              normalizeVer(rollbackInfo.previousVersion) !== normalizeVer(status?.version) && (
               <button
                 type="button"
                 onClick={handleLocalRollback}

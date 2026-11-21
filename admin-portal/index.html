@@ -248,8 +248,10 @@
         <div class="relative w-full sm:w-80">
           <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3.5 top-3"></i>
           <input
-            type="text"
+            type="search"
             id="searchInput"
+            name="station_search_q"
+            autocomplete="off"
             placeholder="Search shop, phone, city, or HWID..."
             oninput="onSearchInput()"
             class="w-full pl-10 pr-4 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-indigo-500"
@@ -2118,9 +2120,13 @@
       lucide.createIcons();
     }
 
+    const DEFAULT_SB_URL = 'https://nslcrlvuulgqtrdqrkgv.supabase.co';
+    const DEFAULT_SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5zbGNybHZ1dWxncXRyZHFya2d2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQxNTI4NzEsImV4cCI6MjEwOTcyODg3MX0.lpRc097A_PFCD-eJVhyQZmPFxexhSGjM2dhCE0LNdxk';
+    const savedSbUrl = (localStorage.getItem('printdrop_sb_url') || '').trim();
+    const savedSbKey = (localStorage.getItem('printdrop_sb_key') || '').trim();
     let cloudConfig = {
-      url: localStorage.getItem('printdrop_sb_url') || 'https://nslcrlvuulgqtrdqrkgv.supabase.co',
-      key: localStorage.getItem('printdrop_sb_key') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5zbGNybHZ1dWxncXRyZHFya2d2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQxNTI4NzEsImV4cCI6MjEwOTcyODg3MX0.lpRc097A_PFCD-eJVhyQZmPFxexhSGjM2dhCE0LNdxk'
+      url: savedSbUrl.startsWith('https://') ? savedSbUrl : DEFAULT_SB_URL,
+      key: savedSbKey.length > 20 ? savedSbKey : DEFAULT_SB_KEY
     };
 
     function getCalendarDaysRemaining(isoStr) {
@@ -2156,6 +2162,9 @@
     function unlockAdminPortalUi() {
       const overlay = document.getElementById('adminLoginOverlay');
       if (overlay) overlay.classList.add('hidden');
+      // Prevent browser password-manager autofill from silently filtering out all stations
+      const searchEl = document.getElementById('searchInput');
+      if (searchEl && searchEl.value) searchEl.value = '';
       loadCommercialPlansFromCloud();
       loadStations();
       loadProviderProfileFromCloud();
@@ -2679,16 +2688,15 @@
       if (!cleanUrl || !cloudConfig?.key) return;
       try {
         const res = await fetch(`${cleanUrl}/rest/v1/system_config?key=eq.ota_rollout_policy&select=value`, {
-          headers: { 'apikey': cloudConfig.key, 'Authorization': `Bearer ${cloudConfig.key}` }
+          headers: { 'apikey': cloudConfig.key, 'Authorization': `Bearer ${cloudConfig.key}` },
+          cache: 'no-store'
         });
         if (res.ok) {
           const rows = await res.json();
           const val = rows?.[0]?.value;
-          if (val) {
-            document.getElementById('otaRolloutPct').value = String(val.rolloutPercentage ?? 100);
-            document.getElementById('otaCanaryHwids').value = (val.canaryHwids || []).join(', ');
-            document.getElementById('otaBlockedVersions').value = (val.blockedVersions || []).join(', ');
-          }
+          document.getElementById('otaRolloutPct').value = String(val?.rolloutPercentage ?? 100);
+          document.getElementById('otaCanaryHwids').value = (val?.canaryHwids || []).join(', ');
+          document.getElementById('otaBlockedVersions').value = (val?.blockedVersions || []).join(', ');
         }
       } catch (_) {}
     }

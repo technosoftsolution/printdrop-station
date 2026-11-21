@@ -118,6 +118,8 @@ pub fn run() {
             bg_pricing_startup.recalculate_all_unpaid_orders(&bg_storage_startup);
             if !commands::get_ota_rollback_info().available {
                 let _ = commands::create_rollback_snapshot_internal(&bg_db_startup);
+            } else {
+                commands::ensure_start_menu_restore_shortcut();
             }
         });
 

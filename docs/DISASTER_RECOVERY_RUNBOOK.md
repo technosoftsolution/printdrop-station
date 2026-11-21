@@ -29,7 +29,7 @@ Every PrintDrop station automatically maintains a snapshot of the last known-goo
   - `printdrop.exe` (previous working binary)
   - `printdrop.db` (WAL-checkpointed SQLite database & settings)
   - `metadata.json` (records `previousVersion`, `exePath`, `dbPath`, `createdAt`)
-- **Start Menu Launcher**: `%APPDATA%\Microsoft\Windows\Start Menu\Programs\PrintDrop\PrintDrop - Emergency Restore Previous Version.bat`
+- **Start Menu Launcher**: `%APPDATA%\Microsoft\Windows\Start Menu\Programs\PrintDrop\PrintDrop - Emergency Restore Previous Version.lnk`
 
 ### Method A: Inside the App (If UI Opens)
 - Click **`Restore vX.Y.Z Now`** on the red Emergency Rollback Banner, **OR**

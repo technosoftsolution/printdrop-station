@@ -1954,6 +1954,11 @@ pub fn prepare_ota_rollback_snapshot(state: State<'_, AppState>) -> Result<OtaRo
 }
 
 pub fn create_rollback_snapshot_internal(db: &std::sync::Arc<crate::db::Database>) -> Result<OtaRollbackInfo, String> {
+    // Never overwrite production rollback snapshot with a debug dev binary (which requires Vite 127.0.0.1:1420)
+    if cfg!(debug_assertions) {
+        return Err("Rollback snapshot skipped in debug dev build.".to_string());
+    }
+
     let base_dir = rollback_base_dir();
     let prev_dir = base_dir.join("prev");
     std::fs::create_dir_all(&prev_dir).map_err(|e| format!("Failed to create rollback dir: {}", e))?;
@@ -1988,6 +1993,10 @@ pub fn create_rollback_snapshot_internal(db: &std::sync::Arc<crate::db::Database
     // Write standalone outside-app Windows recovery script
     let bat_path = base_dir.join("Restore_PrintDrop.bat");
     let exe_str = current_exe.to_string_lossy();
+    let exe_name = current_exe
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("printdrop.exe");
     let db_str = app_data_db.to_string_lossy();
     let backup_exe_str = backup_exe.to_string_lossy();
     let backup_db_str = backup_db.to_string_lossy();
@@ -1998,12 +2007,12 @@ pub fn create_rollback_snapshot_internal(db: &std::sync::Arc<crate::db::Database
          echo   PrintDrop Emergency Restore (v{ver})\r\n\
          echo ======================================================\r\n\
          echo Stopping PrintDrop...\r\n\
-         taskkill /F /IM printdrop.exe >nul 2>&1\r\n\
+         taskkill /F /IM \"{exe_name}\" >nul 2>&1\r\n\
          timeout /t 2 /nobreak >nul\r\n\
          echo Restoring previous application binary (v{ver})...\r\n\
          copy /Y \"{b_exe}\" \"{t_exe}\" >nul\r\n\
          if errorlevel 1 (\r\n\
-           echo ERROR: Could not overwrite printdrop.exe. Try running as Administrator.\r\n\
+           echo ERROR: Could not overwrite {exe_name}. Try running as Administrator.\r\n\
            pause\r\n\
            exit /b 1\r\n\
          )\r\n\
@@ -2011,6 +2020,7 @@ pub fn create_rollback_snapshot_internal(db: &std::sync::Arc<crate::db::Database
          if exist \"{b_db}\" (\r\n\
            choice /C YN /T 6 /D N /M \"Also restore pre-update database/settings snapshot? (Default N in 6s)\"\r\n\
            if errorlevel 2 goto launch\r\n\
+           del /F /Q \"{t_db}-wal\" \"{t_db}-shm\" >nul 2>&1\r\n\
            copy /Y \"{b_db}\" \"{t_db}\" >nul\r\n\
            echo Database snapshot restored.\r\n\
          )\r\n\
@@ -2019,6 +2029,7 @@ pub fn create_rollback_snapshot_internal(db: &std::sync::Arc<crate::db::Database
          start \"\" \"{t_exe}\"\r\n\
          exit /b 0\r\n",
         ver = version,
+        exe_name = exe_name,
         b_exe = backup_exe_str,
         t_exe = exe_str,
         b_db = backup_db_str,
@@ -2027,20 +2038,8 @@ pub fn create_rollback_snapshot_internal(db: &std::sync::Arc<crate::db::Database
     std::fs::write(&bat_path, &bat_content)
         .map_err(|e| format!("Failed to write Restore_PrintDrop.bat: {}", e))?;
 
-    // Place a Start Menu recovery launcher so shopkeepers can restore even if the app won't open
-    if let Ok(appdata) = std::env::var("APPDATA") {
-        let start_menu_dir = std::path::PathBuf::from(appdata)
-            .join("Microsoft")
-            .join("Windows")
-            .join("Start Menu")
-            .join("Programs")
-            .join("PrintDrop");
-        if std::fs::create_dir_all(&start_menu_dir).is_ok() {
-            let launcher_path = start_menu_dir.join("PrintDrop - Emergency Restore Previous Version.bat");
-            let launcher_body = format!("@echo off\r\ncall \"{}\"\r\n", bat_path.to_string_lossy());
-            let _ = std::fs::write(&launcher_path, launcher_body);
-        }
-    }
+    // Place a genuine Windows .lnk Start Menu shortcut (Windows Start Menu ignores raw .bat files)
+    ensure_start_menu_restore_shortcut();
 
     Ok(OtaRollbackInfo {
         available: true,
@@ -2048,6 +2047,67 @@ pub fn create_rollback_snapshot_internal(db: &std::sync::Arc<crate::db::Database
         created_at: Some(now_iso),
         restore_script_path: Some(bat_path.to_string_lossy().to_string()),
     })
+}
+
+/// Ensures a genuine Windows `.lnk` Start Menu shortcut exists for `Restore_PrintDrop.bat`
+/// and removes any legacy `.bat` launcher (Windows Start Menu ignores raw `.bat` files).
+pub fn ensure_start_menu_restore_shortcut() {
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+
+        let base_dir = rollback_base_dir();
+        let bat_path = base_dir.join("Restore_PrintDrop.bat");
+        if !bat_path.exists() {
+            return;
+        }
+
+        if let Ok(appdata) = std::env::var("APPDATA") {
+            let start_menu_dir = std::path::PathBuf::from(appdata)
+                .join("Microsoft")
+                .join("Windows")
+                .join("Start Menu")
+                .join("Programs")
+                .join("PrintDrop");
+            if std::fs::create_dir_all(&start_menu_dir).is_err() {
+                return;
+            }
+
+            // Clean up legacy .bat launcher that Windows Start Menu ignores
+            let legacy_bat = start_menu_dir.join("PrintDrop - Emergency Restore Previous Version.bat");
+            if legacy_bat.exists() {
+                let _ = std::fs::remove_file(&legacy_bat);
+            }
+
+            let lnk_path = start_menu_dir.join("PrintDrop - Emergency Restore Previous Version.lnk");
+            let icon_exe = std::env::current_exe()
+                .ok()
+                .map(|p| p.to_string_lossy().to_string())
+                .unwrap_or_default();
+
+            let esc = |s: &str| s.replace('\'', "''");
+            let ps_script = format!(
+                "$ws = New-Object -ComObject WScript.Shell; \
+                 $s = $ws.CreateShortcut('{lnk}'); \
+                 $s.TargetPath = $env:SystemRoot + '\\System32\\cmd.exe'; \
+                 $s.Arguments = '/C call \"{bat}\"'; \
+                 $s.WorkingDirectory = '{workdir}'; \
+                 $s.Description = 'PrintDrop Emergency Restore Previous Version'; \
+                 if ('{icon}' -ne '') {{ $s.IconLocation = '{icon},0' }}; \
+                 $s.Save()",
+                lnk = esc(&lnk_path.to_string_lossy()),
+                bat = esc(&bat_path.to_string_lossy()),
+                workdir = esc(&base_dir.to_string_lossy()),
+                icon = esc(&icon_exe),
+            );
+
+            let _ = std::process::Command::new("powershell")
+                .args(["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", &ps_script])
+                .creation_flags(CREATE_NO_WINDOW)
+                .output();
+        }
+    }
 }
 
 #[tauri::command]
@@ -2092,7 +2152,7 @@ pub fn trigger_local_rollback() -> Result<(), String> {
         use std::os::windows::process::CommandExt;
         const CREATE_NO_WINDOW: u32 = 0x08000000;
         std::process::Command::new("cmd")
-            .args(["/C", &script, "--auto"])
+            .args(["/C", "call", &script, "--auto"])
             .creation_flags(CREATE_NO_WINDOW)
             .spawn()
             .map_err(|e| format!("Failed to launch rollback script: {}", e))?;
