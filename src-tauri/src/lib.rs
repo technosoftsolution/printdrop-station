@@ -278,6 +278,9 @@ pub fn run() {
             commands::get_license_payment_history,
             commands::record_license_payment,
             commands::get_payment_usage_history,
+            commands::get_remote_support_status,
+            commands::start_remote_support_session,
+            commands::stop_remote_support_session,
         ])
         .setup(|_app| {
             info!("PrintDrop Tauri 2 desktop setup hook completed.");

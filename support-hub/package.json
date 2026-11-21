@@ -1,0 +1,9 @@
+{
+  "name": "printdrop-support-hub",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local white-labeled MeshCentral Remote Support Hub for PrintDrop Provider",
+  "dependencies": {
+    "meshcentral": "^1.1.35"
+  }
+}

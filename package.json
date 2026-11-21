@@ -13,6 +13,7 @@
     "build:all": "powershell -ExecutionPolicy Bypass -File ./scripts/build-installers.ps1 -Edition All",
     "release": "powershell -ExecutionPolicy Bypass -File ./scripts/release.ps1",
     "rollback-release": "powershell -ExecutionPolicy Bypass -File ./scripts/rollback-release.ps1",
+    "support:hub": "powershell -ExecutionPolicy Bypass -File ./support-hub/start-support-hub.ps1",
     "admin:serve": "node ./scripts/serve-admin-portal.mjs"
   },
   "dependencies": {

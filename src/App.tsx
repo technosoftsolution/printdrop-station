@@ -525,6 +525,33 @@ export default function App() {
   const [rollbackInfo, setRollbackInfo] = useState<{ available: boolean; previousVersion?: string | null } | null>(null);
   const [isBlockedVersion, setIsBlockedVersion] = useState(false);
 
+  // On-Demand White-Labeled PrintDrop Remote Support (MeshCentral over Cloudflare Tunnel)
+  const [remoteSupportConnected, setRemoteSupportConnected] = useState(false);
+  const [isTogglingRemoteSupport, setIsTogglingRemoteSupport] = useState(false);
+
+  const handleToggleRemoteSupport = async () => {
+    if (isTogglingRemoteSupport) return;
+    setIsTogglingRemoteSupport(true);
+    try {
+      if (remoteSupportConnected) {
+        await invoke("stop_remote_support_session");
+        setRemoteSupportConnected(false);
+        setActionSuccessMsg("PrintDrop Remote Support disconnected.");
+        setTimeout(() => setActionSuccessMsg(null), 4000);
+      } else {
+        await invoke("start_remote_support_session");
+        setRemoteSupportConnected(true);
+        setActionSuccessMsg("Connected to PrintDrop Remote Support! Technician can now assist you.");
+        setTimeout(() => setActionSuccessMsg(null), 6000);
+      }
+    } catch (err) {
+      setErrorMsg(`${err}`);
+      setTimeout(() => setErrorMsg(null), 6500);
+    } finally {
+      setIsTogglingRemoteSupport(false);
+    }
+  };
+
   const statusRef = useRef(status);
   useEffect(() => {
     statusRef.current = status;
@@ -2439,6 +2466,50 @@ export default function App() {
                   </button>
                 )}
 
+                {/* 7.5. On-Demand PrintDrop Remote Support */}
+                <button
+                  type="button"
+                  disabled={isTogglingRemoteSupport}
+                  onClick={() => {
+                    setIsSettingsMenuOpen(false);
+                    handleToggleRemoteSupport();
+                  }}
+                  className={`w-full flex items-center gap-3 p-2.5 rounded-xl transition group border cursor-pointer text-left ${
+                    remoteSupportConnected
+                      ? "bg-emerald-950/60 hover:bg-emerald-900/70 text-emerald-200 border-emerald-500/50"
+                      : "bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-white border-slate-800 hover:border-indigo-500/50"
+                  }`}
+                >
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                    remoteSupportConnected
+                      ? "bg-emerald-500/20 border border-emerald-400/50 text-emerald-300"
+                      : "bg-indigo-500/20 border border-indigo-500/40 text-indigo-400"
+                  }`}>
+                    <ShieldCheck className="w-4 h-4" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-bold flex items-center justify-between">
+                      <span className={remoteSupportConnected ? "text-emerald-200" : "text-indigo-200"}>
+                        {isTogglingRemoteSupport
+                          ? "Connecting Support..."
+                          : remoteSupportConnected
+                          ? "Disconnect Remote Support"
+                          : "Connect to Remote Support"}
+                      </span>
+                      {remoteSupportConnected && (
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-400/40 animate-pulse">
+                          LIVE
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-slate-400 truncate mt-0.5">
+                      {remoteSupportConnected
+                        ? "PrintDrop Support session active • Click to end"
+                        : "1-click encrypted screen assist with PrintDrop Support"}
+                    </p>
+                  </div>
+                </button>
+
                 {/* 8. Contact Us & Software Provider Support (Last Option in Settings) */}
                 <button
                   type="button"
@@ -2576,6 +2647,33 @@ export default function App() {
 
       {/* Main Workspace */}
       <main className={`flex-1 min-h-0 w-full mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4 flex flex-col overflow-y-auto ${isViewingAllHistory ? "max-w-[1920px] space-y-6" : "max-w-[1920px]"}`}>
+        {/* Active On-Demand Remote Support Banner */}
+        {remoteSupportConnected && (
+          <div className="p-3 mb-3 bg-gradient-to-r from-emerald-950/95 via-slate-900 to-cyan-950/95 border border-emerald-500/60 rounded-2xl text-emerald-100 text-xs sm:text-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 flex-shrink-0 shadow-xl relative z-20">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-emerald-300 shrink-0 animate-pulse">
+                <ShieldCheck className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <div className="font-extrabold text-white text-xs sm:text-sm">
+                  PrintDrop Remote Support Session Active
+                </div>
+                <div className="text-[11px] text-emerald-200/90 mt-0.5">
+                  Your screen is securely shared with PrintDrop Support. Click Disconnect anytime to end access immediately.
+                </div>
+              </div>
+            </div>
+            <button
+              type="button"
+              disabled={isTogglingRemoteSupport}
+              onClick={handleToggleRemoteSupport}
+              className="px-3.5 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-lg transition shrink-0 cursor-pointer"
+            >
+              Disconnect Support
+            </button>
+          </div>
+        )}
+
         {/* Emergency Blocked-Version Rollback Banner (Layer 3) */}
         {isBlockedVersion && (
           <div className="p-3.5 mb-3 bg-gradient-to-r from-rose-950/95 via-slate-900 to-rose-950/95 border-2 border-rose-500 rounded-2xl text-rose-100 text-xs sm:text-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 flex-shrink-0 shadow-2xl relative z-20">

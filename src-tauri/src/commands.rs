@@ -2184,6 +2184,257 @@ pub fn get_payment_usage_history(
     state.license_mgr.get_payment_usage_history(payment_id)
 }
 
+// ==========================================
+// PRINTDROP REMOTE SUPPORT (MESHCENTRAL ON-DEMAND)
+// ==========================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderSupportTunnelConfig {
+    #[serde(default)]
+    pub active: bool,
+    #[serde(default)]
+    pub tunnel_url: String,
+    #[serde(default)]
+    pub mesh_server_wss: String,
+    #[serde(default)]
+    pub server_id: String,
+    #[serde(default)]
+    pub mesh_id: String,
+    #[serde(default = "default_support_mesh_name")]
+    pub mesh_name: String,
+    #[serde(default = "default_support_mesh_type")]
+    pub mesh_type: String,
+}
+
+fn default_support_mesh_name() -> String {
+    "PrintDrop Stations".to_string()
+}
+
+fn default_support_mesh_type() -> String {
+    "2".to_string()
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RemoteSupportStatus {
+    pub connected: bool,
+    pub tunnel_host: Option<String>,
+    pub started_at: Option<String>,
+}
+
+struct RemoteSupportProcessHandle {
+    child: std::process::Child,
+    tunnel_host: String,
+    started_at: String,
+}
+
+fn remote_support_slot() -> &'static std::sync::Mutex<Option<RemoteSupportProcessHandle>> {
+    static SLOT: std::sync::OnceLock<std::sync::Mutex<Option<RemoteSupportProcessHandle>>> = std::sync::OnceLock::new();
+    SLOT.get_or_init(|| std::sync::Mutex::new(None))
+}
+
+#[tauri::command]
+pub fn get_remote_support_status() -> RemoteSupportStatus {
+    let mut guard = match remote_support_slot().lock() {
+        Ok(g) => g,
+        Err(_) => {
+            return RemoteSupportStatus {
+                connected: false,
+                tunnel_host: None,
+                started_at: None,
+            };
+        }
+    };
+
+    if let Some(handle) = guard.as_mut() {
+        match handle.child.try_wait() {
+            Ok(None) => {
+                return RemoteSupportStatus {
+                    connected: true,
+                    tunnel_host: Some(handle.tunnel_host.clone()),
+                    started_at: Some(handle.started_at.clone()),
+                };
+            }
+            _ => {
+                *guard = None;
+            }
+        }
+    }
+
+    RemoteSupportStatus {
+        connected: false,
+        tunnel_host: None,
+        started_at: None,
+    }
+}
+
+#[tauri::command]
+pub async fn start_remote_support_session(
+    state: State<'_, AppState>,
+) -> Result<RemoteSupportStatus, String> {
+    let cloud_config = crate::licensing::heartbeat::get_cloud_config(&state.db);
+    let base_url = cloud_config.supabase_url.trim().trim_end_matches('/');
+    let anon_key = cloud_config.supabase_anon_key.trim();
+
+    if base_url.is_empty() || anon_key.is_empty() {
+        return Err("Cloud configuration is missing. Cannot reach PrintDrop Support Hub.".to_string());
+    }
+
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(20))
+        .build()
+        .map_err(|e| format!("HTTP client error: {}", e))?;
+
+    let query_url = format!("{}/rest/v1/system_config?key=eq.provider_remote_support_tunnel&select=value", base_url);
+    let resp = client
+        .get(&query_url)
+        .header("apikey", anon_key)
+        .header("Authorization", format!("Bearer {}", anon_key))
+        .header("Cache-Control", "no-cache, no-store, must-revalidate")
+        .send()
+        .await
+        .map_err(|e| format!("Could not reach PrintDrop Support cloud: {}", e))?;
+
+    if !resp.status().is_success() {
+        return Err(format!("Support Hub lookup failed (HTTP {}).", resp.status()));
+    }
+
+    #[derive(Deserialize)]
+    struct ConfigRow {
+        value: serde_json::Value,
+    }
+    let rows: Vec<ConfigRow> = resp
+        .json()
+        .await
+        .map_err(|e| format!("Invalid Support Hub response: {}", e))?;
+
+    let cfg: ProviderSupportTunnelConfig = rows
+        .first()
+        .and_then(|r| serde_json::from_value(r.value.clone()).ok())
+        .ok_or_else(|| "PrintDrop Support Hub is currently offline. Please ask Support to start Support Hub and try again.".to_string())?;
+
+    if !cfg.active
+        || cfg.tunnel_url.trim().is_empty()
+        || cfg.mesh_server_wss.trim().is_empty()
+        || cfg.server_id.trim().is_empty()
+        || cfg.mesh_id.trim().is_empty()
+    {
+        return Err("PrintDrop Support Hub is currently offline. Please ask PrintDrop Support to open their Support Hub and try again.".to_string());
+    }
+
+    let support_dir = printdrop_data_dir().join("support");
+    std::fs::create_dir_all(&support_dir)
+        .map_err(|e| format!("Failed to prepare support folder: {}", e))?;
+
+    let agent_exe = support_dir.join("PrintDropSupportAgent.exe");
+    let needs_download = match std::fs::metadata(&agent_exe) {
+        Ok(m) => m.len() < 100_000,
+        Err(_) => true,
+    };
+
+    if needs_download {
+        let dl_url = format!("{}/meshagents?id=4", cfg.tunnel_url.trim().trim_end_matches('/'));
+        let agent_resp = client
+            .get(&dl_url)
+            .send()
+            .await
+            .map_err(|e| format!("Failed to download PrintDrop Support Agent: {}", e))?;
+        if !agent_resp.status().is_success() {
+            return Err(format!("Support Agent download failed (HTTP {}).", agent_resp.status()));
+        }
+        let bytes = agent_resp
+            .bytes()
+            .await
+            .map_err(|e| format!("Failed reading Support Agent binary: {}", e))?;
+        if bytes.len() < 100_000 || &bytes[0..2] != b"MZ" {
+            return Err("Downloaded Support Agent binary is invalid. Please ensure Support Hub is running.".to_string());
+        }
+        std::fs::write(&agent_exe, &bytes)
+            .map_err(|e| format!("Failed to save Support Agent: {}", e))?;
+    }
+
+    // Write fresh .msh config with pinned Root CA ServerID and live Cloudflare WSS endpoint
+    let msh_path = support_dir.join("PrintDropSupportAgent.msh");
+    let msh_content = format!(
+        "MeshName={}\r\nMeshType={}\r\nMeshID={}\r\nServerID={}\r\nMeshServer={}\r\ndisplayName=PrintDrop Support Service\r\n",
+        cfg.mesh_name.trim(),
+        cfg.mesh_type.trim(),
+        cfg.mesh_id.trim(),
+        cfg.server_id.trim(),
+        cfg.mesh_server_wss.trim(),
+    );
+    std::fs::write(&msh_path, msh_content)
+        .map_err(|e| format!("Failed to write Support Agent config: {}", e))?;
+
+    // Terminate any existing support session first
+    let _ = stop_remote_support_session();
+
+    let mut cmd = std::process::Command::new(&agent_exe);
+    cmd.arg("-connect").current_dir(&support_dir);
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+
+    let child = cmd
+        .spawn()
+        .map_err(|e| format!("Failed to launch PrintDrop Support Agent: {}", e))?;
+
+    let tunnel_host = cfg
+        .tunnel_url
+        .trim()
+        .trim_start_matches("https://")
+        .trim_start_matches("http://")
+        .trim_end_matches('/')
+        .to_string();
+    let started_at = chrono::Utc::now().to_rfc3339();
+
+    if let Ok(mut guard) = remote_support_slot().lock() {
+        *guard = Some(RemoteSupportProcessHandle {
+            child,
+            tunnel_host: tunnel_host.clone(),
+            started_at: started_at.clone(),
+        });
+    }
+
+    info!("Started on-demand PrintDrop Remote Support session via {}", tunnel_host);
+
+    Ok(RemoteSupportStatus {
+        connected: true,
+        tunnel_host: Some(tunnel_host),
+        started_at: Some(started_at),
+    })
+}
+
+#[tauri::command]
+pub fn stop_remote_support_session() -> Result<RemoteSupportStatus, String> {
+    if let Ok(mut guard) = remote_support_slot().lock() {
+        if let Some(mut handle) = guard.take() {
+            let _ = handle.child.kill();
+            let _ = handle.child.wait();
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        let _ = std::process::Command::new("taskkill")
+            .args(["/F", "/IM", "PrintDropSupportAgent.exe"])
+            .creation_flags(CREATE_NO_WINDOW)
+            .output();
+    }
+
+    Ok(RemoteSupportStatus {
+        connected: false,
+        tunnel_host: None,
+        started_at: None,
+    })
+}
+
 
 
 

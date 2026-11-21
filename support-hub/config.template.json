@@ -1,0 +1,30 @@
+{
+  "$schema": "https://raw.githubusercontent.com/Ylianst/MeshCentral/master/meshcentral-config-schema.json",
+  "settings": {
+    "cert": "127.0.0.1",
+    "port": 4430,
+    "aliasPort": 443,
+    "redirPort": 0,
+    "tlsOffload": "127.0.0.1",
+    "allowLoginToken": false,
+    "allowFraming": false,
+    "agentPing": 30,
+    "agentPong": 30
+  },
+  "domains": {
+    "": {
+      "title": "PrintDrop Support Hub",
+      "title2": "TechnoSoft Solution Remote Counter Assist",
+      "minify": true,
+      "newAccounts": true,
+      "userNameIsEmail": false,
+      "agentCustomization": {
+        "displayName": "PrintDrop Support Service",
+        "description": "On-demand remote technical support for PrintDrop Desktop Station.",
+        "companyName": "TechnoSoft Solution",
+        "serviceName": "PrintDropSupport",
+        "fileName": "PrintDropSupportAgent"
+      }
+    }
+  }
+}

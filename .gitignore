@@ -47,3 +47,11 @@ dist-installer/*.exe
 *.jpg
 *.jpeg
 *.png
+
+# Local Provider Remote Support Hub (private Root CA keys, DB & group template)
+support-hub/node_modules/
+support-hub/meshcentral-data/
+support-hub/meshcentral-files/
+support-hub/meshcentral-backups/
+support-hub/station-template.msh
+support-hub/*.log
