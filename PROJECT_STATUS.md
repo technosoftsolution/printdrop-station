@@ -1962,6 +1962,30 @@
   - **Live Remote Desktop Control Verified**: Upgraded **Awesome Xerox Center** to `v1.0.16`, clicked **Connect to Remote Support**, confirmed instant appearance in **PrintDrop Support Hub (`http://127.0.0.1:4430`)**, and verified smooth full Remote Desktop control over Cloudflare Quick Tunnel (`104.16.x.x:443`).
   - Layer-2 rollback live drill scheduled for next session.
 
+---
+
+## 78. Unified PrintDrop Design System, Cross-Surface UI/UX Polish & True-Responsive Desktop Engine (`v1.0.17` – `v1.0.19`)
+
+- [x] **Desktop Operational UX Fixes (`v1.0.17` — `d08ccf4` / `b4eb401`)**:
+  - **Scrollable Settings Dropdown with Edge-Hover Auto-Scroll (`src/App.tsx`, `src/index.css`)**: Dynamically clamps Settings popover height to visible window (`window.innerHeight - rect.bottom - 18`), adds `requestAnimationFrame` smooth auto-scroll when hovering top/bottom 56px edge zones, top/bottom scroll indicator bars, and thin custom scrollbar.
+  - **Dev Permanent Portal Link Restored (`src-tauri/src/commands.rs`, `src/App.tsx`)**: Debug/dev builds (`#[cfg(debug_assertions)]` / `import.meta.env.DEV`) default `permanent_portal_url` to `https://technosoftsolution.github.io/printdrop-station/connect.html`, while release installers remain 100% clean-slate empty.
+  - **Explicit Per-File Approval State (`src/App.tsx`)**: Newly uploaded (`AWAITING_APPROVAL`) files in the Inspect modal now show neutral **`Approve`** / **`Reject`** buttons instead of prematurely showing green **`Approved`**; files turn green **`Approved`** only when approved individually or via the consolidated **`Approve Order (X of Y Files)`** button.
+  - **Order Card Row Declutter (`src/App.tsx`)**: Moved billing pills (`₹Amount`, `Unpaid/Paid/Credit`, `UPI Claimed`) from Row 1 to Row 2 right after file size so `Awaiting Review` and `X files ⌄` stay clearly visible on Row 1 at default startup width.
+- [x] **Global `ui-ux-pro-max` Skill & Unified Design System (`design-system/printdrop/`)**:
+  - Installed `nextlevelbuilder/ui-ux-pro-max-skill` globally (`C:\Users\satis\.gemini\config\skills\ui-ux-pro-max`) and created the unified **Precision Dark-Slate Retail & POS** design system ([MASTER.md](file:///C:/Flutter_src/PrintDrop/design-system/printdrop/MASTER.md) + per-surface blueprints for Customer Mobile, Admin Portal, and Desktop Station).
+- [x] **Customer Mobile Portal & Admin Fleet Portal UI/UX Polish (`v1.0.18` — `34d6cbc`)**:
+  - **Customer Mobile Portal (`src-tauri/src/server/customer.html`)**: Removed `user-scalable=no` pinch-zoom lock; added `--pd-*` semantic CSS tokens, `touch-action: manipulation`, `:focus-visible`, `tabular-nums`, and `prefers-reduced-motion`; replaced structural emojis with crisp 2px offline-safe inline SVGs; upgraded touch targets (≥ 40–46px), Hero Dropzone with format chips, digital ticket Pickup Token card (`#XXXX`), frosted sticky checkout bar, and single-line `white-space: nowrap` status pills; removed Find Order & App View header buttons for a clean normal-view mobile header.
+  - **Admin Fleet Portal (`admin-portal/index.html`)**: Added shared `--pd-*` canvas/tokens, viewport-clamped scrollable Settings dropdown (`max-h-[calc(100vh-5rem)]`), compact executive Provider Profile strip, elevated 5-card KPI bento grid with `tabular-nums`, and sticky frosted fleet table header.
+- [x] **Desktop True-Responsive Engine & POS Polish (`v1.0.19` — `dae4985`)**:
+  - **Fixed Maximize Header Wrap & Font Blow-Up (`src/index.css`, `src/App.tsx`)**: Replaced the `html[data-maximized="true"] { font-size: 17.5px }` jump with smooth viewport-proportional `clamp(12px, 0.42vw + 0.48vh + 5.5px, 15.5px)` scaling; made `<header>` single-row (`lg:flex-nowrap`) with `min-w-0 truncate` on shop title and `whitespace-nowrap shrink-0` on `Settings`, `Pro: XXd`, `4G/5G`, and `Port 8080` so right-corner controls stay anchored at the top-right in both default and maximized states.
+  - **Monitor-Aware Startup Window Clamping (`src-tauri/src/lib.rs`)**: Reads `current_monitor()` logical size & DPI scale factor on startup and clamps/centers the window inside `94% × 88%` of visible screen area so it never clips behind the Windows taskbar on 1024×768 / 1366×768 @ 125% displays.
+  - **Fluid Proportional QR Sidebar (`src/App.tsx`)**: Replaced rigid `510px` / `540px` left column with `lg:grid-cols-[minmax(320px,34%)_1fr] xl:grid-cols-[minmax(380px,35%)_1fr] 2xl:grid-cols-[440px_1fr]`.
+  - **POS Visual Polish (`src/App.tsx`, `src/index.css`)**: Replaced structural emojis on Desktop order cards with crisp `lucide-react` icons (`User`, `Globe`, `IndianRupee`, `CheckCircle2`, `FileText`, `Clock`, `Smartphone`) + `tabular-nums` and `:focus-visible`.
+- [x] **Verification & Live Rollout**:
+  - `npm run build` (`tsc && vite build`): **0 errors** (11.00s); `cargo check --manifest-path src-tauri/Cargo.toml`: **0 errors**; inline JS validated on both `customer.html` and `admin-portal/index.html`.
+  - Shipped `v1.0.19` and verified live responsive UI improvement on **Awesome Xerox Center**.
+  - Created reusable cross-project skill: `.agents/skills/true-responsive-ui-ux-engineering/SKILL.md` (and global copy at `C:\Users\satis\.gemini\config\skills\true-responsive-ui-ux-engineering\SKILL.md`).
+
 
 
 

@@ -33,6 +33,9 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      - name: Run UI/API Contract & Regression Gate
+        run: npm run test:regression
+
       - name: Prepare Windows Binary Resources (cloudflared & SumatraPDF settings)
         run: |
           New-Item -ItemType Directory -Force -Path "src-tauri/bin" | Out-Null

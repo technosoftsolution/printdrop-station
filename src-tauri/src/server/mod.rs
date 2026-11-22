@@ -87,6 +87,7 @@ pub struct HealthResponse {
     pub service: &'static str,
     pub version: &'static str,
     pub station_name: Option<String>,
+    pub station_hwid: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -223,19 +224,23 @@ pub fn start_server(
 }
 
 async fn health_check(State(state): State<ServerState>) -> Json<HealthResponse> {
-    let station_name = state.db.with_conn(|conn| {
-        let mut stmt = conn.prepare("SELECT shop_name FROM app_licenses WHERE id = 1")?;
-        let name: String = stmt.query_row([], |r| r.get(0))?;
-        Ok(name)
-    }).ok().and_then(|s| {
-        let clean = s.replace("(Trial Mode)", "").replace("(Trial)", "").trim().to_string();
-        if clean.is_empty() || clean == "PrintDrop Retail Station" { None } else { Some(clean) }
-    });
+    let (station_name, station_hwid) = state.db.with_conn(|conn| {
+        let mut stmt = conn.prepare("SELECT shop_name, hwid FROM app_licenses WHERE id = 1")?;
+        let row: (String, String) = stmt.query_row([], |r| Ok((r.get(0)?, r.get(1)?)))?;
+        Ok(row)
+    }).map(|(name, hwid)| {
+        let clean_name = name.replace("(Trial Mode)", "").replace("(Trial)", "").trim().to_string();
+        let name_opt = if clean_name.is_empty() || clean_name == "PrintDrop Retail Station" { None } else { Some(clean_name) };
+        let clean_hwid = hwid.trim().to_string();
+        let hwid_opt = if clean_hwid.is_empty() { None } else { Some(clean_hwid) };
+        (name_opt, hwid_opt)
+    }).unwrap_or((None, None));
     Json(HealthResponse {
         status: "ok",
         service: "PrintDrop Local Receiver",
         version: env!("CARGO_PKG_VERSION"),
         station_name,
+        station_hwid,
     })
 }
 

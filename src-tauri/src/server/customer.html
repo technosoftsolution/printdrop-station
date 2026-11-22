@@ -630,17 +630,15 @@
   </header>
 
   <!-- Mobile Dual-Source Connection Alert Banner -->
-  <div id="mobileConnectionAlertBanner" style="display:none; position:sticky; top:0.5rem; z-index:999; margin:0.65rem 0 0.25rem; border-radius:1rem; padding:0.75rem 1rem; font-size:0.75rem; box-shadow:0 8px 24px rgba(0,0,0,0.6); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); animation:fadeIn 0.25s ease;">
-    <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:0.6rem;">
-      <div style="display:flex; align-items:flex-start; gap:0.6rem; flex:1; min-width:0;">
-        <span id="connAlertIcon" style="font-size:1.35rem; line-height:1; shrink:0; margin-top:2px;">⚠️</span>
-        <div style="flex:1; min-width:0;">
-          <div id="connAlertTitle" style="font-weight:800; font-size:0.82rem; margin-bottom:0.2rem;">Connection Notice</div>
-          <div id="connAlertMessage" style="font-size:0.72rem; line-height:1.4; opacity:0.95;">Checking connection...</div>
-        </div>
+  <div id="mobileConnectionAlertBanner" style="display:none; position:sticky; top:0.5rem; z-index:999; margin:0.65rem 0 0.25rem; border-radius:1rem; padding:0.75rem 0.95rem; font-size:0.75rem; box-shadow:0 8px 24px rgba(0,0,0,0.6); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); animation:fadeIn 0.25s ease;">
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; margin-bottom:0.3rem;">
+      <div style="display:flex; align-items:center; gap:0.45rem; min-width:0; flex:1;">
+        <span id="connAlertIcon" style="font-size:1.15rem; line-height:1; flex-shrink:0;">⚠️</span>
+        <div id="connAlertTitle" style="font-weight:800; font-size:0.84rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Connection Notice</div>
       </div>
-      <span id="connAlertPill" style="font-size:0.65rem; font-weight:700; padding:0.2rem 0.55rem; border-radius:9999px; white-space:nowrap; shrink:0;">Auto-retrying</span>
+      <span id="connAlertPill" style="font-size:0.65rem; font-weight:700; padding:0.2rem 0.55rem; border-radius:9999px; white-space:nowrap; flex-shrink:0;">Auto-retrying</span>
     </div>
+    <div id="connAlertMessage" style="font-size:0.74rem; line-height:1.4; opacity:0.95; width:100%;">Checking connection...</div>
   </div>
 
   <!-- Corporate Client Status Banner -->
@@ -782,6 +780,10 @@
                 const sName = localStorage.getItem("printdrop_customer_name");
                 if (inp && sName) inp.value = sName;
                 fetch("/api/health").then(r => r.ok ? r.json() : null).then(d => {
+                  if (d && d.stationHwid) {
+                    window.__PRINTDROP_STATION_HWID__ = d.stationHwid;
+                    try { localStorage.setItem("printdrop_station_hwid", d.stationHwid); } catch (_) {}
+                  }
                   if (d && d.stationName) {
                     const bt = document.getElementById("headerBrandTitle");
                     const bb = document.getElementById("headerBrandBadge");
@@ -3984,31 +3986,54 @@
       globalStationHeartbeatTimer = setInterval(runHeartbeat, 1800);
     }
 
-    const STATION_REGISTRY_SUPABASE_ENDPOINT = "https://nslcrlvuulgqtrdqrkgv.supabase.co/rest/v1/system_config?key=eq.station_live_registry&select=value";
+    const STATION_REGISTRY_SUPABASE_BASE = "https://nslcrlvuulgqtrdqrkgv.supabase.co/rest/v1/system_config";
     const STATION_REGISTRY_SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5zbGNybHZ1dWxncXRyZHFya2d2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQxNTI4NzEsImV4cCI6MjEwOTcyODg3MX0.lpRc097A_PFCD-eJVhyQZmPFxexhSGjM2dhCE0LNdxk";
+
+    function getActiveStationHwid() {
+      if (window.__PRINTDROP_STATION_HWID__) return String(window.__PRINTDROP_STATION_HWID__).trim();
+      try {
+        const fromUrl = new URLSearchParams(window.location.search).get("hwid");
+        if (fromUrl && fromUrl.trim()) return fromUrl.trim();
+      } catch (_) {}
+      try {
+        const fromLs = localStorage.getItem("printdrop_station_hwid");
+        if (fromLs && fromLs.trim()) return fromLs.trim();
+      } catch (_) {}
+      return "";
+    }
 
     async function fetchLiveStationRegistry(now) {
       // 1. Direct real-time Supabase PostgREST query (Zero CDN cache, returns fresh station URL in ~180ms)
-      try {
-        const supaCtrl = new AbortController();
-        const supaTimeout = setTimeout(() => supaCtrl.abort(), 2000);
-        const supaResp = await fetch(STATION_REGISTRY_SUPABASE_ENDPOINT + "&_t=" + now, {
-          method: "GET",
-          headers: {
-            apikey: STATION_REGISTRY_SUPABASE_KEY,
-            Authorization: "Bearer " + STATION_REGISTRY_SUPABASE_KEY
-          },
-          cache: "no-store",
-          signal: supaCtrl.signal
-        });
-        clearTimeout(supaTimeout);
-        if (supaResp.ok) {
-          const rows = await supaResp.json();
-          if (rows && rows.length > 0 && rows[0].value) {
-            return rows[0].value;
+      // IMPORTANT: Never append unknown query params like &_t= to PostgREST URLs — PostgREST treats
+      // them as SQL column filters and rejects with HTTP 400! Use cache: "no-store" instead.
+      const activeHwid = getActiveStationHwid();
+      const keysToTry = activeHwid
+        ? ["station_tunnel_" + activeHwid, "station_live_registry"]
+        : ["station_live_registry"];
+
+      for (const lookupKey of keysToTry) {
+        try {
+          const supaCtrl = new AbortController();
+          const supaTimeout = setTimeout(() => supaCtrl.abort(), 2500);
+          const endpoint = `${STATION_REGISTRY_SUPABASE_BASE}?key=eq.${encodeURIComponent(lookupKey)}&select=value`;
+          const supaResp = await fetch(endpoint, {
+            method: "GET",
+            headers: {
+              apikey: STATION_REGISTRY_SUPABASE_KEY,
+              Authorization: "Bearer " + STATION_REGISTRY_SUPABASE_KEY
+            },
+            cache: "no-store",
+            signal: supaCtrl.signal
+          });
+          clearTimeout(supaTimeout);
+          if (supaResp.ok) {
+            const rows = await supaResp.json();
+            if (rows && rows.length > 0 && rows[0].value) {
+              return rows[0].value;
+            }
           }
-        }
-      } catch (_) {}
+        } catch (_) {}
+      }
 
       // 2. Secondary fallback to Gist raw
       try {
@@ -4055,8 +4080,10 @@
                 clearTimeout(checkTimeout);
 
                 if (testResp.ok) {
-                  // Build migration URL preserving dt, order, cust_name AND current active tab!
+                  // Build migration URL preserving hwid, dt, order, cust_name AND current active tab!
                   const params = new URLSearchParams(window.location.search);
+                  const activeHwid = getActiveStationHwid();
+                  if (activeHwid) params.set("hwid", activeHwid);
                   const dt = getOrCreateDeviceToken();
                   if (dt) params.set("dt", dt);
                   let lastOrdId = null;
