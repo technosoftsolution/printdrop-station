@@ -25,8 +25,37 @@
   </script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap');
-    body { font-family: 'Inter', sans-serif; }
+    :root {
+      --pd-bg-canvas: #090d16;
+      --pd-bg-surface: #111827;
+      --pd-border-subtle: #1e293b;
+      --pd-brand-primary: #4f46e5;
+    }
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: var(--pd-bg-canvas);
+      background-image: radial-gradient(circle at top center, rgba(79, 70, 229, 0.09) 0%, transparent 45%);
+    }
     .font-mono { font-family: 'JetBrains Mono', monospace; }
+    .tabular-nums { font-variant-numeric: tabular-nums; }
+    button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+      outline: 2px solid #6366f1;
+      outline-offset: 2px;
+    }
+    .admin-scroll {
+      scrollbar-width: thin;
+      scrollbar-color: rgba(100, 116, 139, 0.5) transparent;
+    }
+    .admin-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+    .admin-scroll::-webkit-scrollbar-track { background: transparent; }
+    .admin-scroll::-webkit-scrollbar-thumb { background: rgba(100, 116, 139, 0.45); border-radius: 9999px; }
+    .admin-scroll::-webkit-scrollbar-thumb:hover { background: rgba(148, 163, 184, 0.7); }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
     @media print {
       body * { visibility: hidden; }
       #printableReceiptModal:not(.hidden), #printableReceiptModal:not(.hidden) *,
@@ -74,7 +103,7 @@
             <span>Settings</span>
             <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400"></i>
           </button>
-          <div id="adminSettingsDropdownMenu" class="hidden absolute right-0 mt-1.5 w-64 rounded-2xl bg-slate-900 border border-slate-700/80 shadow-2xl py-1.5 z-50">
+          <div id="adminSettingsDropdownMenu" class="hidden absolute right-0 mt-1.5 w-64 max-h-[calc(100vh-5rem)] overflow-y-auto admin-scroll rounded-2xl bg-slate-900 border border-slate-700/80 shadow-2xl shadow-black/70 ring-1 ring-slate-600/40 py-1.5 z-50">
             <button type="button" onclick="closeAdminSettingsMenu(); openPlansManagerModal()" class="w-full px-3.5 py-2.5 text-left text-xs font-semibold text-slate-200 hover:bg-slate-800/90 flex items-center gap-2.5 transition cursor-pointer">
               <i data-lucide="sliders" class="w-4 h-4 text-amber-400 shrink-0"></i>
               <div>
@@ -138,99 +167,106 @@
   </header>
 
   <!-- Main Content -->
-  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 no-print">
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-5 space-y-5 no-print">
 
-    <!-- Software Provider Profile & Desktop Station Sync Banner (Topmost Section) -->
-    <div class="p-5 rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950/40 to-slate-900 border border-indigo-500/30 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
-      <div class="flex items-start sm:items-center gap-3.5">
-        <div class="w-12 h-12 rounded-2xl bg-indigo-500/20 border border-indigo-500/40 text-indigo-400 flex items-center justify-center shrink-0 shadow-inner">
-          <i data-lucide="building-2" class="w-6 h-6"></i>
+    <!-- Software Provider Profile & Desktop Station Sync Strip (Compact Executive Bar) -->
+    <div class="px-4 py-3 rounded-2xl bg-gradient-to-r from-slate-900/95 via-indigo-950/35 to-slate-900/95 border border-indigo-500/25 shadow-lg flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+      <div class="flex items-center gap-3 min-w-0">
+        <div class="w-10 h-10 rounded-xl bg-indigo-500/20 border border-indigo-500/35 text-indigo-400 flex items-center justify-center shrink-0">
+          <i data-lucide="building-2" class="w-5 h-5"></i>
         </div>
-        <div>
-          <div class="flex items-center gap-2">
+        <div class="min-w-0">
+          <div class="flex flex-wrap items-center gap-2">
             <h3 class="text-sm font-extrabold text-white tracking-wide" id="dashProviderName">TechnoSoft Solution</h3>
-            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 inline-flex items-center gap-1">
               <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-              Live Synced to Desktop Stations
+              Live Synced to POS Stations
             </span>
           </div>
-          <p class="text-[11px] text-slate-300 mt-0.5">
-            Official Software Provider Profile published live to all Shopkeepers' POS Terminals (Settings &gt; #8 Contact Us &amp; Grace Banners).
-          </p>
-          <div class="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-xs text-slate-300">
+          <div class="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-xs text-slate-300">
             <span class="flex items-center gap-1.5">
               <i data-lucide="phone" class="w-3.5 h-3.5 text-emerald-400"></i>
-              <span>Call: <strong id="dashProviderPhone" class="text-white">+91 94220 00000</strong></span>
+              <strong id="dashProviderPhone" class="text-white tabular-nums">+91 94220 00000</strong>
             </span>
             <span class="flex items-center gap-1.5">
               <i data-lucide="message-circle" class="w-3.5 h-3.5 text-emerald-400"></i>
-              <span>WhatsApp: <strong id="dashProviderWhatsApp" class="text-white">+91 94220 00000</strong></span>
+              <strong id="dashProviderWhatsApp" class="text-white tabular-nums">+91 94220 00000</strong>
             </span>
             <span class="flex items-center gap-1.5">
-              <i data-lucide="mail" class="w-3.5 h-3.5 text-blue-400"></i>
-              <span>Email: <strong id="dashProviderEmail" class="text-white">support@technosoftsolution.com</strong></span>
+              <i data-lucide="mail" class="w-3.5 h-3.5 text-sky-400"></i>
+              <strong id="dashProviderEmail" class="text-white">support@technosoftsolution.com</strong>
             </span>
             <span class="flex items-center gap-1.5">
               <i data-lucide="qr-code" class="w-3.5 h-3.5 text-purple-400"></i>
-              <span>UPI: <code id="dashProviderUpi" class="text-slate-300 font-mono text-[11px]">satishharilalpa302866.rzp@rxairtel</code></span>
+              <code id="dashProviderUpi" class="text-slate-300 font-mono text-[11px]">satishharilalpa302866.rzp@rxairtel</code>
             </span>
           </div>
         </div>
       </div>
 
-      <div class="flex items-center gap-2 shrink-0 self-end md:self-center">
-        <button onclick="openConfigModal()" class="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-md shadow-indigo-600/30 transition cursor-pointer">
-          <i data-lucide="edit-3" class="w-4 h-4"></i>
+      <div class="flex items-center gap-2 shrink-0 self-end lg:self-center">
+        <button onclick="openConfigModal()" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-md shadow-indigo-600/25 transition cursor-pointer">
+          <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
           <span>Edit Provider Profile</span>
         </button>
       </div>
     </div>
 
-    <!-- KPI Metrics Cards -->
-    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-      <div class="p-4 rounded-2xl bg-slate-900/60 border border-slate-800">
-        <div class="flex items-center justify-between text-xs text-slate-400">
+    <!-- KPI Metrics Bento Cards -->
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5">
+      <div class="p-4 rounded-2xl bg-slate-900/75 border border-slate-800/90 hover:border-indigo-500/35 transition shadow-sm">
+        <div class="flex items-center justify-between text-xs font-medium text-slate-400">
           <span>Registered Stations</span>
-          <i data-lucide="monitor" class="w-4 h-4 text-slate-400"></i>
+          <span class="w-7 h-7 rounded-lg bg-indigo-500/15 border border-indigo-500/25 flex items-center justify-center text-indigo-400">
+            <i data-lucide="monitor" class="w-3.5 h-3.5"></i>
+          </span>
         </div>
-        <div class="text-2xl font-bold text-white mt-1" id="statTotalStations">0</div>
+        <div class="text-2xl font-extrabold text-white mt-1.5 tabular-nums" id="statTotalStations">0</div>
         <div class="text-[11px] text-slate-400 mt-0.5" id="statInstalledSubtext">Motherboard fingerprints</div>
       </div>
 
-      <div class="p-4 rounded-2xl bg-slate-900/60 border border-slate-800">
-        <div class="flex items-center justify-between text-xs text-slate-400">
+      <div class="p-4 rounded-2xl bg-slate-900/75 border border-slate-800/90 hover:border-emerald-500/35 transition shadow-sm">
+        <div class="flex items-center justify-between text-xs font-medium text-slate-400">
           <span>Active Licenses</span>
-          <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400"></i>
+          <span class="w-7 h-7 rounded-lg bg-emerald-500/15 border border-emerald-500/25 flex items-center justify-center text-emerald-400">
+            <i data-lucide="check-circle-2" class="w-3.5 h-3.5"></i>
+          </span>
         </div>
-        <div class="text-2xl font-bold text-emerald-400 mt-1" id="statActiveStations">0</div>
-        <div class="text-[11px] text-slate-400 mt-0.5" id="statActiveRatio">0% authorization rate</div>
+        <div class="text-2xl font-extrabold text-emerald-400 mt-1.5 tabular-nums" id="statActiveStations">0</div>
+        <div class="text-[11px] text-slate-400 mt-0.5 tabular-nums" id="statActiveRatio">0% authorization rate</div>
       </div>
 
-      <div onclick="switchFleetTab('REMOVED_FLEET')" class="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 hover:border-rose-500/40 transition cursor-pointer" title="Click to inspect Removed / Uninstalled History">
-        <div class="flex items-center justify-between text-xs text-slate-400">
+      <div onclick="switchFleetTab('REMOVED_FLEET')" class="p-4 rounded-2xl bg-slate-900/75 border border-slate-800/90 hover:border-rose-500/45 transition cursor-pointer shadow-sm" title="Click to inspect Removed / Uninstalled History">
+        <div class="flex items-center justify-between text-xs font-medium text-slate-400">
           <span>Removed / Uninstalled</span>
-          <i data-lucide="trash-2" class="w-4 h-4 text-rose-400"></i>
+          <span class="w-7 h-7 rounded-lg bg-rose-500/15 border border-rose-500/25 flex items-center justify-center text-rose-400">
+            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+          </span>
         </div>
-        <div class="text-2xl font-bold text-rose-400 mt-1" id="statUninstalledStations">0</div>
-        <div class="text-[11px] text-slate-400 mt-0.5" id="statUninstalledSubtext">0% churn rate</div>
+        <div class="text-2xl font-extrabold text-rose-400 mt-1.5 tabular-nums" id="statUninstalledStations">0</div>
+        <div class="text-[11px] text-slate-400 mt-0.5 tabular-nums" id="statUninstalledSubtext">0% churn rate</div>
       </div>
 
-      <div class="p-4 rounded-2xl bg-slate-900/60 border border-slate-800">
-        <div class="flex items-center justify-between text-xs text-slate-400">
+      <div class="p-4 rounded-2xl bg-slate-900/75 border border-slate-800/90 hover:border-amber-500/35 transition shadow-sm">
+        <div class="flex items-center justify-between text-xs font-medium text-slate-400">
           <span>Total Billed Volume</span>
-          <i data-lucide="indian-rupee" class="w-4 h-4 text-amber-400"></i>
+          <span class="w-7 h-7 rounded-lg bg-amber-500/15 border border-amber-500/25 flex items-center justify-center text-amber-400">
+            <i data-lucide="indian-rupee" class="w-3.5 h-3.5"></i>
+          </span>
         </div>
-        <div class="text-2xl font-bold text-amber-300 mt-1" id="statTotalRevenue">₹0</div>
-        <div class="text-[11px] text-slate-400 mt-0.5" id="statEstMrr">MRR: ₹0/mo</div>
+        <div class="text-2xl font-extrabold text-amber-300 mt-1.5 tabular-nums" id="statTotalRevenue">₹0</div>
+        <div class="text-[11px] text-slate-400 mt-0.5 tabular-nums" id="statEstMrr">MRR: ₹0/mo</div>
       </div>
 
-      <div class="p-4 rounded-2xl bg-slate-900/60 border border-slate-800">
-        <div class="flex items-center justify-between text-xs text-slate-400">
+      <div class="p-4 rounded-2xl bg-slate-900/75 border border-slate-800/90 hover:border-purple-500/35 transition shadow-sm">
+        <div class="flex items-center justify-between text-xs font-medium text-slate-400">
           <span>Lifetime Printed Pages</span>
-          <i data-lucide="printer" class="w-4 h-4 text-purple-400"></i>
+          <span class="w-7 h-7 rounded-lg bg-purple-500/15 border border-purple-500/25 flex items-center justify-center text-purple-400">
+            <i data-lucide="printer" class="w-3.5 h-3.5"></i>
+          </span>
         </div>
-        <div class="text-2xl font-bold text-purple-300 mt-1" id="statLifetimePrints">0</div>
-        <div class="text-[11px] text-slate-400 mt-0.5">Across all customer retail counters</div>
+        <div class="text-2xl font-extrabold text-purple-300 mt-1.5 tabular-nums" id="statLifetimePrints">0</div>
+        <div class="text-[11px] text-slate-400 mt-0.5">Across all customer counters</div>
       </div>
     </div>
 
@@ -281,7 +317,7 @@
             class="px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
           >
             <option value="ALL">All Plans</option>
-            <option value="TRIAL">14-Day Trial</option>
+            <option value="TRIAL">Free Trial Evaluation</option>
             <option value="WALLET_PAGES">Page Wallet</option>
             <option value="SUB_MONTHLY">1 Month Unlimited</option>
             <option value="SUB_QUARTERLY">3 Months Unlimited</option>
@@ -325,10 +361,10 @@
       </div>
 
       <!-- Table View -->
-      <div class="overflow-x-auto">
+      <div class="overflow-x-auto admin-scroll">
         <table class="w-full text-left border-collapse text-xs">
-          <thead>
-            <tr class="border-b border-slate-800 bg-slate-950/40 text-slate-400 font-semibold uppercase tracking-wider text-[11px]">
+          <thead class="sticky top-0 z-10">
+            <tr class="border-b border-slate-800 bg-slate-950/90 backdrop-blur text-slate-400 font-semibold uppercase tracking-wider text-[11px]">
               <th class="py-3 px-4">Customer &amp; Location</th>
               <th class="py-3 px-4">Hardware ID (HWID)</th>
               <th class="py-3 px-4">Active Plan</th>
@@ -339,7 +375,7 @@
               <th class="py-3 px-4 text-right">Actions</th>
             </tr>
           </thead>
-          <tbody id="stationsTableBody" class="divide-y divide-slate-800 text-slate-300">
+          <tbody id="stationsTableBody" class="divide-y divide-slate-800/80 text-slate-300 tabular-nums">
             <!-- Dynamic rows will be injected here -->
           </tbody>
         </table>

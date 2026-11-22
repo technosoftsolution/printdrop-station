@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>PrintDrop - Send Documents to Print</title>
   <!-- Permanent PWA is anchored at https://technosoftsolution.github.io/printdrop-station/connect.html -->
   <meta name="theme-color" content="#090d16">
@@ -21,15 +21,60 @@
     
     :root {
       --app-max-width: 540px;
+      --pd-bg-canvas: #090d16;
+      --pd-bg-surface: #111827;
+      --pd-bg-elevated: #182235;
+      --pd-bg-inset: #0b1120;
+      --pd-border-subtle: #1e293b;
+      --pd-border-strong: #334155;
+      --pd-text-primary: #f8fafc;
+      --pd-text-secondary: #cbd5e1;
+      --pd-text-muted: #94a3b8;
+      --pd-brand-primary: #4f46e5;
+      --pd-brand-hover: #6366f1;
+      --pd-success: #10b981;
+      --pd-success-text: #34d399;
+      --pd-warning: #f59e0b;
+      --pd-warning-text: #fbbf24;
+      --pd-info: #0ea5e9;
+      --pd-info-text: #38bdf8;
+      --pd-danger: #ef4444;
+      --pd-danger-text: #f87171;
+    }
+
+    button, a, input, select, .dropzone-card {
+      touch-action: manipulation;
+    }
+    button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible {
+      outline: 2px solid var(--pd-brand-hover);
+      outline-offset: 2px;
+    }
+    .pd-svg {
+      display: inline-block;
+      vertical-align: middle;
+      flex-shrink: 0;
+    }
+    .pd-tabular {
+      font-variant-numeric: tabular-nums;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
     }
 
     body {
-      background: #090d16;
-      color: #f8fafc;
+      background: radial-gradient(circle at top center, rgba(79, 70, 229, 0.1) 0%, var(--pd-bg-canvas) 38%);
+      background-color: var(--pd-bg-canvas);
+      color: var(--pd-text-primary);
       min-height: 100vh;
+      overscroll-behavior-y: contain;
       padding: clamp(0.75rem, 1.8vw, 1.5rem);
       padding-top: calc(clamp(0.75rem, 1.8vw, 1.5rem) + env(safe-area-inset-top, 0px));
-      padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+      padding-bottom: calc(6rem + env(safe-area-inset-bottom, 0px));
       padding-left: calc(clamp(0.75rem, 1.8vw, 1.5rem) + env(safe-area-inset-left, 0px));
       padding-right: calc(clamp(0.75rem, 1.8vw, 1.5rem) + env(safe-area-inset-right, 0px));
       display: flex;
@@ -256,93 +301,118 @@
 
     /* Cards & Dropzone */
     .dropzone-card {
-      margin-top: 0.65rem;
-      background: rgba(19, 28, 46, 0.96);
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-      border: 1.5px dashed #3b82f6;
-      border-radius: 1rem;
-      padding: 0.55rem 0.85rem;
+      margin-top: 0.75rem;
+      background: linear-gradient(145deg, rgba(24, 34, 53, 0.96), rgba(17, 24, 39, 0.98));
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1.5px dashed rgba(99, 102, 241, 0.65);
+      border-radius: 1.15rem;
+      padding: 0.9rem 1rem;
       text-align: center;
       cursor: pointer;
-      transition: all 0.2s;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+      transition: border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease, transform 0.12s ease;
+      box-shadow: 0 8px 24px -6px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.05);
       position: sticky;
       top: 0.35rem;
       z-index: 35;
     }
-    .dropzone-card:active { transform: scale(0.98); background: #182338; }
+    .dropzone-card:hover { border-color: #818cf8; box-shadow: 0 10px 28px -6px rgba(79, 70, 229, 0.3); }
+    .dropzone-card:active { transform: scale(0.985); background: #182338; }
     .upload-icon {
-      width: 32px;
-      height: 32px;
-      background: rgba(59, 130, 246, 0.15);
-      color: #60a5fa;
-      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      background: linear-gradient(135deg, rgba(79, 70, 229, 0.24), rgba(56, 189, 248, 0.18));
+      border: 1px solid rgba(129, 140, 248, 0.45);
+      color: #a5b4fc;
+      border-radius: 0.85rem;
       display: flex;
       align-items: center;
       justify-content: center;
-      margin: 0 auto 0.2rem;
-      font-size: 1.15rem;
-      font-weight: bold;
+      margin: 0 auto 0.45rem;
+      box-shadow: 0 4px 14px rgba(79, 70, 229, 0.25);
     }
-    .drop-title { font-size: 0.92rem; font-weight: 700; color: #ffffff; line-height: 1.25; }
-    .drop-subtitle { font-size: 0.68rem; color: #94a3b8; margin-top: 0.15rem; line-height: 1.2; }
+    .drop-title { font-size: 0.95rem; font-weight: 800; color: var(--pd-text-primary); line-height: 1.25; letter-spacing: -0.01em; }
+    .drop-subtitle { font-size: 0.72rem; color: var(--pd-text-muted); margin-top: 0.2rem; line-height: 1.3; }
+    .format-chips {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 0.3rem;
+      margin-top: 0.5rem;
+    }
+    .format-chip {
+      font-size: 0.64rem;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      color: var(--pd-text-secondary);
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(51, 65, 85, 0.8);
+      padding: 0.14rem 0.45rem;
+      border-radius: 9999px;
+    }
 
     /* Alerts */
     .alert { margin-top: 0.75rem; padding: 0.75rem 1rem; border-radius: 0.75rem; font-size: 0.8rem; display: none; align-items: center; gap: 0.5rem; }
     .alert-error { background: rgba(239, 68, 68, 0.15); border: 1px solid #ef4444; color: #fca5a5; }
 
     /* File List */
-    .section-title { font-size: 0.85rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; margin: 1.25rem 0 0.5rem; display: flex; justify-content: space-between; align-items: center; }
-    .file-list { display: flex; flex-direction: column; gap: 0.6rem; }
-    .file-card { background: #131c2e; border: 1px solid #1e293b; border-radius: 1rem; padding: 0.85rem; display: flex; flex-direction: column; gap: 0.5rem; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+    .section-title { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--pd-text-muted); margin: 1.2rem 0 0.55rem; display: flex; justify-content: space-between; align-items: center; }
+    .file-list { display: flex; flex-direction: column; gap: 0.7rem; }
+    .file-card { background: var(--pd-bg-surface); border: 1px solid var(--pd-border-subtle); border-radius: 1.05rem; padding: 0.9rem; display: flex; flex-direction: column; gap: 0.55rem; box-shadow: 0 4px 12px -2px rgba(0,0,0,0.28); transition: border-color 0.15s ease; }
+    .file-card:hover { border-color: var(--pd-border-strong); }
     .file-top { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
     .file-info { display: flex; align-items: center; gap: 0.6rem; overflow: hidden; }
-    .ext-badge { padding: 0.2rem 0.45rem; border-radius: 0.4rem; font-size: 0.65rem; font-weight: 700; text-transform: uppercase; flex-shrink: 0; }
+    .ext-badge { padding: 0.25rem 0.5rem; border-radius: 0.45rem; font-size: 0.66rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.03em; flex-shrink: 0; }
     .ext-pdf { background: #dc2626; color: white; }
     .ext-doc { background: #2563eb; color: white; }
     .ext-xls { background: #059669; color: white; }
     .ext-ppt { background: #ea580c; color: white; }
     .ext-img { background: #0891b2; color: white; }
     .ext-other { background: #475569; color: white; }
-    .file-name { font-size: 0.85rem; font-weight: 600; color: #f1f5f9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px; }
-    .file-size { font-size: 0.7rem; color: #64748b; font-mono; }
-    .btn-remove { background: none; border: none; color: #ef4444; font-size: 1.1rem; cursor: pointer; padding: 0.25rem; }
+    .file-name { font-size: 0.88rem; font-weight: 700; color: var(--pd-text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 195px; }
+    .file-size { font-size: 0.74rem; color: var(--pd-text-muted); font-variant-numeric: tabular-nums; }
+    .btn-remove { background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.25); color: var(--pd-danger-text); width: 34px; height: 34px; border-radius: 0.6rem; font-size: 1.15rem; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background 0.15s ease; }
+    .btn-remove:hover, .btn-remove:active { background: rgba(239, 68, 68, 0.22); }
     
-    .file-bottom { display: flex; justify-content: space-between; align-items: center; padding-top: 0.4rem; border-top: 1px solid #1e293b; }
-    .setting-pill { font-size: 0.72rem; color: #cbd5e1; background: #090d16; padding: 0.2rem 0.5rem; border-radius: 0.4rem; border: 1px solid #334155; }
-    .btn-config { background: #3b82f6; color: white; border: none; border-radius: 0.5rem; padding: 0.3rem 0.7rem; font-size: 0.75rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 0.3rem; }
+    .file-bottom { display: flex; justify-content: space-between; align-items: center; padding-top: 0.45rem; border-top: 1px solid var(--pd-border-subtle); }
+    .setting-pill { font-size: 0.72rem; color: var(--pd-text-secondary); background: var(--pd-bg-inset); padding: 0.22rem 0.55rem; border-radius: 0.45rem; border: 1px solid var(--pd-border-strong); }
+    .btn-config { background: #3b82f6; color: white; border: none; border-radius: 0.6rem; padding: 0.45rem 0.8rem; min-height: 38px; font-size: 0.76rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 0.35rem; transition: background 0.15s ease, transform 0.1s ease; }
+    .btn-config:active { transform: scale(0.97); }
 
     /* Sticky Footer Summary */
-    .sticky-footer { position: fixed; bottom: 0; left: 0; right: 0; width: 100%; box-sizing: border-box; background: #0f172a; border-top: 1px solid #334155; padding: 0.85rem 1.25rem; padding-bottom: calc(0.85rem + env(safe-area-inset-bottom, 0px)); display: flex; align-items: center; justify-content: space-between; gap: 1rem; box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.4); z-index: 20; }
+    .sticky-footer { position: fixed; bottom: 0; left: 0; right: 0; width: 100%; box-sizing: border-box; background: rgba(15, 23, 42, 0.94); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-top: 1px solid rgba(99, 102, 241, 0.35); padding: 0.85rem 1.15rem; padding-bottom: calc(0.85rem + env(safe-area-inset-bottom, 0px)); display: flex; align-items: center; justify-content: space-between; gap: 0.85rem; box-shadow: 0 -10px 28px rgba(0, 0, 0, 0.55); z-index: 20; }
     .footer-summary { display: flex; flex-direction: column; flex-shrink: 0; min-width: 0; gap: 0.15rem; }
-    .footer-count { font-size: 0.85rem; font-weight: 700; color: #ffffff; white-space: nowrap; }
-    .footer-size { font-size: 0.72rem; color: #94a3b8; white-space: nowrap; }
-    .btn-submit { background: #4f46e5; color: white; border: none; border-radius: 0.75rem; padding: 0.75rem 1.4rem; font-size: 0.85rem; font-weight: 700; cursor: pointer; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.4); flex-shrink: 0; white-space: nowrap; }
+    .footer-count { font-size: 0.85rem; font-weight: 800; color: var(--pd-text-primary); white-space: nowrap; }
+    .footer-size { font-size: 0.72rem; color: var(--pd-text-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .btn-submit { background: linear-gradient(135deg, #4f46e5, #059669); color: white; border: none; border-radius: 0.85rem; padding: 0.8rem 1.35rem; min-height: 46px; font-size: 0.88rem; font-weight: 800; cursor: pointer; box-shadow: 0 6px 18px rgba(79, 70, 229, 0.4); flex-shrink: 0; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; gap: 0.45rem; transition: transform 0.12s ease, box-shadow 0.15s ease; }
+    .btn-submit:active { transform: scale(0.97); }
 
     /* Modal Backdrop & Drawer */
-    .modal-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(4px); display: none; align-items: flex-end; z-index: 100; }
-    .modal-drawer { background: #131c2e; border: 1px solid #334155; border-top-left-radius: 1.5rem; border-top-right-radius: 1.5rem; padding: 1.25rem; padding-bottom: calc(1.25rem + env(safe-area-inset-bottom, 0px)); width: 100%; max-height: 85vh; overflow-y: auto; box-shadow: 0 -10px 25px rgba(0, 0, 0, 0.5); animation: slideUp 0.25s ease-out; }
+    .modal-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.78); backdrop-filter: blur(6px); display: none; align-items: flex-end; z-index: 100; }
+    .modal-drawer { background: var(--pd-bg-surface); border: 1px solid var(--pd-border-strong); border-top-left-radius: 1.5rem; border-top-right-radius: 1.5rem; padding: 1.25rem; padding-bottom: calc(1.25rem + env(safe-area-inset-bottom, 0px)); width: 100%; max-height: 86vh; overflow-y: auto; overscroll-behavior: contain; box-shadow: 0 -12px 32px rgba(0, 0, 0, 0.6); animation: slideUp 0.22s cubic-bezier(0.16, 1, 0.3, 1); }
     @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
-    .drawer-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
-    .drawer-title { font-size: 1.05rem; font-weight: 700; color: #ffffff; }
-    .drawer-close { background: #1e293b; border: none; color: #94a3b8; width: 28px; height: 28px; border-radius: 50%; font-size: 1rem; cursor: pointer; }
+    .drawer-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; gap: 0.75rem; }
+    .drawer-title { font-size: 1.05rem; font-weight: 800; color: var(--pd-text-primary); }
+    .drawer-close { background: #1e293b; border: 1px solid #334155; color: var(--pd-text-secondary); width: 38px; height: 38px; border-radius: 50%; font-size: 1.15rem; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background 0.15s ease; }
+    .drawer-close:hover, .drawer-close:active { background: #334155; color: #fff; }
     
     /* Config Controls */
     .control-group { margin-bottom: 1rem; }
-    .control-label { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: #94a3b8; margin-bottom: 0.35rem; display: block; }
+    .control-label { font-size: 0.74rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--pd-text-muted); margin-bottom: 0.4rem; display: block; }
     
-    .segment-bar { display: flex; background: #090d16; border: 1px solid #334155; border-radius: 0.6rem; padding: 0.2rem; gap: 0.2rem; }
-    .segment-btn { flex: 1; padding: 0.45rem; border: none; background: transparent; color: #94a3b8; font-size: 0.75rem; font-weight: 600; border-radius: 0.45rem; cursor: pointer; text-align: center; }
-    .segment-btn.active { background: #4f46e5; color: white; }
+    .segment-bar { display: flex; background: var(--pd-bg-inset); border: 1px solid var(--pd-border-strong); border-radius: 0.7rem; padding: 0.22rem; gap: 0.22rem; }
+    .segment-btn { flex: 1; padding: 0.55rem 0.5rem; min-height: 40px; border: none; background: transparent; color: var(--pd-text-muted); font-size: 0.78rem; font-weight: 700; border-radius: 0.5rem; cursor: pointer; text-align: center; transition: background 0.15s ease, color 0.15s ease; }
+    .segment-btn.active { background: var(--pd-brand-primary); color: white; box-shadow: 0 2px 8px rgba(79, 70, 229, 0.35); }
 
     .stepper { display: flex; align-items: center; gap: 0.75rem; }
-    .stepper-btn { width: 36px; height: 36px; border-radius: 0.5rem; background: #1e293b; border: 1px solid #334155; color: white; font-size: 1.2rem; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .stepper-btn { width: 42px; height: 42px; border-radius: 0.65rem; background: #1e293b; border: 1px solid #334155; color: white; font-size: 1.25rem; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.12s ease; }
     .stepper-btn:active { background: #334155; }
-    .stepper-val { font-size: 1.1rem; font-weight: 700; font-mono; width: 40px; text-align: center; }
+    .stepper-val { font-size: 1.15rem; font-weight: 800; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric: tabular-nums; width: 44px; text-align: center; }
 
-    .input-text { width: 100%; background: #090d16; border: 1px solid #334155; color: white; padding: 0.5rem 0.75rem; border-radius: 0.6rem; font-size: 0.8rem; }
-    .btn-save-modal { width: 100%; background: #4f46e5; color: white; border: none; border-radius: 0.75rem; padding: 0.8rem; font-size: 0.9rem; font-weight: 700; margin-top: 1rem; cursor: pointer; }
+    .input-text { width: 100%; background: var(--pd-bg-inset); border: 1px solid var(--pd-border-strong); color: white; padding: 0.65rem 0.85rem; min-height: 42px; border-radius: 0.65rem; font-size: 0.84rem; transition: border-color 0.15s ease; }
+    .input-text:focus { border-color: var(--pd-brand-hover); }
+    .btn-save-modal { width: 100%; background: linear-gradient(135deg, #4f46e5, #6366f1); color: white; border: none; border-radius: 0.85rem; padding: 0.9rem; min-height: 46px; font-size: 0.92rem; font-weight: 800; margin-top: 1rem; cursor: pointer; box-shadow: 0 6px 16px rgba(79, 70, 229, 0.35); }
 
     /* Progress Modal */
     .progress-modal { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(6px); display: none; align-items: center; justify-content: center; z-index: 150; padding: 1.25rem; }
@@ -484,41 +554,44 @@
     /* Professional Mobile Navigation Tabs */
     .mobile-nav-tabs {
       display: flex;
-      background: #0f172a;
-      border: 1px solid #1e293b;
-      border-radius: 0.85rem;
-      padding: 0.25rem;
+      background: var(--pd-bg-surface);
+      border: 1px solid var(--pd-border-subtle);
+      border-radius: 0.95rem;
+      padding: 0.28rem;
       gap: 0.3rem;
-      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3);
+      box-shadow: 0 4px 12px -2px rgba(0,0,0,0.35);
     }
     .nav-tab-btn {
       flex: 1;
       background: transparent;
       border: none;
-      color: #94a3b8;
+      color: var(--pd-text-muted);
       font-size: 0.76rem;
       font-weight: 700;
-      padding: 0.6rem 0.35rem;
-      border-radius: 0.65rem;
+      padding: 0.65rem 0.4rem;
+      min-height: 42px;
+      border-radius: 0.7rem;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
       gap: 0.35rem;
-      transition: all 0.2s ease;
+      transition: background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
       white-space: nowrap;
     }
+    .nav-tab-btn:hover { color: var(--pd-text-primary); }
     .nav-tab-btn.active {
-      background: #4f46e5;
+      background: linear-gradient(135deg, #4f46e5, #6366f1);
       color: #ffffff;
-      box-shadow: 0 2px 8px rgba(79, 70, 229, 0.4);
+      box-shadow: 0 4px 12px rgba(79, 70, 229, 0.42);
     }
     .nav-tab-badge {
-      font-size: 0.65rem;
-      font-family: monospace;
-      padding: 0.1rem 0.4rem;
+      font-size: 0.66rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-variant-numeric: tabular-nums;
+      padding: 0.12rem 0.42rem;
       border-radius: 9999px;
-      background: rgba(255, 255, 255, 0.15);
+      background: rgba(255, 255, 255, 0.14);
       color: #ffffff;
       font-weight: 800;
     }
@@ -542,18 +615,17 @@
 
   <!-- Top Header -->
   <header class="header">
-    <div class="brand" onclick="switchToUploadView()" title="Back to Home / New Order">
-      <span class="brand-title" id="headerBrandTitle">PrintDrop</span>
-      <span class="brand-badge" id="headerBrandBadge">Express</span>
+    <div class="brand" onclick="switchToUploadView()" title="Back to Home / New Order" style="flex-direction:row; align-items:center; gap:0.55rem;">
+      <div aria-hidden="true" style="width:34px; height:34px; border-radius:0.65rem; background:linear-gradient(135deg, #4f46e5, #0ea5e9); display:flex; align-items:center; justify-content:center; box-shadow:0 4px 12px rgba(79,70,229,0.35); flex-shrink:0;">
+        <svg class="pd-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+      </div>
+      <div style="display:flex; flex-direction:column; align-items:flex-start; line-height:1.05; min-width:0;">
+        <span class="brand-title" id="headerBrandTitle">PrintDrop</span>
+        <span class="brand-badge" id="headerBrandBadge">Express</span>
+      </div>
     </div>
     <div class="header-actions">
-      <button id="btnHeaderLookup" onclick="promptOrderLookup()" style="background:rgba(255,255,255,0.06); border:1px solid #334155; color:#94a3b8; font-size:0.7rem; font-weight:600; padding:0.25rem 0.5rem; border-radius:9999px; cursor:pointer;" title="Find order by #ID">
-        🔍 Find Order
-      </button>
-      <button id="btnHeaderFullscreen" onclick="toggleFullscreenApp()" style="display:inline-flex; background:rgba(56,189,248,0.12); border:1px solid rgba(56,189,248,0.35); color:#38bdf8; font-size:0.7rem; font-weight:700; padding:0.25rem 0.55rem; border-radius:9999px; cursor:pointer; align-items:center; gap:0.25rem;" title="Toggle Fullscreen App View">
-        ⛶ App View
-      </button>
-      <span class="badge" id="headerConnectionBadge"><span class="pulse" id="headerConnectionPulse"></span> <span id="headerConnectionText">Connected</span></span>
+      <span class="badge" id="headerConnectionBadge" style="min-height:34px;"><span class="pulse" id="headerConnectionPulse"></span> <span id="headerConnectionText">Connected</span></span>
     </div>
   </header>
 
@@ -624,15 +696,18 @@
   </div>
 
   <!-- Professional 3-Tab Mobile Navigation -->
-  <nav class="mobile-nav-tabs" id="mobileNavTabs" style="margin-top:0.75rem;">
+  <nav class="mobile-nav-tabs" id="mobileNavTabs" style="margin-top:0.75rem;" aria-label="Order Sections">
     <button class="nav-tab-btn active" id="tabBtnDrafts" onclick="switchMobileTab('drafts')">
-      📁 Drafts <span class="nav-tab-badge" id="draftsTabBadge">0</span>
+      <svg class="pd-svg" aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+      <span>Drafts</span> <span class="nav-tab-badge" id="draftsTabBadge">0</span>
     </button>
     <button class="nav-tab-btn" id="tabBtnSent" onclick="switchMobileTab('sent')">
-      📤 Sent Orders <span class="nav-tab-badge" id="sentTabBadge" style="display:none;">0</span>
+      <svg class="pd-svg" aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      <span>Sent</span> <span class="nav-tab-badge" id="sentTabBadge" style="display:none;">0</span>
     </button>
     <button class="nav-tab-btn" id="tabBtnPrinted" onclick="switchMobileTab('printed')">
-      🖨️ Printed Jobs <span class="nav-tab-badge" id="printedTabBadge" style="display:none;">0</span>
+      <svg class="pd-svg" aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+      <span>Printed</span> <span class="nav-tab-badge" id="printedTabBadge" style="display:none;">0</span>
     </button>
   </nav>
 
@@ -668,13 +743,14 @@
       <!-- Left Column: Primary File Upload & Selection Pane -->
       <div class="upload-main-pane">
         <!-- Customer Identification & Counter Token Card -->
-        <div style="margin-top: 0.85rem; background: #131c2e; border: 1px solid #1e293b; border-radius: 1rem; padding: 0.85rem 1rem;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.45rem;">
-            <label for="customerNameInput" style="font-size: 0.76rem; font-weight: 700; color: #f1f5f9; display: flex; align-items: center; gap: 0.35rem;">
-              <span>👤</span> Your Name / Mobile (Optional)
+        <div style="margin-top: 0.8rem; background: var(--pd-bg-surface); border: 1px solid var(--pd-border-subtle); border-radius: 1.05rem; padding: 0.85rem 1rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.45rem; gap: 0.5rem;">
+            <label for="customerNameInput" style="font-size: 0.78rem; font-weight: 700; color: var(--pd-text-primary); display: flex; align-items: center; gap: 0.4rem;">
+              <svg class="pd-svg" aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              <span>Your Name / Mobile <span style="font-weight:500; color:var(--pd-text-muted);">(Optional)</span></span>
             </label>
-            <span id="detectedDeviceBadge" style="font-size: 0.65rem; color: #34d399; background: rgba(16,185,129,0.12); border: 1px solid rgba(16,185,129,0.25); padding: 0.15rem 0.5rem; border-radius: 9999px; font-weight: 600;">
-              📱 Ready
+            <span id="detectedDeviceBadge" style="font-size: 0.66rem; color: #34d399; background: rgba(16,185,129,0.12); border: 1px solid rgba(16,185,129,0.28); padding: 0.18rem 0.55rem; border-radius: 9999px; font-weight: 700; white-space:nowrap;">
+              Ready
             </span>
           </div>
           <input 
@@ -682,7 +758,7 @@
             id="customerNameInput" 
             placeholder="e.g. Rahul, Priya, or last 4 digits of phone" 
             maxlength="40" 
-            style="width: 100%; box-sizing: border-box; background: #090d16; border: 1px solid #334155; border-radius: 0.65rem; padding: 0.55rem 0.75rem; color: #f8fafc; font-size: 0.82rem; outline: none;"
+            class="input-text"
           />
           <script>
             (function() {
@@ -717,16 +793,26 @@
               } catch (_) {}
             })();
           </script>
-          <div style="font-size: 0.67rem; color: #64748b; margin-top: 0.35rem; display: flex; align-items: center; gap: 0.35rem;">
-            <span>ℹ️</span> Helps the shopkeeper identify your prints at the counter.
+          <div style="font-size: 0.7rem; color: var(--pd-text-muted); margin-top: 0.4rem; display: flex; align-items: center; gap: 0.35rem;">
+            <svg class="pd-svg" aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+            <span>Helps the shopkeeper call out your prints quickly at the counter.</span>
           </div>
         </div>
 
         <!-- Upload Touch Card -->
-        <div class="dropzone-card" id="dropzone">
-          <div class="upload-icon">📁</div>
-          <div class="drop-title">Tap to Choose Files (Select Multiple) or Drag Here</div>
-          <div class="drop-subtitle">Select single or multiple PDF, Word, Excel, PPT, or Photos up to 100MB each</div>
+        <div class="dropzone-card" id="dropzone" role="button" tabindex="0" aria-label="Choose documents or photos to print">
+          <div class="upload-icon" aria-hidden="true">
+            <svg class="pd-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          </div>
+          <div class="drop-title">Tap to Choose Files (Select Multiple)</div>
+          <div class="drop-subtitle">Or drag &amp; drop documents here • Up to 100 MB per file</div>
+          <div class="format-chips" aria-hidden="true">
+            <span class="format-chip">PDF</span>
+            <span class="format-chip">Word</span>
+            <span class="format-chip">Excel</span>
+            <span class="format-chip">PPT</span>
+            <span class="format-chip">Photos</span>
+          </div>
           <input type="file" id="fileInput" multiple style="display:none">
         </div>
 
@@ -780,16 +866,17 @@
             </div>
             <div class="desktop-summary-row" style="border-top:1px dashed rgba(148,163,184,0.25); padding-top:0.6rem; margin-top:0.2rem; align-items:baseline;">
               <span style="font-weight:700; color:#93c5fd;">Estimated Cost:</span>
-              <strong id="desktopTotalCost" style="font-size:1.35rem; color:#34d399; font-family:monospace; font-weight:900;">₹0.00</strong>
+              <strong id="desktopTotalCost" class="pd-tabular" style="font-size:1.35rem; color:#34d399; font-family:monospace; font-weight:900;">₹0.00</strong>
             </div>
           </div>
 
           <button class="btn-submit-desktop" id="btnSubmitOrderDesktop" type="button" onclick="document.getElementById('btnSubmitOrder').click()">
-            🚀 Upload &amp; Submit Order
+            <svg class="pd-svg" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            <span>Upload &amp; Submit Order</span>
           </button>
 
-          <div class="desktop-privacy-note">
-            <span>🔒</span>
+          <div class="desktop-privacy-note" style="color:var(--pd-text-muted);">
+            <svg class="pd-svg" aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-top:2px;"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
             <span>Documents are encrypted and transmitted directly to the counter PC via secure local network.</span>
           </div>
         </div>
@@ -800,58 +887,63 @@
   <!-- Live Order Tracking View (Sent Orders Tab) -->
   <div id="orderTrackingView" style="display: none; animation: slideUp 0.3s ease;">
     <!-- Empty State for Sent Orders if None Active -->
-    <div id="noSentOrdersCard" style="display: none; text-align: center; padding: 3rem 1.5rem; background: #131c2e; border: 1px solid #1e293b; border-radius: 1.25rem; margin-top: 0.85rem;">
-      <div style="font-size: 2.5rem; margin-bottom: 0.75rem;">📤</div>
-      <h3 style="font-size: 1.05rem; font-weight: 700; color: white;">No Active Orders in Progress</h3>
-      <p style="font-size: 0.78rem; color: #94a3b8; margin-top: 0.35rem; line-height: 1.4;">
+    <div id="noSentOrdersCard" style="display: none; text-align: center; padding: 2.75rem 1.5rem; background: var(--pd-bg-surface); border: 1px solid var(--pd-border-subtle); border-radius: 1.25rem; margin-top: 0.85rem;">
+      <div aria-hidden="true" style="width:52px; height:52px; border-radius:1rem; background:rgba(79,70,229,0.14); border:1px solid rgba(99,102,241,0.3); color:#818cf8; display:flex; align-items:center; justify-content:center; margin:0 auto 0.9rem;">
+        <svg class="pd-svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      </div>
+      <h3 style="font-size: 1.05rem; font-weight: 800; color: var(--pd-text-primary);">No Active Orders in Progress</h3>
+      <p style="font-size: 0.8rem; color: var(--pd-text-muted); margin-top: 0.4rem; line-height: 1.45;">
         You don't have any print jobs currently awaiting shopkeeper approval or printing.
       </p>
-      <button onclick="switchMobileTab('drafts')" style="margin-top: 1.15rem; background: #4f46e5; color: white; border: none; padding: 0.65rem 1.35rem; border-radius: 0.75rem; font-size: 0.82rem; font-weight: 700; cursor: pointer; box-shadow: 0 4px 12px rgba(79,70,229,0.35);">
-        + Create New Print Job (Drafts)
+      <button onclick="switchMobileTab('drafts')" style="margin-top: 1.15rem; background: linear-gradient(135deg, #4f46e5, #6366f1); color: white; border: none; padding: 0.72rem 1.35rem; min-height: 44px; border-radius: 0.8rem; font-size: 0.84rem; font-weight: 700; cursor: pointer; box-shadow: 0 6px 16px rgba(79,70,229,0.35); display: inline-flex; align-items: center; gap: 0.4rem;">
+        <svg class="pd-svg" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        <span>Create New Print Job</span>
       </button>
     </div>
 
     <!-- Active Tracker Wrapper -->
     <div id="activeTrackerWrapper">
       <!-- Order Tracking Top Navigation Bar -->
-      <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem; margin-bottom: 0.85rem;">
-        <button id="btnBackToHome" onclick="switchMobileTab('drafts')" style="flex: 1; background: linear-gradient(135deg, #1e293b, #0f172a); color: #f8fafc; border: 1px solid #475569; border-radius: 0.75rem; padding: 0.55rem 0.85rem; font-size: 0.78rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
-          ➕ New Draft Order
+      <div style="display: flex; gap: 0.5rem; margin-top: 0.55rem; margin-bottom: 0.85rem;">
+        <button id="btnBackToHome" onclick="switchMobileTab('drafts')" style="flex: 1; background: var(--pd-bg-surface); color: var(--pd-text-primary); border: 1px solid var(--pd-border-strong); border-radius: 0.8rem; padding: 0.6rem 0.9rem; min-height: 42px; font-size: 0.8rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem;">
+          <svg class="pd-svg" aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          <span>New Draft Order</span>
         </button>
-        <button onclick="refreshSentOrdersTab()" style="background: #1e293b; color: #cbd5e1; border: 1px solid #334155; border-radius: 0.75rem; padding: 0.55rem 0.85rem; font-size: 0.78rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 0.35rem;">
-          🔄 Refresh
+        <button onclick="refreshSentOrdersTab()" style="background: var(--pd-bg-surface); color: var(--pd-text-secondary); border: 1px solid var(--pd-border-strong); border-radius: 0.8rem; padding: 0.6rem 0.9rem; min-height: 42px; font-size: 0.8rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 0.35rem;">
+          <svg class="pd-svg" aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+          <span>Refresh</span>
         </button>
       </div>
 
     <!-- Order Header Card -->
-    <div style="background: #131c2e; border: 1px solid #1e293b; border-radius: 1.25rem; padding: 1.25rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3);">
+    <div style="background: var(--pd-bg-surface); border: 1px solid var(--pd-border-subtle); border-radius: 1.25rem; padding: 1.2rem; box-shadow: 0 8px 24px -6px rgba(0,0,0,0.4);">
       <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem;">
         <div>
-          <span style="font-size: 0.7rem; color: #94a3b8; font-weight: 600; text-transform: uppercase;">Order Tracking</span>
-          <h2 id="trackerOrderId" style="font-size: 1.2rem; font-weight: 800; color: #fff; font-mono; margin-top: 0.1rem;">#ABCD1234</h2>
-          <p id="trackerTimestamp" style="font-size: 0.7rem; color: #64748b; margin-top: 0.15rem;">Live Sync with Shopkeeper Desktop</p>
+          <span style="font-size: 0.68rem; color: var(--pd-text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;">Order Tracking</span>
+          <h2 id="trackerOrderId" class="pd-tabular" style="font-size: 1.2rem; font-weight: 800; color: #fff; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; margin-top: 0.1rem;">#ABCD1234</h2>
+          <p id="trackerTimestamp" style="font-size: 0.72rem; color: var(--pd-text-muted); margin-top: 0.15rem;">Live Sync with Shopkeeper Desktop</p>
         </div>
         <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.35rem;">
-          <span class="badge" id="trackerSyncBadge" style="font-size: 0.65rem; padding: 0.2rem 0.5rem;"><span class="pulse"></span> Live Sync</span>
-          <span id="trackerStatusBadge" style="padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.72rem; font-weight: 700; background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid #f59e0b;">
+          <span class="badge" id="trackerSyncBadge" style="font-size: 0.66rem; padding: 0.22rem 0.55rem;"><span class="pulse"></span> Live Sync</span>
+          <span id="trackerStatusBadge" style="padding: 0.28rem 0.65rem; border-radius: 9999px; font-size: 0.72rem; font-weight: 700; background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid #f59e0b;">
             ⏳ Awaiting Review
           </span>
         </div>
       </div>
 
-      <!-- Prominent Counter Pickup Token Card -->
-      <div id="trackerPickupBox" style="margin-top: 0.85rem; background: linear-gradient(135deg, rgba(30, 27, 75, 0.95), rgba(49, 46, 129, 0.85)); border: 1.5px solid #818cf8; border-radius: 1rem; padding: 0.85rem 1rem; text-align: center; box-shadow: 0 4px 12px rgba(99,102,241,0.25);">
-        <div style="font-size: 0.68rem; font-weight: 700; color: #a5b4fc; text-transform: uppercase; letter-spacing: 0.05em;">
-          Counter Pickup Code
+      <!-- Prominent Counter Pickup Token Card (Digital Ticket Style) -->
+      <div id="trackerPickupBox" style="margin-top: 0.95rem; background: linear-gradient(145deg, rgba(30, 27, 75, 0.96), rgba(49, 46, 129, 0.88)); border: 1.5px solid rgba(129, 140, 248, 0.7); border-radius: 1.1rem; padding: 1rem 1.1rem; text-align: center; box-shadow: 0 10px 26px -6px rgba(79,70,229,0.35), inset 0 1px 0 rgba(255,255,255,0.12);">
+        <div style="font-size: 0.68rem; font-weight: 800; color: #c7d2fe; text-transform: uppercase; letter-spacing: 0.1em;">
+          Counter Pickup Token
         </div>
-        <div id="trackerPickupCode" style="font-size: 2.2rem; font-weight: 900; color: #fbbf24; font-family: monospace; letter-spacing: 0.1em; line-height: 1.1; margin: 0.2rem 0;">
+        <div id="trackerPickupCode" class="pd-tabular" style="font-size: 2.35rem; font-weight: 900; color: #fbbf24; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: 0.12em; line-height: 1.1; margin: 0.25rem 0; text-shadow: 0 2px 14px rgba(251,191,36,0.3);">
           #----
         </div>
-        <div id="trackerCustomerNameTag" style="font-size: 0.82rem; font-weight: 700; color: #f8fafc;">
+        <div id="trackerCustomerNameTag" style="font-size: 0.86rem; font-weight: 800; color: #ffffff;">
           Customer
         </div>
-        <div style="font-size: 0.68rem; color: #cbd5e1; margin-top: 0.3rem;">
-          📢 Call out this Pickup Code or your name when collecting your prints!
+        <div style="margin-top: 0.55rem; padding-top: 0.5rem; border-top: 1px dashed rgba(165, 180, 252, 0.3); font-size: 0.72rem; color: #e0e7ff;">
+          Share this Pickup Code or your name at the counter when collecting prints.
         </div>
       </div>
 
@@ -1001,28 +1093,33 @@
     </div>
 
     <!-- Customer Privacy Shield -->
-    <div id="trackerPrivacyBox" style="margin-top:1.25rem; background:rgba(15,23,42,0.95); border:1px solid rgba(99,102,241,0.3); border-radius:1rem; padding:1rem;">
-      <div style="display:flex; align-items:center; gap:0.5rem; color:#818cf8; font-weight:700; font-size:0.85rem;">
-        <span>🔒 Privacy & Data Protection</span>
+    <div id="trackerPrivacyBox" style="margin-top:1.25rem; background:var(--pd-bg-surface); border:1px solid rgba(99,102,241,0.32); border-radius:1.05rem; padding:1rem;">
+      <div style="display:flex; align-items:center; gap:0.5rem; color:#a5b4fc; font-weight:800; font-size:0.84rem;">
+        <svg class="pd-svg" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        <span>Privacy &amp; Data Protection</span>
       </div>
-      <p style="font-size:0.74rem; color:#94a3b8; margin-top:0.4rem; line-height:1.4;">
+      <p style="font-size:0.76rem; color:var(--pd-text-muted); margin-top:0.4rem; line-height:1.45;">
         Your documents are stored privately on the shop counter PC strictly for printing your order. Once printing is completed and payment is settled, all documents are securely shredded.
       </p>
-      <div style="font-size:0.72rem; color:#38bdf8; margin-top:0.45rem; font-weight:600; display:flex; align-items:center; gap:0.35rem; background:rgba(56,189,248,0.1); border:1px solid rgba(56,189,248,0.2); padding:0.45rem 0.65rem; border-radius:0.5rem;">
-        <span>🛡️</span> 100% Confidential: Processed locally at this counter station only and never shared with third parties.
+      <div style="font-size:0.72rem; color:#38bdf8; margin-top:0.55rem; font-weight:600; display:flex; align-items:center; gap:0.45rem; background:rgba(56,189,248,0.1); border:1px solid rgba(56,189,248,0.22); padding:0.5rem 0.7rem; border-radius:0.65rem;">
+        <svg class="pd-svg" aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        <span>100% Confidential: Processed locally at this counter station only and never shared with third parties.</span>
       </div>
     </div>
 
     <!-- Actions Footer -->
-      <div id="trackerActionButtons" style="margin-top: 1.25rem; display: flex; flex-direction: column; gap: 0.6rem;">
-        <button id="btnAddMoreFilesToOrder" onclick="startAddMoreFilesToCurrentOrder()" style="display:none; width:100%; background:linear-gradient(135deg, #4f46e5, #059669); color:white; border:none; border-radius:0.75rem; padding:0.85rem; font-size:0.85rem; font-weight:700; cursor:pointer; align-items:center; justify-content:center; gap:0.5rem; box-shadow:0 4px 12px rgba(79, 70, 229, 0.35);">
-          ➕ Add More Files to This Order (<span id="addMoreOrderBadge">#XXXXXXXX</span>)
+      <div id="trackerActionButtons" style="margin-top: 1.15rem; display: flex; flex-direction: column; gap: 0.6rem;">
+        <button id="btnAddMoreFilesToOrder" onclick="startAddMoreFilesToCurrentOrder()" style="display:none; width:100%; background:linear-gradient(135deg, #4f46e5, #059669); color:white; border:none; border-radius:0.85rem; padding:0.85rem; min-height:46px; font-size:0.86rem; font-weight:800; cursor:pointer; align-items:center; justify-content:center; gap:0.45rem; box-shadow:0 6px 16px rgba(79, 70, 229, 0.35);">
+          <svg class="pd-svg" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          <span>Add More Files to This Order (<span id="addMoreOrderBadge">#XXXXXXXX</span>)</span>
         </button>
-        <button onclick="switchMobileTab('drafts')" style="width: 100%; background: linear-gradient(135deg, #1e293b, #0f172a); color: #f8fafc; border: 1px solid #475569; border-radius: 0.75rem; padding: 0.8rem; font-size: 0.82rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.45rem;">
-          ➕ Create Another Draft Order
+        <button onclick="switchMobileTab('drafts')" style="width: 100%; background: var(--pd-bg-surface); color: var(--pd-text-primary); border: 1px solid var(--pd-border-strong); border-radius: 0.85rem; padding: 0.8rem; min-height: 44px; font-size: 0.84rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.45rem;">
+          <svg class="pd-svg" aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          <span>Create Another Draft Order</span>
         </button>
-        <button onclick="refreshSentOrdersTab()" style="width: 100%; background: #1e293b; color: #cbd5e1; border: 1px solid #334155; border-radius: 0.75rem; padding: 0.75rem; font-size: 0.82rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.4rem;">
-          🔄 Refresh Status
+        <button onclick="refreshSentOrdersTab()" style="width: 100%; background: var(--pd-bg-surface); color: var(--pd-text-secondary); border: 1px solid var(--pd-border-subtle); border-radius: 0.85rem; padding: 0.78rem; min-height: 44px; font-size: 0.84rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.4rem;">
+          <svg class="pd-svg" aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+          <span>Refresh Status</span>
         </button>
       </div>
     </div> <!-- end activeTrackerWrapper -->
@@ -1031,16 +1128,18 @@
   <!-- Printed Jobs & Erasure History View (Printed Jobs Tab) -->
   <div id="printedJobsView" style="display: none; animation: slideUp 0.3s ease;">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.85rem;">
-      <span style="font-size: 0.75rem; font-weight: 700; color: #94a3b8; text-transform: uppercase;">Completed Print Jobs</span>
-      <span id="printedJobsCountBadge" style="font-size: 0.72rem; color: #10b981; font-weight: 700; background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.3); padding: 0.15rem 0.5rem; border-radius: 9999px;">0 Completed</span>
+      <span style="font-size: 0.76rem; font-weight: 700; color: var(--pd-text-muted); text-transform: uppercase; letter-spacing: 0.05em;">Completed Print Jobs</span>
+      <span id="printedJobsCountBadge" class="pd-tabular" style="font-size: 0.72rem; color: #34d399; font-weight: 700; background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.3); padding: 0.18rem 0.55rem; border-radius: 9999px;">0 Completed</span>
     </div>
     <div id="printedJobsList" style="display: flex; flex-direction: column; gap: 0.75rem; margin-top: 0.75rem;">
       <!-- Dynamic printed jobs injected here -->
     </div>
-    <div id="noPrintedJobsCard" style="display: none; text-align: center; padding: 3rem 1.5rem; background: #131c2e; border: 1px solid #1e293b; border-radius: 1.25rem; margin-top: 0.75rem;">
-      <div style="font-size: 2.5rem; margin-bottom: 0.75rem;">🖨️</div>
-      <h3 style="font-size: 1.05rem; font-weight: 700; color: white;">No Printed Jobs Yet</h3>
-      <p style="font-size: 0.78rem; color: #94a3b8; margin-top: 0.35rem; line-height: 1.4;">
+    <div id="noPrintedJobsCard" style="display: none; text-align: center; padding: 2.75rem 1.5rem; background: var(--pd-bg-surface); border: 1px solid var(--pd-border-subtle); border-radius: 1.25rem; margin-top: 0.75rem;">
+      <div aria-hidden="true" style="width:52px; height:52px; border-radius:1rem; background:rgba(16,185,129,0.14); border:1px solid rgba(16,185,129,0.3); color:#34d399; display:flex; align-items:center; justify-content:center; margin:0 auto 0.9rem;">
+        <svg class="pd-svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+      </div>
+      <h3 style="font-size: 1.05rem; font-weight: 800; color: var(--pd-text-primary);">No Printed Jobs Yet</h3>
+      <p style="font-size: 0.8rem; color: var(--pd-text-muted); margin-top: 0.4rem; line-height: 1.45;">
         Once the shopkeeper finishes printing your documents, they will appear here along with verified data shredding options.
       </p>
     </div>
@@ -1051,12 +1150,15 @@
     <div class="footer-summary" style="display:flex; flex-direction:column; justify-content:center;">
       <div style="display:flex; align-items:baseline; gap:0.4rem;">
         <div class="footer-count" id="footerTotalFiles">0 Documents</div>
-        <span style="color:#64748b; font-size:0.75rem;">&bull;</span>
-        <div id="footerTotalCost" style="font-size:0.95rem; font-weight:900; color:#34d399; font-family:monospace;">₹0.00</div>
+        <span style="color:var(--pd-text-muted); font-size:0.75rem;">&bull;</span>
+        <div id="footerTotalCost" class="pd-tabular" style="font-size:1.02rem; font-weight:900; color:#34d399; font-family:ui-monospace, SFMono-Regular, Menlo, monospace;">₹0.00</div>
       </div>
       <div class="footer-size" id="footerTotalSize">0.0 MB &bull; 0 Copies Total</div>
     </div>
-    <button class="btn-submit" id="btnSubmitOrder">Upload & Submit</button>
+    <button class="btn-submit" id="btnSubmitOrder">
+      <span>Upload &amp; Submit</span>
+      <svg class="pd-svg" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+    </button>
   </div>
 
   <!-- Configuration Modal Drawer -->
@@ -1295,38 +1397,6 @@
         <button id="btnConfirmPurgeAction" onclick="executePurge()" style="flex:1; background:#dc2626; color:white; border:none; padding:0.65rem; border-radius:0.75rem; font-size:0.8rem; font-weight:700; cursor:pointer;">
           Yes, Delete Now
         </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Find / Select Recent Order Modal -->
-  <div class="modal-backdrop" id="lookupModalBackdrop" style="display:none; align-items:center; justify-content:center; padding:1.25rem;">
-    <div style="background:#131c2e; border:1px solid #3b82f6; border-radius:1.5rem; padding:1.5rem; max-width:420px; width:100%; box-shadow:0 25px 50px -12px rgba(0,0,0,0.5); text-align:left;">
-      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.75rem;">
-        <h3 style="font-size:1.05rem; font-weight:700; color:white; display:flex; align-items:center; gap:0.5rem; margin:0;">
-          📋 Find &amp; Manage Your Order
-        </h3>
-        <button onclick="closeLookupModal()" style="background:transparent; border:none; color:#94a3b8; font-size:1.4rem; cursor:pointer; line-height:1;">&times;</button>
-      </div>
-
-      <p style="font-size:0.75rem; color:#94a3b8; margin-bottom:0.75rem;">
-        Select your order to view live progress and print status:
-      </p>
-
-      <div id="recentOrdersList" style="max-height:220px; overflow-y:auto; display:flex; flex-direction:column; gap:0.5rem; margin-bottom:1rem;">
-        <div style="text-align:center; padding:1rem; color:#64748b; font-size:0.75rem;">
-          Loading recent orders...
-        </div>
-      </div>
-
-      <div style="border-top:1px solid #334155; padding-top:0.75rem;">
-        <label style="font-size:0.72rem; color:#94a3b8; display:block; margin-bottom:0.35rem;">Or search by 4-digit Pickup Code, Name, or Order ID:</label>
-        <div style="display:flex; gap:0.4rem;">
-          <input type="text" id="manualLookupInput" placeholder="e.g. 4829 or Rahul" onkeydown="if(event.key==='Enter') executeManualLookup()" style="flex:1; background:#0f172a; border:1px solid #475569; border-radius:0.6rem; color:white; padding:0.5rem 0.75rem; font-size:0.82rem;">
-          <button onclick="executeManualLookup()" style="background:#4f46e5; color:white; border:none; border-radius:0.6rem; padding:0.5rem 0.85rem; font-size:0.78rem; font-weight:600; cursor:pointer;">
-            Search
-          </button>
-        </div>
       </div>
     </div>
   </div>
@@ -1958,47 +2028,6 @@
     function isCurrentlyInStandaloneWindow() {
       return (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) || (window.navigator.standalone === true);
     }
-
-    function toggleFullscreenApp() {
-      try {
-        const isFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
-        if (!isFs) {
-          if (document.documentElement.requestFullscreen) {
-            document.documentElement.requestFullscreen().catch(() => {});
-          } else if (document.documentElement.webkitRequestFullscreen) {
-            document.documentElement.webkitRequestFullscreen();
-          } else {
-            alert("📲 To view as a full-screen app on iPhone without the URL bar:\n\n1. Tap Safari's Share button (at the bottom)\n2. Tap 'Add to Home Screen'\n3. Open PrintDrop from your home screen!");
-          }
-        } else {
-          if (document.exitFullscreen) {
-            document.exitFullscreen().catch(() => {});
-          } else if (document.webkitExitFullscreen) {
-            document.webkitExitFullscreen();
-          }
-        }
-      } catch (_) {}
-    }
-
-    function updateFullscreenButtonState() {
-      const btn = document.getElementById("btnHeaderFullscreen");
-      if (!btn) return;
-      btn.style.display = "inline-flex";
-      const isFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
-      btn.innerHTML = isFs ? "🗗 Normal" : "⛶ App View";
-      btn.style.color = isFs ? "#f59e0b" : "#38bdf8";
-      btn.style.borderColor = isFs ? "rgba(245,158,11,0.4)" : "rgba(56,189,248,0.35)";
-      btn.style.background = isFs ? "rgba(245,158,11,0.12)" : "rgba(56,189,248,0.12)";
-    }
-
-    document.addEventListener("fullscreenchange", updateFullscreenButtonState);
-    document.addEventListener("webkitfullscreenchange", updateFullscreenButtonState);
-    window.addEventListener("DOMContentLoaded", updateFullscreenButtonState);
-    window.addEventListener("pageshow", updateFullscreenButtonState);
-    window.addEventListener("visibilitychange", updateFullscreenButtonState);
-    window.addEventListener("resize", updateFullscreenButtonState);
-    setTimeout(updateFullscreenButtonState, 50);
-    setTimeout(updateFullscreenButtonState, 300);
 
     // Check for incoming shared files from Android native share sheet via share_token or IndexedDB
     async function checkIncomingSharedFiles() {
@@ -2704,27 +2733,29 @@
           </div>
 
           <!-- Mode Toggle: Auto vs Manual Custom (Prominently Visible on Each File) -->
-          <div style="display:flex; background:#090d16; border:1px solid #1e293b; border-radius:0.6rem; padding:0.2rem; gap:0.25rem;">
-            <button type="button" onclick="setFileMode('${item.id}', 'AUTO')" style="flex:1; border:none; padding:0.42rem 0.5rem; border-radius:0.45rem; font-size:0.75rem; font-weight:700; cursor:pointer; transition:all 0.15s; ${!isManual ? 'background:#4f46e5; color:white; box-shadow:0 1px 3px rgba(0,0,0,0.4);' : 'background:transparent; color:#94a3b8;'}">
-              ✨ Auto (Original)
+          <div style="display:flex; background:var(--pd-bg-inset); border:1px solid var(--pd-border-subtle); border-radius:0.7rem; padding:0.22rem; gap:0.25rem;">
+            <button type="button" onclick="setFileMode('${item.id}', 'AUTO')" style="flex:1; border:none; padding:0.5rem 0.55rem; min-height:38px; border-radius:0.5rem; font-size:0.76rem; font-weight:700; cursor:pointer; transition:all 0.15s; display:inline-flex; align-items:center; justify-content:center; gap:0.35rem; ${!isManual ? 'background:#4f46e5; color:white; box-shadow:0 2px 8px rgba(79,70,229,0.35);' : 'background:transparent; color:#94a3b8;'}">
+              <svg class="pd-svg" aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+              <span>Auto (Original)</span>
             </button>
-            <button type="button" onclick="setFileMode('${item.id}', 'MANUAL')" style="flex:1; border:none; padding:0.42rem 0.5rem; border-radius:0.45rem; font-size:0.75rem; font-weight:700; cursor:pointer; transition:all 0.15s; ${isManual ? 'background:#059669; color:white; box-shadow:0 1px 3px rgba(0,0,0,0.4);' : 'background:transparent; color:#94a3b8;'}">
-              ✍️ Manual Custom
+            <button type="button" onclick="setFileMode('${item.id}', 'MANUAL')" style="flex:1; border:none; padding:0.5rem 0.55rem; min-height:38px; border-radius:0.5rem; font-size:0.76rem; font-weight:700; cursor:pointer; transition:all 0.15s; display:inline-flex; align-items:center; justify-content:center; gap:0.35rem; ${isManual ? 'background:#059669; color:white; box-shadow:0 2px 8px rgba(5,150,105,0.35);' : 'background:transparent; color:#94a3b8;'}">
+              <svg class="pd-svg" aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
+              <span>Manual Custom</span>
             </button>
           </div>
 
           <!-- Settings Detail & Quick Copies Box -->
-          <div style="background:${isManual ? 'rgba(5, 150, 105, 0.08)' : 'rgba(79, 70, 229, 0.06)'}; border:1px solid ${isManual ? 'rgba(5, 150, 105, 0.25)' : 'rgba(79, 70, 229, 0.2)'}; border-radius:0.65rem; padding:0.55rem 0.7rem; display:flex; flex-direction:column; gap:0.45rem;">
-            <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.35rem;">
-              <span style="font-size:0.72rem; font-weight:700; color:${isManual ? '#34d399' : '#a5b4fc'};">
-                ${isManual ? '⚙️ Custom Print Settings (Click Manual Custom to Edit)' : '✓ Auto Mode: Preserves Original Layout & Pages'}
+          <div style="background:${isManual ? 'rgba(5, 150, 105, 0.08)' : 'rgba(79, 70, 229, 0.06)'}; border:1px solid ${isManual ? 'rgba(5, 150, 105, 0.25)' : 'rgba(79, 70, 229, 0.2)'}; border-radius:0.75rem; padding:0.6rem 0.75rem; display:flex; flex-direction:column; gap:0.5rem;">
+            <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.4rem;">
+              <span style="font-size:0.73rem; font-weight:700; color:${isManual ? '#34d399' : '#a5b4fc'};">
+                ${isManual ? 'Custom Print Settings (Tap Manual Custom to Edit)' : '✓ Auto Mode: Preserves Original Layout & Pages'}
               </span>
               <!-- Quick Copies Stepper on Card -->
-              <div style="display:flex; align-items:center; gap:0.35rem; background:#0f172a; border:1px solid #334155; border-radius:0.4rem; padding:0.15rem 0.45rem;">
-                <span style="font-size:0.68rem; color:#94a3b8;">Copies:</span>
-                <button type="button" onclick="stepFileCopies('${item.id}', -1)" style="background:none; border:none; color:#cbd5e1; font-weight:bold; font-size:0.85rem; cursor:pointer; padding:0 0.25rem;">-</button>
-                <span style="font-size:0.75rem; font-weight:700; color:#fff; min-width:1rem; text-align:center;">${item.settings.copies}</span>
-                <button type="button" onclick="stepFileCopies('${item.id}', 1)" style="background:none; border:none; color:#cbd5e1; font-weight:bold; font-size:0.85rem; cursor:pointer; padding:0 0.25rem;">+</button>
+              <div style="display:flex; align-items:center; gap:0.35rem; background:#0f172a; border:1px solid #334155; border-radius:0.55rem; padding:0.15rem 0.35rem;">
+                <span style="font-size:0.7rem; color:#94a3b8; padding-left:0.2rem;">Copies:</span>
+                <button type="button" onclick="stepFileCopies('${item.id}', -1)" aria-label="Decrease copies" style="background:rgba(255,255,255,0.06); border:none; color:#f8fafc; font-weight:bold; font-size:0.95rem; cursor:pointer; width:30px; height:30px; border-radius:0.4rem; display:inline-flex; align-items:center; justify-content:center;">-</button>
+                <span class="pd-tabular" style="font-size:0.82rem; font-weight:800; color:#fff; min-width:1.25rem; text-align:center;">${item.settings.copies}</span>
+                <button type="button" onclick="stepFileCopies('${item.id}', 1)" aria-label="Increase copies" style="background:rgba(255,255,255,0.06); border:none; color:#f8fafc; font-weight:bold; font-size:0.95rem; cursor:pointer; width:30px; height:30px; border-radius:0.4rem; display:inline-flex; align-items:center; justify-content:center;">+</button>
               </div>
             </div>
 
@@ -2772,17 +2803,21 @@
           </div>
 
           <!-- Action Buttons Row (Cost shown after Preview and before Delete) -->
-          <div style="display:flex; justify-content:flex-end; align-items:center; gap:0.5rem; padding-top:0.35rem; border-top:1px dashed rgba(148,163,184,0.15); margin-top:0.15rem; flex-wrap:wrap;">
-            <button type="button" class="btn-config" style="background:#1e293b; color:#cbd5e1; border:1px solid #334155; padding:0.38rem 0.75rem; font-size:0.75rem; font-weight:700; border-radius:0.5rem; cursor:pointer;" onclick="openPreviewModal('${item.id}')">
-              👁️ Preview
-            </button>
-            <div style="display:inline-flex; align-items:center; gap:0.3rem; background:rgba(16,185,129,0.14); border:1.5px solid rgba(16,185,129,0.4); border-radius:0.5rem; padding:0.32rem 0.65rem;">
-              <span style="font-size:0.68rem; color:#a7f3d0; font-weight:700; text-transform:uppercase;">Cost:</span>
-              <span style="font-size:0.95rem; font-weight:900; color:#34d399; font-family:monospace;">₹${costInfo.subtotal.toFixed(2)}</span>
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; padding-top:0.45rem; border-top:1px dashed rgba(148,163,184,0.16); margin-top:0.15rem; flex-wrap:wrap;">
+            <div style="display:inline-flex; align-items:center; gap:0.35rem; background:rgba(16,185,129,0.12); border:1px solid rgba(16,185,129,0.35); border-radius:0.6rem; padding:0.38rem 0.7rem;">
+              <span style="font-size:0.68rem; color:#a7f3d0; font-weight:700; text-transform:uppercase; letter-spacing:0.03em;">Est.</span>
+              <span class="pd-tabular" style="font-size:0.96rem; font-weight:900; color:#34d399; font-family:ui-monospace, SFMono-Regular, Menlo, monospace;">₹${costInfo.subtotal.toFixed(2)}</span>
             </div>
-            <button type="button" class="btn-config" style="background:rgba(239, 68, 68, 0.15); color:#f87171; border:1px solid rgba(239, 68, 68, 0.35); padding:0.38rem 0.75rem; font-size:0.75rem; font-weight:700; border-radius:0.5rem; cursor:pointer; transition:all 0.15s;" onclick="removeFile('${item.id}')" title="Delete selected file">
-              🗑️ Delete
-            </button>
+            <div style="display:flex; align-items:center; gap:0.5rem;">
+              <button type="button" class="btn-config" style="background:#1e293b; color:#e2e8f0; border:1px solid #334155;" onclick="openPreviewModal('${item.id}')">
+                <svg class="pd-svg" aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                <span>Preview</span>
+              </button>
+              <button type="button" class="btn-config" style="background:rgba(239, 68, 68, 0.14); color:#f87171; border:1px solid rgba(239, 68, 68, 0.32);" onclick="removeFile('${item.id}')" title="Delete selected file">
+                <svg class="pd-svg" aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                <span>Delete</span>
+              </button>
+            </div>
           </div>
         `;
         fileListEl.appendChild(card);
@@ -5276,19 +5311,19 @@
               `;
             } else if (data.queueInfo && data.queueInfo.isInQueue) {
               fileApprovalBadge = `
-                <span style="font-size:0.68rem; font-weight:700; color:#38bdf8; background:rgba(56,189,248,0.15); border:1px solid rgba(56,189,248,0.3); padding:0.2rem 0.5rem; border-radius:9999px; display:inline-flex; align-items:center; gap:0.25rem;">
+                <span style="font-size:0.68rem; font-weight:700; color:#38bdf8; background:rgba(56,189,248,0.15); border:1px solid rgba(56,189,248,0.3); padding:0.2rem 0.55rem; border-radius:9999px; display:inline-flex; align-items:center; gap:0.25rem; white-space:nowrap; flex-shrink:0;">
                   ⏳ In Queue (#${data.queueInfo.queuePosition})
                 </span>
               `;
             } else if (data.status === "AWAITING_APPROVAL") {
               fileApprovalBadge = `
-                <span style="font-size:0.68rem; font-weight:700; color:#fbbf24; background:rgba(245,158,11,0.15); border:1px solid rgba(245,158,11,0.3); padding:0.2rem 0.5rem; border-radius:9999px; display:inline-flex; align-items:center; gap:0.25rem;">
+                <span style="font-size:0.68rem; font-weight:700; color:#fbbf24; background:rgba(245,158,11,0.15); border:1px solid rgba(245,158,11,0.3); padding:0.2rem 0.55rem; border-radius:9999px; display:inline-flex; align-items:center; gap:0.25rem; white-space:nowrap; flex-shrink:0;">
                   ⏳ Awaiting Review
                 </span>
               `;
             } else if (data.status === "APPROVED") {
               fileApprovalBadge = `
-                <span style="font-size:0.68rem; font-weight:700; color:#34d399; background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.3); padding:0.2rem 0.5rem; border-radius:9999px; display:inline-flex; align-items:center; gap:0.25rem;">
+                <span style="font-size:0.68rem; font-weight:700; color:#34d399; background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.3); padding:0.2rem 0.55rem; border-radius:9999px; display:inline-flex; align-items:center; gap:0.25rem; white-space:nowrap; flex-shrink:0;">
                   ✓ Approved by Shopkeeper
                 </span>
               `;
@@ -7062,96 +7097,6 @@
       document.getElementById("purgeModalTitle").textContent = `Delete Order #${code} from Shop PC?`;
       document.getElementById("purgeModalMessage").textContent = `Are you sure you want to permanently delete all uploaded documents for this completed order from the shopkeeper's desktop computer?`;
       document.getElementById("purgeModalBackdrop").style.display = "flex";
-    }
-
-    // Recent Orders & Order Lookup Modal
-    function promptOrderLookup() {
-      openLookupModal();
-    }
-
-    async function openLookupModal() {
-      const modal = document.getElementById("lookupModalBackdrop");
-      if (modal) modal.style.display = "flex";
-      loadRecentOrders();
-    }
-
-    function closeLookupModal() {
-      const modal = document.getElementById("lookupModalBackdrop");
-      if (modal) modal.style.display = "none";
-    }
-
-    async function loadRecentOrders(searchQuery) {
-      const listContainer = document.getElementById("recentOrdersList");
-      if (!listContainer) return;
-      listContainer.innerHTML = '<div style="text-align:center; padding:1rem; color:#64748b; font-size:0.75rem;">Loading orders...</div>';
-
-      try {
-        const dt = getOrCreateDeviceToken();
-        const fp = getDeviceFingerprint();
-        let url = "/api/session/recent-orders?device_token=" + encodeURIComponent(dt) + "&device_fingerprint=" + encodeURIComponent(fp);
-        if (searchQuery && searchQuery.trim()) {
-          url = "/api/session/recent-orders?search=" + encodeURIComponent(searchQuery.trim());
-        }
-        const resp = await fetch(url);
-        if (!resp.ok) throw new Error("Failed to load");
-        const json = await resp.json();
-        const orders = json.orders || [];
-
-        if (orders.length === 0) {
-          const emptyMsg = searchQuery 
-            ? `No orders found matching "${searchQuery}". Check the code or name and try again.`
-            : `No recent orders found for this phone. You can search by your 4-digit code or name below.`;
-          listContainer.innerHTML = `<div style="text-align:center; padding:1rem; color:#94a3b8; font-size:0.75rem;">${emptyMsg}</div>`;
-          return;
-        }
-
-        listContainer.innerHTML = orders.map(ord => {
-          const isCompletedOrPurged = ord.status === "COMPLETED" || ord.status === "PURGED_BY_CUSTOMER" || ord.isPurged || ord.activeFilesCount === 0;
-          const statusColor = ord.status === "COMPLETED" ? "#10b981" : ord.status === "PRINTING" ? "#6366f1" : ord.status === "PURGED_BY_CUSTOMER" ? "#64748b" : "#f59e0b";
-          const statusText = ord.status === "COMPLETED" ? "Print Complete" : ord.status === "PRINTING" ? "Printing" : ord.status === "PURGED_BY_CUSTOMER" ? "Erased from PC" : "Awaiting Review";
-          const pinBadge = ord.pickupCode ? `<span style="background:#fbbf24; color:#0f172a; font-weight:800; font-size:0.75rem; padding:0.1rem 0.4rem; border-radius:4px; margin-right:0.35rem;">#${ord.pickupCode}</span>` : "";
-          const nameBadge = ord.customerName ? `<span style="color:#e2e8f0; font-weight:700; font-size:0.78rem;">${ord.customerName}</span>` : "";
-          return `
-            <div onclick="selectOrderFromList('${ord.orderId}', ${isCompletedOrPurged})" style="background:#0f172a; border:1px solid #334155; border-radius:0.75rem; padding:0.65rem 0.85rem; cursor:pointer; display:flex; align-items:center; justify-content:space-between; transition:border-color 0.15s;" onmouseover="this.style.borderColor='#6366f1'" onmouseout="this.style.borderColor='#334155'">
-              <div>
-                <div style="display:flex; align-items:center; gap:0.25rem;">
-                  ${pinBadge}
-                  ${nameBadge}
-                  <span style="font-family:monospace; color:#94a3b8; font-size:0.72rem;">(#${ord.shortId})</span>
-                </div>
-                <div style="font-size:0.7rem; color:#94a3b8; margin-top:0.2rem;">${ord.totalFiles} File(s) &bull; ${ord.createdAt.substring(11, 16)}</div>
-              </div>
-              <div style="text-align:right;">
-                <span style="font-size:0.68rem; font-weight:700; color:${statusColor}; border:1px solid ${statusColor}44; background:${statusColor}18; padding:0.2rem 0.45rem; border-radius:9999px;">
-                  ${statusText}
-                </span>
-                <div style="font-size:0.68rem; color:#6366f1; font-weight:600; margin-top:0.25rem;">${isCompletedOrPurged ? "View Printout &rarr;" : "Track Order &rarr;"}</div>
-              </div>
-            </div>
-          `;
-        }).join("");
-      } catch (e) {
-        listContainer.innerHTML = '<div style="text-align:center; padding:1rem; color:#ef4444; font-size:0.75rem;">Could not load orders.</div>';
-      }
-    }
-
-    function selectOrderFromList(orderId, isCompletedOrPurged) {
-      closeLookupModal();
-      if (isCompletedOrPurged) {
-        switchMobileTab("printed");
-        loadPrintedJobs(orderId);
-      } else {
-        try {
-          localStorage.setItem("printdrop_last_order_id", orderId);
-        } catch (e) {}
-        switchToTrackingView(orderId);
-      }
-    }
-
-    function executeManualLookup() {
-      const input = document.getElementById("manualLookupInput");
-      if (!input || !input.value.trim()) return;
-      loadRecentOrders(input.value.trim());
     }
 
     // Verify Session Preflight on Page Load
