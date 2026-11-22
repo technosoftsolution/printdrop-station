@@ -64,3 +64,22 @@ html[data-maximized="true"] {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* Sleek thin scrollbar for Settings dropdown menu */
+.settings-dropdown-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(100, 116, 139, 0.55) transparent;
+}
+.settings-dropdown-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+.settings-dropdown-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.settings-dropdown-scroll::-webkit-scrollbar-thumb {
+  background-color: rgba(100, 116, 139, 0.5);
+  border-radius: 9999px;
+}
+.settings-dropdown-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(148, 163, 184, 0.75);
+}

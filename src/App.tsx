@@ -400,7 +400,10 @@ export default function App() {
   const [tunnelCopied, setTunnelCopied] = useState(false);
   const [permanentPortalQr, setPermanentPortalQr] = useState<string>("");
   const [permanentPortalCopied, setPermanentPortalCopied] = useState(false);
-  const [permanentPortalBaseUrl, setPermanentPortalBaseUrl] = useState<string>("");
+  const DEV_DEFAULT_PORTAL_URL = (import.meta as any).env?.DEV
+    ? "https://technosoftsolution.github.io/printdrop-station/connect.html"
+    : "";
+  const [permanentPortalBaseUrl, setPermanentPortalBaseUrl] = useState<string>(DEV_DEFAULT_PORTAL_URL);
   const [isEditingPortalUrl, setIsEditingPortalUrl] = useState(false);
   const [portalUrlInput, setPortalUrlInput] = useState("");
   const [licenseState, setLicenseState] = useState<LicenseStateDto | null>(null);
@@ -485,6 +488,8 @@ export default function App() {
       .then(saved => {
         if (saved && saved.trim().length > 0) {
           setPermanentPortalBaseUrl(saved.trim());
+        } else if (DEV_DEFAULT_PORTAL_URL) {
+          setPermanentPortalBaseUrl(DEV_DEFAULT_PORTAL_URL);
         }
       })
       .catch(() => {});
@@ -700,8 +705,14 @@ export default function App() {
   const [isSyncingProviderProfile, setIsSyncingProviderProfile] = useState(false);
   const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
   const settingsCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const settingsMenuScrollRef = useRef<HTMLDivElement | null>(null);
+  const settingsAutoScrollRafRef = useRef<number | null>(null);
+  const settingsAutoScrollSpeedRef = useRef<number>(0);
+  const [settingsScrollState, setSettingsScrollState] = useState({ canScrollUp: false, canScrollDown: false });
+  const [settingsMenuMaxHeight, setSettingsMenuMaxHeight] = useState<number | null>(null);
   const [selectedOrderBilling, setSelectedOrderBilling] = useState<OrderBilling | null>(null);
   const [expandedFilesOrderIds, setExpandedFilesOrderIds] = useState<Set<string>>(new Set());
+  const [approvedFileIds, setApprovedFileIds] = useState<Set<string>>(new Set());
 
   // Dynamic App & Window Title Syncing based on Station Name & License Plan
   useEffect(() => {
@@ -1010,6 +1021,94 @@ export default function App() {
     }
     return () => {
       document.removeEventListener("click", handleClickOutside);
+    };
+  }, [isSettingsMenuOpen]);
+
+  const stopSettingsAutoScroll = () => {
+    settingsAutoScrollSpeedRef.current = 0;
+    if (settingsAutoScrollRafRef.current !== null) {
+      cancelAnimationFrame(settingsAutoScrollRafRef.current);
+      settingsAutoScrollRafRef.current = null;
+    }
+  };
+
+  const updateSettingsScrollIndicators = () => {
+    const el = settingsMenuScrollRef.current;
+    if (!el) return;
+    const canScrollUp = el.scrollTop > 2;
+    const canScrollDown = el.scrollTop + el.clientHeight < el.scrollHeight - 2;
+    setSettingsScrollState((prev) =>
+      prev.canScrollUp === canScrollUp && prev.canScrollDown === canScrollDown
+        ? prev
+        : { canScrollUp, canScrollDown }
+    );
+  };
+
+  const startSettingsAutoScrollLoop = () => {
+    if (settingsAutoScrollRafRef.current !== null) return;
+    const step = () => {
+      const el = settingsMenuScrollRef.current;
+      const speed = settingsAutoScrollSpeedRef.current;
+      if (!el || speed === 0) {
+        settingsAutoScrollRafRef.current = null;
+        return;
+      }
+      const prevTop = el.scrollTop;
+      el.scrollTop += speed;
+      updateSettingsScrollIndicators();
+      if (el.scrollTop === prevTop) {
+        settingsAutoScrollSpeedRef.current = 0;
+        settingsAutoScrollRafRef.current = null;
+        return;
+      }
+      settingsAutoScrollRafRef.current = requestAnimationFrame(step);
+    };
+    settingsAutoScrollRafRef.current = requestAnimationFrame(step);
+  };
+
+  const handleSettingsMenuMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const el = settingsMenuScrollRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    if (rect.height <= 0) return;
+
+    const edgeZone = Math.min(56, rect.height * 0.22);
+    const distFromBottom = rect.bottom - e.clientY;
+    const distFromTop = e.clientY - rect.top;
+
+    if (distFromBottom <= edgeZone && el.scrollTop + el.clientHeight < el.scrollHeight - 1) {
+      const ratio = Math.min(1, Math.max(0, (edgeZone - distFromBottom) / edgeZone));
+      settingsAutoScrollSpeedRef.current = 2 + ratio * 5.5;
+      startSettingsAutoScrollLoop();
+    } else if (distFromTop <= edgeZone && el.scrollTop > 1) {
+      const ratio = Math.min(1, Math.max(0, (edgeZone - distFromTop) / edgeZone));
+      settingsAutoScrollSpeedRef.current = -(2 + ratio * 5.5);
+      startSettingsAutoScrollLoop();
+    } else {
+      stopSettingsAutoScroll();
+    }
+  };
+
+  // Clamp Settings dropdown max-height to visible window & keep scroll indicators synced
+  useEffect(() => {
+    if (!isSettingsMenuOpen) {
+      stopSettingsAutoScroll();
+      return;
+    }
+    const syncLayout = () => {
+      const container = document.getElementById("settings-dropdown-container");
+      if (container) {
+        const rect = container.getBoundingClientRect();
+        const available = Math.max(220, Math.floor(window.innerHeight - rect.bottom - 18));
+        setSettingsMenuMaxHeight(available);
+      }
+      requestAnimationFrame(updateSettingsScrollIndicators);
+    };
+    syncLayout();
+    window.addEventListener("resize", syncLayout);
+    return () => {
+      window.removeEventListener("resize", syncLayout);
+      stopSettingsAutoScroll();
     };
   }, [isSettingsMenuOpen]);
 
@@ -1324,10 +1423,35 @@ export default function App() {
     }
   }
 
+  async function handleApproveSingleFile(fileId: string, currentlyExcluded: boolean) {
+    if (!selectedOrderDetails) return;
+    if (currentlyExcluded) {
+      await handleToggleFileExclusion(fileId, true);
+    }
+    setApprovedFileIds((prev) => {
+      const next = new Set(prev);
+      next.add(fileId);
+      return next;
+    });
+    if (!currentlyExcluded) {
+      setActionSuccessMsg("File marked as approved.");
+      setTimeout(() => setActionSuccessMsg(null), 2000);
+    }
+  }
+
   async function handleToggleFileExclusion(fileId: string, currentExcluded: boolean) {
     if (!selectedOrderDetails) return;
     try {
       await invoke("toggle_file_exclusion", { fileId, isExcluded: !currentExcluded });
+      if (!currentExcluded) {
+        // Rejecting/excluding this file clears any prior per-file approval
+        setApprovedFileIds((prev) => {
+          if (!prev.has(fileId)) return prev;
+          const next = new Set(prev);
+          next.delete(fileId);
+          return next;
+        });
+      }
       const [refreshed, refreshedBilling] = await Promise.all([
         invoke<OrderDetailDto | null>("get_order_details", { orderId: selectedOrderDetails.order.id }),
         invoke<OrderBilling | null>("get_order_billing", { orderId: selectedOrderDetails.order.id }),
@@ -1350,6 +1474,7 @@ export default function App() {
   async function handleRestoreOrder(orderId: string) {
     try {
       await invoke("restore_order", { orderId });
+      setApprovedFileIds(new Set());
       setActionSuccessMsg(`Order #${orderId.substring(0, 8)} restored to Active Orders.`);
       const updatedOrders = await invoke<OrderSummaryDto[]>("list_incoming_orders");
       setOrders(updatedOrders);
@@ -2206,6 +2331,7 @@ export default function App() {
               setIsSettingsMenuOpen(true);
             }}
             onMouseLeave={() => {
+              stopSettingsAutoScroll();
               settingsCloseTimerRef.current = setTimeout(() => {
                 setIsSettingsMenuOpen(false);
               }, 180);
@@ -2226,13 +2352,39 @@ export default function App() {
               <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isSettingsMenuOpen ? "rotate-180 text-white" : "text-slate-400"}`} />
             </button>
 
-            {/* Dropdown Menu Popover (100% Solid Opaque Background) */}
+            {/* Dropdown Menu Popover (100% Solid Opaque Background, Viewport-Clamped + Hover Edge Auto-Scroll) */}
             {isSettingsMenuOpen && (
               <div
-                className="absolute right-0 top-full mt-2 w-72 border border-slate-700 rounded-2xl shadow-2xl shadow-black p-2 z-50 ring-1 ring-slate-600/50 space-y-1 text-left animate-fade-in"
-                style={{ backgroundColor: "#0f172a", opacity: 1 }}
+                className="absolute right-0 top-full mt-2 w-72 border border-slate-700 rounded-2xl shadow-2xl shadow-black z-50 ring-1 ring-slate-600/50 text-left animate-fade-in flex flex-col overflow-hidden"
+                style={{
+                  backgroundColor: "#0f172a",
+                  opacity: 1,
+                  maxHeight: settingsMenuMaxHeight ? `${settingsMenuMaxHeight}px` : "calc(100vh - 5.25rem)",
+                }}
                 onClick={(e) => e.stopPropagation()}
+                onMouseMove={handleSettingsMenuMouseMove}
+                onMouseLeave={stopSettingsAutoScroll}
               >
+                {/* Top Edge Scroll Indicator (visible when options exist above) */}
+                {settingsScrollState.canScrollUp && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      settingsMenuScrollRef.current?.scrollBy({ top: -140, behavior: "smooth" });
+                    }}
+                    className="w-full py-1 px-2 flex items-center justify-center gap-1 text-[10px] font-semibold text-indigo-300 bg-slate-900/95 hover:bg-slate-800 border-b border-slate-800 shrink-0 cursor-pointer transition"
+                    title="Hover near top edge or click to scroll up"
+                  >
+                    <ChevronUp className="w-3 h-3 animate-bounce" />
+                    <span>Scroll up for more</span>
+                  </button>
+                )}
+
+                <div
+                  ref={settingsMenuScrollRef}
+                  onScroll={updateSettingsScrollIndicators}
+                  className="overflow-y-auto overscroll-contain p-2 space-y-1 settings-dropdown-scroll flex-1 min-h-0"
+                >
                 {/* 1. Print Jobs & Financial Ledger */}
                 <button
                   type="button"
@@ -2535,6 +2687,22 @@ export default function App() {
                     </p>
                   </div>
                 </button>
+                </div>
+
+                {/* Bottom Edge Scroll Indicator (visible when options exist below) */}
+                {settingsScrollState.canScrollDown && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      settingsMenuScrollRef.current?.scrollBy({ top: 140, behavior: "smooth" });
+                    }}
+                    className="w-full py-1 px-2 flex items-center justify-center gap-1 text-[10px] font-semibold text-indigo-300 bg-slate-900/95 hover:bg-slate-800 border-t border-slate-800 shrink-0 cursor-pointer transition"
+                    title="Hover near bottom edge or click to scroll down"
+                  >
+                    <ChevronDown className="w-3 h-3 animate-bounce" />
+                    <span>More options below</span>
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -4197,32 +4365,6 @@ export default function App() {
                         }`}>
                           {ord.customerType === "REMOTE" ? "🌐 Remote" : "🚶 Walk-In"}
                         </span>
-                        {ord.totalAmount !== undefined && ord.totalAmount !== null && (
-                          <span className="font-mono font-bold text-xs sm:text-sm bg-emerald-950/80 text-emerald-300 border border-emerald-700/60 px-2.5 py-0.5 rounded-full shadow-sm flex items-center gap-1 whitespace-nowrap shrink-0">
-                            💰 ₹{ord.totalAmount.toFixed(2)}
-                          </span>
-                        )}
-                        {ord.paymentStatus && (
-                          <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full border whitespace-nowrap shrink-0 ${
-                            ord.paymentStatus === "PAID"
-                              ? "bg-emerald-950 text-emerald-400 border-emerald-700/70"
-                              : ord.paymentStatus === "CREDIT"
-                              ? "bg-purple-950 text-purple-300 border-purple-700/70"
-                              : "bg-gradient-to-r from-amber-950 to-orange-950 text-amber-300 border-amber-600/80 shadow-sm"
-                          }`}>
-                            {ord.paymentStatus === "PAID"
-                              ? `✅ Paid (${ord.paymentMethod || "CASH"})`
-                              : ord.paymentStatus === "CREDIT"
-                              ? "📋 Credit"
-                              : "⏳ Unpaid"}
-                          </span>
-                        )}
-                        {ord.paymentClaim === "CLAIMED" && ord.paymentStatus !== "PAID" && (
-                          <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-cyan-950 text-cyan-300 border border-cyan-400 animate-pulse flex items-center gap-1 shadow-sm whitespace-nowrap shrink-0">
-                            <span>📱</span>
-                            <span>UPI Claimed</span>
-                          </span>
-                        )}
                       </div>
                       
                       <div className="flex items-center gap-2 shrink-0 ml-auto pl-2">
@@ -4350,15 +4492,41 @@ export default function App() {
                       </div>
                     )}
 
-                    <div className="flex items-center justify-between text-xs text-slate-400 pt-1">
-                      <div className="flex items-center gap-4">
-                        <span className="flex items-center gap-1 text-slate-300 font-medium">
+                    <div className="flex items-center justify-between gap-2 text-xs text-slate-400 pt-1 flex-wrap sm:flex-nowrap">
+                      <div className="flex items-center gap-2.5 flex-wrap min-w-0">
+                        <span className="flex items-center gap-1 text-slate-300 font-medium whitespace-nowrap">
                           <FileText className="w-3.5 h-3.5 text-indigo-400" />
                           {ord.totalFiles} {ord.totalFiles === 1 ? "File" : "Files"}
                         </span>
-                        <span>{formatBytes(ord.totalBytes)}</span>
+                        <span className="whitespace-nowrap">{formatBytes(ord.totalBytes)}</span>
+                        {ord.totalAmount !== undefined && ord.totalAmount !== null && (
+                          <span className="font-mono font-bold text-xs bg-emerald-950/80 text-emerald-300 border border-emerald-700/60 px-2 py-0.5 rounded-full shadow-sm flex items-center gap-1 whitespace-nowrap shrink-0">
+                            💰 ₹{ord.totalAmount.toFixed(2)}
+                          </span>
+                        )}
+                        {ord.paymentStatus && (
+                          <span className={`text-xs font-bold px-2 py-0.5 rounded-full border whitespace-nowrap shrink-0 ${
+                            ord.paymentStatus === "PAID"
+                              ? "bg-emerald-950 text-emerald-400 border-emerald-700/70"
+                              : ord.paymentStatus === "CREDIT"
+                              ? "bg-purple-950 text-purple-300 border-purple-700/70"
+                              : "bg-gradient-to-r from-amber-950 to-orange-950 text-amber-300 border-amber-600/80 shadow-sm"
+                          }`}>
+                            {ord.paymentStatus === "PAID"
+                              ? `✅ Paid (${ord.paymentMethod || "CASH"})`
+                              : ord.paymentStatus === "CREDIT"
+                              ? "📋 Credit"
+                              : "⏳ Unpaid"}
+                          </span>
+                        )}
+                        {ord.paymentClaim === "CLAIMED" && ord.paymentStatus !== "PAID" && (
+                          <span className="text-xs font-extrabold px-2 py-0.5 rounded-full bg-cyan-950 text-cyan-300 border border-cyan-400 animate-pulse flex items-center gap-1 shadow-sm whitespace-nowrap shrink-0">
+                            <span>📱</span>
+                            <span>UPI Claimed</span>
+                          </span>
+                        )}
                         {ord.completedAt && (
-                          <span className="text-teal-400 font-medium flex items-center gap-1">
+                          <span className="text-teal-400 font-medium flex items-center gap-1 whitespace-nowrap">
                             <Clock className="w-3 h-3" />
                             Printed: {ord.completedAt}
                           </span>
@@ -4789,37 +4957,43 @@ export default function App() {
                           )}
 
                           {/* Per-File Approval / Rejection Dual-State Segmented Switch (Only in Active Queue / Non-Completed Orders) */}
-                          {!file.isPurged && selectedOrderDetails.order.status !== "COMPLETED" && activeTab !== "PRINTED" && (
-                            <div className="flex items-center bg-slate-950 p-0.5 rounded-xl border border-slate-800 text-xs shadow-inner">
-                              <button
-                                type="button"
-                                onClick={() => isExcluded && handleToggleFileExclusion(file.fileId, true)}
-                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
-                                  !isExcluded
-                                    ? "bg-emerald-600 text-white shadow-md shadow-emerald-950 ring-1 ring-emerald-400"
-                                    : "text-slate-400 hover:text-emerald-300 hover:bg-slate-900"
-                                }`}
-                                title={!isExcluded ? "File is approved for printing" : "Click to approve this file for printing"}
-                              >
-                                <CheckCircle2 className={`w-3.5 h-3.5 ${!isExcluded ? "text-white" : "text-emerald-500"}`} />
-                                <span>{!isExcluded ? "Approved" : "Approve"}</span>
-                              </button>
+                          {!file.isPurged && selectedOrderDetails.order.status !== "COMPLETED" && activeTab !== "PRINTED" && (() => {
+                            const isOrderApproved =
+                              selectedOrderDetails.order.status === "APPROVED" ||
+                              selectedOrderDetails.order.status === "PRINTING";
+                            const isFileApproved = !isExcluded && (isOrderApproved || approvedFileIds.has(file.fileId));
+                            return (
+                              <div className="flex items-center bg-slate-950 p-0.5 rounded-xl border border-slate-800 text-xs shadow-inner">
+                                <button
+                                  type="button"
+                                  onClick={() => !isFileApproved && handleApproveSingleFile(file.fileId, isExcluded)}
+                                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                                    isFileApproved
+                                      ? "bg-emerald-600 text-white shadow-md shadow-emerald-950 ring-1 ring-emerald-400"
+                                      : "text-slate-300 hover:text-emerald-300 hover:bg-slate-900"
+                                  }`}
+                                  title={isFileApproved ? "File is approved for printing" : "Click to approve this file for printing"}
+                                >
+                                  <CheckCircle2 className={`w-3.5 h-3.5 ${isFileApproved ? "text-white" : "text-emerald-500"}`} />
+                                  <span>{isFileApproved ? "Approved" : "Approve"}</span>
+                                </button>
 
-                              <button
-                                type="button"
-                                onClick={() => !isExcluded && handleToggleFileExclusion(file.fileId, false)}
-                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
-                                  isExcluded
-                                    ? "bg-rose-600 text-white shadow-md shadow-rose-950 ring-1 ring-rose-400"
-                                    : "text-slate-400 hover:text-rose-300 hover:bg-slate-900"
-                                }`}
-                                title={isExcluded ? "File is rejected / excluded from printing" : "Click to reject / exclude this file from printing"}
-                              >
-                                <XCircle className={`w-3.5 h-3.5 ${isExcluded ? "text-white" : "text-rose-400"}`} />
-                                <span>{isExcluded ? "Rejected" : "Reject"}</span>
-                              </button>
-                            </div>
-                          )}
+                                <button
+                                  type="button"
+                                  onClick={() => !isExcluded && handleToggleFileExclusion(file.fileId, false)}
+                                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                                    isExcluded
+                                      ? "bg-rose-600 text-white shadow-md shadow-rose-950 ring-1 ring-rose-400"
+                                      : "text-slate-400 hover:text-rose-300 hover:bg-slate-900"
+                                  }`}
+                                  title={isExcluded ? "File is rejected / excluded from printing" : "Click to reject / exclude this file from printing"}
+                                >
+                                  <XCircle className={`w-3.5 h-3.5 ${isExcluded ? "text-white" : "text-rose-400"}`} />
+                                  <span>{isExcluded ? "Rejected" : "Reject"}</span>
+                                </button>
+                              </div>
+                            );
+                          })()}
                         </div>
                       </div>
 

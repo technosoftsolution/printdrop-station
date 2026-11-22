@@ -1237,6 +1237,12 @@ pub fn get_permanent_portal_url(state: State<'_, AppState>) -> Result<String, St
     let saved = state.db.get_config("permanent_portal_url")
         .map_err(|e| e.to_string())?
         .unwrap_or_default();
+    if saved.trim().is_empty() {
+        #[cfg(debug_assertions)]
+        {
+            return Ok("https://technosoftsolution.github.io/printdrop-station/connect.html".to_string());
+        }
+    }
     Ok(saved)
 }
 
