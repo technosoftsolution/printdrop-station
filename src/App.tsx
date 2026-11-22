@@ -2242,39 +2242,41 @@ export default function App() {
   return (
     <div className="h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-indigo-500 selection:text-white overflow-hidden">
       {/* Top Header */}
-      <header className="flex-shrink-0 border-b border-slate-800 bg-[#0f172a] px-4 sm:px-6 py-2 sm:py-2.5 flex flex-wrap items-center justify-between gap-2 sm:gap-3 sticky top-0 z-30 shadow-md">
+      <header className="flex-shrink-0 border-b border-slate-800 bg-[#0f172a] px-3 sm:px-5 py-2 flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 sticky top-0 z-30 shadow-md">
         {/* PrintDrop Brand & Logo Launcher (Click to Return to Home Dashboard) */}
         <div
           onClick={() => {
             setIsViewingAllHistory(false);
             setIsOrderManagementMaximized(false);
           }}
-          className="flex items-center space-x-2.5 cursor-pointer select-none group"
+          className="flex items-center space-x-2.5 cursor-pointer select-none group min-w-0 shrink"
           title="PrintDrop Home Dashboard (Click to return to home)"
         >
-          <div className="p-2 bg-indigo-600 rounded-xl text-white shadow-lg shadow-indigo-500/25 group-hover:scale-105 group-hover:bg-indigo-500 transition-all">
+          <div className="p-2 bg-indigo-600 rounded-xl text-white shadow-lg shadow-indigo-500/25 group-hover:scale-105 group-hover:bg-indigo-500 transition-all shrink-0">
             <Printer className="w-5 h-5" />
           </div>
-          <div>
-            <h1 className="text-lg font-bold tracking-tight text-white flex items-center gap-2 group-hover:text-indigo-200 transition-colors">
-              {licenseState?.shopName &&
-              licenseState.shopName.trim() !== "" &&
-              licenseState.shopName.trim() !== "PrintDrop Retail Station"
-                ? licenseState.shopName.trim()
-                : "PrintDrop"}
-              <span className="text-[10px] uppercase tracking-wider bg-indigo-900/70 text-indigo-300 border border-indigo-700/60 px-2 py-0.5 rounded-full font-semibold">
+          <div className="min-w-0">
+            <h1 className="text-base xl:text-lg font-bold tracking-tight text-white flex items-center gap-1.5 group-hover:text-indigo-200 transition-colors">
+              <span className="truncate">
+                {licenseState?.shopName &&
+                licenseState.shopName.trim() !== "" &&
+                licenseState.shopName.trim() !== "PrintDrop Retail Station"
+                  ? licenseState.shopName.trim()
+                  : "PrintDrop"}
+              </span>
+              <span className="hidden xl:inline-flex text-[10px] uppercase tracking-wider bg-indigo-900/70 text-indigo-300 border border-indigo-700/60 px-2 py-0.5 rounded-full font-semibold whitespace-nowrap shrink-0">
                 {(!licenseState || licenseState.planType === 'TRIAL') ? 'Demo Station' : 'Shopkeeper Station'}
               </span>
               {status?.version && (
                 <span
-                  className="text-[10px] font-mono bg-slate-800/90 text-slate-300 border border-slate-700/80 px-1.5 py-0.5 rounded-md font-semibold"
+                  className="text-[10px] font-mono bg-slate-800/90 text-slate-300 border border-slate-700/80 px-1.5 py-0.5 rounded-md font-semibold whitespace-nowrap shrink-0"
                   title={`PrintDrop v${status.version}`}
                 >
                   v{status.version}
                 </span>
               )}
             </h1>
-            <p className="text-[11px] text-slate-400 group-hover:text-slate-300 transition-colors">
+            <p className="text-[11px] text-slate-400 group-hover:text-slate-300 transition-colors truncate">
               {licenseState?.shopName &&
               licenseState.shopName.trim() !== "" &&
               licenseState.shopName.trim() !== "PrintDrop Retail Station"
@@ -2283,11 +2285,11 @@ export default function App() {
             </p>
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2.5">
+        <div className="flex flex-wrap lg:flex-nowrap items-center justify-end gap-1.5 xl:gap-2 shrink-0">
           {/* Active Target Printer Dropdown */}
-          <div className="flex items-center gap-1.5 bg-slate-950/80 border border-slate-800 rounded-xl px-2.5 py-1 text-xs shadow-sm">
-            <Printer className="w-3.5 h-3.5 text-indigo-400" />
-            <span className="text-slate-400 font-medium">Printer:</span>
+          <div className="flex items-center gap-1.5 bg-slate-950/80 border border-slate-800 rounded-xl px-2 py-1 text-xs shadow-sm shrink-0">
+            <Printer className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+            <span className="hidden 2xl:inline text-slate-400 font-medium">Printer:</span>
             <select
               value={selectedPrinter}
               onChange={(e) => {
@@ -2298,7 +2300,7 @@ export default function App() {
                   setTimeout(() => setErrorMsg(null), 6000);
                 }
               }}
-              className="bg-transparent text-slate-200 font-semibold focus:outline-none cursor-pointer max-w-[150px] lg:max-w-[190px] xl:max-w-[210px] truncate"
+              className="bg-transparent text-slate-200 font-semibold focus:outline-none cursor-pointer max-w-[115px] xl:max-w-[165px] 2xl:max-w-[205px] truncate"
             >
               {printers.map((p) => (
                 <option key={p.name} value={p.name} className="bg-slate-900 text-white">
@@ -2713,7 +2715,7 @@ export default function App() {
               type="button"
               onClick={() => setIsLicenseModalOpen(true)}
               title="Click to view license details & hardware ID"
-              className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 sm:px-3 py-1 rounded-full border shadow-sm transition hover:scale-105 cursor-pointer ${
+              className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border shadow-sm transition hover:scale-105 cursor-pointer whitespace-nowrap shrink-0 tabular-nums ${
                 !licenseState.isValid
                   ? 'text-red-400 bg-red-950/80 border-red-700 animate-pulse'
                   : licenseState.isLicenseGraceActive
@@ -2757,9 +2759,9 @@ export default function App() {
           )}
 
           {/* Real-time Internet Connectivity & 4G/5G Tunnel Pill */}
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 shrink-0">
             <span
-              className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 sm:px-3 py-1 rounded-full border shadow-sm transition ${
+              className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border shadow-sm transition whitespace-nowrap shrink-0 ${
                 isInternetOnline === false
                   ? "text-amber-300 bg-amber-950/80 border-amber-600 animate-pulse"
                   : isInternetOnline === true && tunnelInfo?.isActive
@@ -3306,7 +3308,7 @@ export default function App() {
           </div>
         ) : (
         /* Primary Row: QR Code Box + Incoming Orders Queue */
-        <div className="grid grid-cols-1 lg:grid-cols-[510px_1fr] xl:grid-cols-[540px_1fr] gap-6 flex-1 min-h-0">
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(320px,34%)_1fr] xl:grid-cols-[minmax(380px,35%)_1fr] 2xl:grid-cols-[440px_1fr] gap-4 xl:gap-6 flex-1 min-h-0">
           {/* Customer Connect & QR Box - Optimal width (~510-540px) ensuring Desk Poster & tabs fit cleanly without cutting */}
           <div className="w-full max-w-[540px] mx-auto lg:mx-0 bg-gradient-to-b from-slate-900/90 to-slate-900/50 border border-slate-800/90 rounded-3xl p-3 sm:p-4 xl:p-5 flex flex-col justify-between text-center shadow-xl relative overflow-hidden self-start">
             {/* Top Bar: Navigation Tabs & Poster Launcher */}
@@ -4358,12 +4360,22 @@ export default function App() {
                         <span className="text-xs bg-slate-800/90 text-slate-400 px-2 py-0.5 rounded font-mono whitespace-nowrap shrink-0">
                           Rev {ord.revisionNumber}
                         </span>
-                        <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full border whitespace-nowrap shrink-0 ${
+                        <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full border inline-flex items-center gap-1 whitespace-nowrap shrink-0 ${
                           ord.customerType === "REMOTE"
                             ? "bg-cyan-950/70 text-cyan-300 border-cyan-800/60"
                             : "bg-slate-900 text-slate-300 border-slate-700/60"
                         }`}>
-                          {ord.customerType === "REMOTE" ? "🌐 Remote" : "🚶 Walk-In"}
+                          {ord.customerType === "REMOTE" ? (
+                            <>
+                              <Globe className="w-3 h-3 text-cyan-400" />
+                              <span>Remote</span>
+                            </>
+                          ) : (
+                            <>
+                              <User className="w-3 h-3 text-slate-400" />
+                              <span>Walk-In</span>
+                            </>
+                          )}
                         </span>
                       </div>
                       
@@ -4500,28 +4512,40 @@ export default function App() {
                         </span>
                         <span className="whitespace-nowrap">{formatBytes(ord.totalBytes)}</span>
                         {ord.totalAmount !== undefined && ord.totalAmount !== null && (
-                          <span className="font-mono font-bold text-xs bg-emerald-950/80 text-emerald-300 border border-emerald-700/60 px-2 py-0.5 rounded-full shadow-sm flex items-center gap-1 whitespace-nowrap shrink-0">
-                            💰 ₹{ord.totalAmount.toFixed(2)}
+                          <span className="font-mono tabular-nums font-bold text-xs bg-emerald-950/80 text-emerald-300 border border-emerald-700/60 px-2 py-0.5 rounded-full shadow-sm inline-flex items-center gap-1 whitespace-nowrap shrink-0">
+                            <IndianRupee className="w-3 h-3 text-emerald-400" />
+                            <span>{ord.totalAmount.toFixed(2)}</span>
                           </span>
                         )}
                         {ord.paymentStatus && (
-                          <span className={`text-xs font-bold px-2 py-0.5 rounded-full border whitespace-nowrap shrink-0 ${
+                          <span className={`text-xs font-bold px-2 py-0.5 rounded-full border inline-flex items-center gap-1 whitespace-nowrap shrink-0 ${
                             ord.paymentStatus === "PAID"
                               ? "bg-emerald-950 text-emerald-400 border-emerald-700/70"
                               : ord.paymentStatus === "CREDIT"
                               ? "bg-purple-950 text-purple-300 border-purple-700/70"
                               : "bg-gradient-to-r from-amber-950 to-orange-950 text-amber-300 border-amber-600/80 shadow-sm"
                           }`}>
-                            {ord.paymentStatus === "PAID"
-                              ? `✅ Paid (${ord.paymentMethod || "CASH"})`
-                              : ord.paymentStatus === "CREDIT"
-                              ? "📋 Credit"
-                              : "⏳ Unpaid"}
+                            {ord.paymentStatus === "PAID" ? (
+                              <>
+                                <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                                <span>Paid ({ord.paymentMethod || "CASH"})</span>
+                              </>
+                            ) : ord.paymentStatus === "CREDIT" ? (
+                              <>
+                                <FileText className="w-3 h-3 text-purple-300" />
+                                <span>Credit</span>
+                              </>
+                            ) : (
+                              <>
+                                <Clock className="w-3 h-3 text-amber-400" />
+                                <span>Unpaid</span>
+                              </>
+                            )}
                           </span>
                         )}
                         {ord.paymentClaim === "CLAIMED" && ord.paymentStatus !== "PAID" && (
-                          <span className="text-xs font-extrabold px-2 py-0.5 rounded-full bg-cyan-950 text-cyan-300 border border-cyan-400 animate-pulse flex items-center gap-1 shadow-sm whitespace-nowrap shrink-0">
-                            <span>📱</span>
+                          <span className="text-xs font-extrabold px-2 py-0.5 rounded-full bg-cyan-950 text-cyan-300 border border-cyan-400 animate-pulse inline-flex items-center gap-1 shadow-sm whitespace-nowrap shrink-0">
+                            <Smartphone className="w-3 h-3 text-cyan-300" />
                             <span>UPI Claimed</span>
                           </span>
                         )}

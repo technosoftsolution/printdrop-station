@@ -282,7 +282,30 @@ pub fn run() {
             commands::start_remote_support_session,
             commands::stop_remote_support_session,
         ])
-        .setup(|_app| {
+        .setup(|app| {
+            use tauri::Manager;
+            // Monitor-aware startup window clamping: prevent the default 1280x700 window
+            // from overflowing low-res laptops (1024x768, 1366x768 @ 125% Windows scaling).
+            if let Some(win) = app.get_webview_window("main") {
+                if let Ok(Some(monitor)) = win.current_monitor() {
+                    let scale = monitor.scale_factor();
+                    let phys = monitor.size();
+                    let logical_w = (phys.width as f64) / scale;
+                    let logical_h = (phys.height as f64) / scale;
+                    let max_w = (logical_w * 0.94).max(780.0);
+                    let max_h = (logical_h * 0.88).max(540.0);
+                    if 1280.0 > max_w || 700.0 > max_h {
+                        let target_w = 1280.0_f64.min(max_w);
+                        let target_h = 700.0_f64.min(max_h);
+                        let _ = win.set_size(tauri::Size::Logical(tauri::LogicalSize::new(target_w, target_h)));
+                        let _ = win.center();
+                        info!(
+                            "Clamped startup window to {:.0}x{:.0} logical px for {:.0}x{:.0} monitor (scale {:.2})",
+                            target_w, target_h, logical_w, logical_h, scale
+                        );
+                    }
+                }
+            }
             info!("PrintDrop Tauri 2 desktop setup hook completed.");
             Ok(())
         })
