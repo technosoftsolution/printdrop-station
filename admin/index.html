@@ -634,7 +634,7 @@
             <label class="block text-[11px] font-semibold text-slate-300 mb-1.5">Select Commercial Plan Preset</label>
             <select id="wizPlanPreset" onchange="handleWizPlanChange()" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
               <optgroup label="Free Trial">
-                <option value="TRIAL">Free Trial Evaluation (Default 14 Days / 300 Pages)</option>
+                <option value="TRIAL">Free Trial Evaluation (Default 30 Days / 300 Pages)</option>
               </optgroup>
               <optgroup label="Model A: Pay-As-You-Go Page Packs (No Expiration)">
                 <option value="WALLET_200">Micro Starter: 200 Pages (₹80 ~40p/pg)</option>
@@ -935,7 +935,7 @@
           <div class="space-y-1.5">
             <div class="flex items-center justify-between">
               <label class="text-[11px] font-semibold text-slate-300">Extend Trial Validity By (Days):</label>
-              <span class="text-[10px] text-slate-400">Default: 14 days</span>
+              <span id="drwTrialDefaultDaysLabel" class="text-[10px] text-slate-400">Default: 30 days</span>
             </div>
             <div class="flex items-center gap-2">
               <input
@@ -1726,6 +1726,32 @@
       </div>
 
       <div class="p-6 space-y-6 text-xs overflow-y-auto flex-1">
+        <!-- Section 0: Dynamic Free Trial Evaluation Policy -->
+        <div class="p-4 rounded-2xl bg-gradient-to-r from-amber-950/35 via-slate-950/80 to-slate-950/80 border border-amber-500/35 space-y-3">
+          <div class="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-800">
+            <div>
+              <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                <i data-lucide="timer" class="w-4 h-4 text-amber-400"></i>
+                <span>0. Default Free Trial Evaluation Policy (Dynamic)</span>
+              </h3>
+              <p class="text-[11px] text-slate-400">Controls default trial validity for new stations, Onboarding Wizard, and Partner Launch Kit flyers (default: 30 days / 1 Month).</p>
+            </div>
+            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/35">Cloud Dynamic</span>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-[11px] font-bold text-amber-200 mb-1">Default Free Trial Duration (Days)</label>
+              <input id="cfgDefaultTrialDays" type="number" min="1" max="365" value="30" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-amber-500/40 text-white font-bold font-mono focus:outline-none focus:border-amber-400" />
+              <p class="text-[10px] text-slate-400 mt-0.5">30 days = 1 Month (change anytime)</p>
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold text-amber-200 mb-1">Default Free Trial Test Pages</label>
+              <input id="cfgDefaultTrialPages" type="number" min="10" max="100000" value="300" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-amber-500/40 text-white font-bold font-mono focus:outline-none focus:border-amber-400" />
+              <p class="text-[10px] text-slate-400 mt-0.5">Default test print quota during evaluation</p>
+            </div>
+          </div>
+        </div>
+
         <!-- Section 1: Unlimited Time Subscription Plans -->
         <div class="p-4 rounded-2xl bg-slate-950/70 border border-blue-500/30 space-y-3">
           <div class="flex items-center justify-between pb-2 border-b border-slate-800">
@@ -3317,7 +3343,7 @@
         } else if (isStationTrial && isExpired) {
           statusBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-950 text-red-400 border border-red-800">Trial Expired</span>`;
         } else if (isStationTrial) {
-          statusBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">Free Trial (${daysRemaining !== null ? `${daysRemaining}d left` : '14d'})</span>`;
+          statusBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">Free Trial (${daysRemaining !== null ? `${daysRemaining}d left` : `${getDefaultTrialPolicy().defaultDays}d`})</span>`;
         } else if (isExpired && !hasWallet) {
           statusBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-950 text-red-400 border border-red-800">Expired</span>`;
         } else if (isExpired && hasWallet) {
@@ -3951,14 +3977,15 @@
         return;
       }
 
+      const trialPolicy = getDefaultTrialPolicy();
       let planType = 'TRIAL';
       let pagesGranted = null;
-      let durationDays = 14;
+      let durationDays = trialPolicy.defaultDays;
 
       if (preset === 'TRIAL') {
         planType = 'TRIAL';
-        pagesGranted = 300;
-        durationDays = 14;
+        pagesGranted = trialPolicy.defaultPages;
+        durationDays = trialPolicy.defaultDays;
       } else if (preset === 'CUSTOM_WALLET') {
         planType = 'WALLET_PAGES';
         pagesGranted = parseInt(document.getElementById('wizCustomPages').value, 10) || 1000;
@@ -5593,8 +5620,17 @@
       refreshAdminPlanSelectors();
     }
 
+    function getDefaultTrialPolicy() {
+      const days = Math.max(1, parseInt(commercialCatalog?.trialPolicy?.defaultDays, 10) || 30);
+      const pages = Math.max(10, parseInt(commercialCatalog?.trialPolicy?.defaultPages, 10) || 300);
+      return { defaultDays: days, defaultPages: pages };
+    }
+
     function refreshAdminPlanSelectors() {
       if (!commercialCatalog || !Array.isArray(commercialCatalog.plans)) return;
+      const trialPolicy = getDefaultTrialPolicy();
+      const lbl = document.getElementById('drwTrialDefaultDaysLabel');
+      if (lbl) lbl.innerText = `Default: ${trialPolicy.defaultDays} days`;
       const activeUnlimited = commercialCatalog.plans.filter(p => p.category === 'UNLIMITED' && p.isActive !== false);
       const activeWallet = commercialCatalog.plans.filter(p => p.category === 'WALLET' && p.isActive !== false);
 
@@ -5614,7 +5650,7 @@
       if (wizSelect) {
         wizSelect.innerHTML = `
           <optgroup label="Free Trial">
-            <option value="TRIAL" data-amount="0" data-pages="300" data-days="14">Free Trial Evaluation (Default 14 Days / 300 Pages)</option>
+            <option value="TRIAL" data-amount="0" data-pages="${trialPolicy.defaultPages}" data-days="${trialPolicy.defaultDays}">Free Trial Evaluation (Default ${trialPolicy.defaultDays} Days / ${trialPolicy.defaultPages} Pages)</option>
           </optgroup>
           <optgroup label="Model A: Pay-As-You-Go Page Packs (No Expiration)">
             ${activeWallet.map(p => `<option value="${escapeHtml(p.code)}" data-amount="${p.amount}" data-pages="${p.pages || 500}">${escapeHtml(p.name)} (₹${p.amount} • ${escapeHtml(p.perMonthOrPage || '')})</option>`).join('')}
@@ -5642,6 +5678,12 @@
     }
 
     function renderCommercialPlansEditor() {
+      const trialPolicy = getDefaultTrialPolicy();
+      const tdEl = document.getElementById('cfgDefaultTrialDays');
+      const tpEl = document.getElementById('cfgDefaultTrialPages');
+      if (tdEl) tdEl.value = String(trialPolicy.defaultDays);
+      if (tpEl) tpEl.value = String(trialPolicy.defaultPages);
+
       const unlimContainer = document.getElementById('unlimitedPlansEditorList');
       const walletContainer = document.getElementById('walletPacksEditorList');
       if (!unlimContainer || !walletContainer) return;
@@ -5888,6 +5930,10 @@
         tier4Rate: tier4Rate,
         tier5Rate: tier5Rate,
         quickPicks: quickPicks.length > 0 ? quickPicks : [200, 500, 2000, 5000, 10000]
+      };
+      commercialCatalog.trialPolicy = {
+        defaultDays: Math.max(1, Math.min(365, parseInt(document.getElementById('cfgDefaultTrialDays')?.value, 10) || 30)),
+        defaultPages: Math.max(10, Math.min(100000, parseInt(document.getElementById('cfgDefaultTrialPages')?.value, 10) || 300))
       };
       commercialCatalog.updatedAt = new Date().toISOString();
 
