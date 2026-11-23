@@ -207,15 +207,25 @@
       <div class="space-y-1 min-w-0">
         <div class="flex flex-wrap items-center gap-2">
           <h2 id="dashPartnerName" class="text-base font-extrabold text-white">Partner Name</h2>
-          <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">Active Partner</span>
+          <span id="dashTierBadge" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-300 border border-orange-400/40 whitespace-nowrap">Bronze Partner</span>
+          <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 whitespace-nowrap">Active</span>
         </div>
         <div id="dashPartnerMeta" class="text-xs text-slate-300 flex flex-wrap items-center gap-x-3 gap-y-1">
-          <span>📍 City</span>
+          <span>Location</span>
           <span>•</span>
           <span>UPI: Not set</span>
         </div>
         <div id="dashShareRuleText" class="text-[11px] text-violet-200/90 tabular-nums">
-          Revenue Share: <strong>0% First Sale</strong> &bull; <strong>0% Renewal</strong> &bull; Payout Cycle: Monthly on 5th
+          Sub First Sale: <strong>40%</strong> &bull; Sub Renewal: <strong>20%</strong> &bull; Page Wallet: <strong>20%</strong>
+        </div>
+        <div id="dashTierProgressWrap" class="hidden pt-1 max-w-md space-y-1">
+          <div class="flex items-center justify-between text-[10px] text-slate-400 tabular-nums">
+            <span id="dashTierProgressLabel">Progress to next tier</span>
+            <span id="dashTierProgressPct" class="font-mono text-violet-300 font-bold">0%</span>
+          </div>
+          <div class="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
+            <div id="dashTierProgressBar" class="h-full rounded-full bg-gradient-to-r from-violet-500 to-amber-400 transition-all" style="width: 0%"></div>
+          </div>
         </div>
       </div>
 
@@ -638,10 +648,46 @@
         <span class="text-slate-600">&bull;</span>
         <span class="inline-flex items-center gap-1"><i data-lucide="qr-code" class="w-3.5 h-3.5 text-emerald-400 shrink-0"></i>UPI: <strong class="font-mono text-slate-200">${escapeHtml(p.upi_id || 'Not configured')}</strong></span>
       `;
+      const tierBadge = document.getElementById('dashTierBadge');
+      if (tierBadge) {
+        const tId = p.tier_id || 'BRONZE';
+        const tName = p.tier_name || 'Bronze';
+        tierBadge.innerText = `${tName} Partner`;
+        tierBadge.className = tId === 'GOLD'
+          ? 'text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-400/40 whitespace-nowrap'
+          : tId === 'SILVER'
+          ? 'text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-400/20 text-slate-200 border border-slate-400/40 whitespace-nowrap'
+          : tId === 'CUSTOM'
+          ? 'text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-200 border border-violet-400/40 whitespace-nowrap'
+          : 'text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-300 border border-orange-400/40 whitespace-nowrap';
+      }
+
       document.getElementById('dashShareRuleText').innerHTML =
-        `Revenue Share: <strong class="text-white">${Number(p.effective_first_sale_rate || 0)}% First Sale</strong> &bull; <strong class="text-white">${Number(p.effective_renewal_rate || 0)}% Renewal</strong>` +
-        (Number(p.deduction_percent || 0) > 0 ? ` &bull; Net after ${Number(p.deduction_percent)}% fee/tax` : '') +
-        ` &bull; Payout Cycle: <strong class="text-white">${escapeHtml(p.payout_cycle_note || 'Monthly')}</strong>`;
+        `Sub First Sale: <strong class="text-white">${Number(p.effective_first_sale_rate || 0)}%</strong> &bull; Sub Renewal: <strong class="text-white">${Number(p.effective_renewal_rate || 0)}%</strong> &bull; Page Wallet: <strong class="text-white">${Number(p.effective_wallet_rate ?? p.effective_renewal_rate ?? 0)}%</strong>` +
+        (Number(p.deduction_percent || 0) > 0 ? ` &bull; Net after ${Number(p.deduction_percent)}% fee` : '') +
+        ` &bull; Cycle: <strong class="text-white">${escapeHtml(p.payout_cycle_note || 'Monthly')}</strong>`;
+
+      const progWrap = document.getElementById('dashTierProgressWrap');
+      if (progWrap) {
+        const nextT = p.next_tier;
+        const activePaid = Number(p.active_paid_shops || 0);
+        if (nextT && Number(nextT.min_shops || 0) > activePaid) {
+          const target = Number(nextT.min_shops);
+          const remaining = target - activePaid;
+          const pct = Math.min(100, Math.round((activePaid / target) * 100));
+          document.getElementById('dashTierProgressLabel').innerText = `${activePaid}/${target} paid shops — ${remaining} more to unlock ${nextT.name} (${nextT.first_sale_rate}% / ${nextT.renewal_rate}% / ${nextT.wallet_rate}%)`;
+          document.getElementById('dashTierProgressPct').innerText = `${pct}%`;
+          document.getElementById('dashTierProgressBar').style.width = `${pct}%`;
+          progWrap.classList.remove('hidden');
+        } else if (p.tier_id === 'GOLD') {
+          document.getElementById('dashTierProgressLabel').innerText = `Gold Tier Unlocked (${activePaid} active paid shops) — Top share rates active!`;
+          document.getElementById('dashTierProgressPct').innerText = '100%';
+          document.getElementById('dashTierProgressBar').style.width = '100%';
+          progWrap.classList.remove('hidden');
+        } else {
+          progWrap.classList.add('hidden');
+        }
+      }
 
       const waLink = document.getElementById('providerSupportWhatsApp');
       const provPhone = cleanPhone(prov.whatsapp || prov.phone || '');

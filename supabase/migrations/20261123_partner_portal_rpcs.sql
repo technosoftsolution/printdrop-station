@@ -85,6 +85,12 @@ DECLARE
   v_provider JSONB;
   v_eff_first NUMERIC(5,2);
   v_eff_renew NUMERIC(5,2);
+  v_eff_wallet NUMERIC(5,2);
+  v_active_paid_shops INTEGER := 0;
+  v_tier_name TEXT := 'Bronze';
+  v_tier_id TEXT := 'BRONZE';
+  v_next_tier JSONB := NULL;
+  v_tier_elem JSONB;
   v_shops JSONB;
   v_comms JSONB;
   v_payouts JSONB;
@@ -137,15 +143,45 @@ BEGIN
     v_provider := (v_provider #>> '{}')::jsonb;
   END IF;
 
-  v_eff_first := CASE
-    WHEN v_partner.use_global_rates THEN COALESCE((v_rules->>'first_sale_rate')::numeric, 0)
-    ELSE COALESCE(v_partner.first_sale_rate, (v_rules->>'first_sale_rate')::numeric, 0)
-  END;
+  -- Count active paid shops for dynamic tier calculation
+  SELECT COUNT(*)::int INTO v_active_paid_shops
+  FROM public.licenses
+  WHERE partner_id = v_partner.id
+    AND is_installed IS DISTINCT FROM false
+    AND is_active IS DISTINCT FROM false
+    AND plan_type IS DISTINCT FROM 'TRIAL'
+    AND (expires_at IS NULL OR expires_at > NOW() OR COALESCE(pages_granted, 0) > 0);
 
-  v_eff_renew := CASE
-    WHEN v_partner.use_global_rates THEN COALESCE((v_rules->>'renewal_rate')::numeric, 0)
-    ELSE COALESCE(v_partner.renewal_rate, (v_rules->>'renewal_rate')::numeric, 0)
-  END;
+  -- Resolve dynamic tier from system_config.tiers (sorted ascending by min_shops)
+  v_eff_first := COALESCE((v_rules->>'first_sale_rate')::numeric, 40);
+  v_eff_renew := COALESCE((v_rules->>'renewal_rate')::numeric, 20);
+  v_eff_wallet := COALESCE((v_rules->>'wallet_rate')::numeric, v_eff_renew);
+
+  IF v_rules->'tiers' IS NOT NULL AND jsonb_typeof(v_rules->'tiers') = 'array' THEN
+    FOR v_tier_elem IN
+      SELECT elem FROM jsonb_array_elements(v_rules->'tiers') AS elem
+      ORDER BY COALESCE((elem->>'min_shops')::int, 0) ASC
+    LOOP
+      IF v_active_paid_shops >= COALESCE((v_tier_elem->>'min_shops')::int, 0) THEN
+        v_tier_id := COALESCE(v_tier_elem->>'id', 'BRONZE');
+        v_tier_name := COALESCE(v_tier_elem->>'name', 'Bronze');
+        v_eff_first := COALESCE((v_tier_elem->>'first_sale_rate')::numeric, v_eff_first);
+        v_eff_renew := COALESCE((v_tier_elem->>'renewal_rate')::numeric, v_eff_renew);
+        v_eff_wallet := COALESCE((v_tier_elem->>'wallet_rate')::numeric, v_eff_renew);
+      ELSIF v_next_tier IS NULL THEN
+        v_next_tier := v_tier_elem;
+      END IF;
+    END LOOP;
+  END IF;
+
+  IF NOT v_partner.use_global_rates THEN
+    v_tier_id := 'CUSTOM';
+    v_tier_name := 'Custom';
+    v_eff_first := COALESCE(v_partner.first_sale_rate, v_eff_first);
+    v_eff_renew := COALESCE(v_partner.renewal_rate, v_eff_renew);
+    v_eff_wallet := COALESCE(v_partner.wallet_rate, v_partner.renewal_rate, v_eff_wallet);
+    v_next_tier := NULL;
+  END IF;
 
   -- Sanitized shopkeepers list for THIS partner only (no HWID, no signature, no technical internals)
   SELECT COALESCE(jsonb_agg(
@@ -228,8 +264,14 @@ BEGIN
       'data_sync_request_note', v_partner.data_sync_request_note,
       'data_sync_approved_at', v_partner.data_sync_approved_at,
       'use_global_rates', v_partner.use_global_rates,
+      'tier_id', v_tier_id,
+      'tier_name', v_tier_name,
+      'active_paid_shops', v_active_paid_shops,
+      'next_tier', v_next_tier,
+      'all_tiers', COALESCE(v_rules->'tiers', '[]'::jsonb),
       'effective_first_sale_rate', v_eff_first,
       'effective_renewal_rate', v_eff_renew,
+      'effective_wallet_rate', v_eff_wallet,
       'deduction_percent', COALESCE((v_rules->>'deduction_percent')::numeric, 0),
       'min_payout_threshold', COALESCE((v_rules->>'min_payout_threshold')::numeric, 500),
       'payout_cycle_note', COALESCE(v_rules->>'payout_cycle_note', 'Monthly on 5th')

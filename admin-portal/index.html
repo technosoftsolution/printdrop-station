@@ -4825,7 +4825,7 @@
               grossAmount: Number(s.amount_paid || 0),
               paymentRef: s.payment_reference || 'ONLINE-VERIFIED',
               invoiceNumber: invNo,
-              isRenewal: existingHistory.length > 1
+              isRenewal: existingHistory.slice(1).some(h => h.status !== 'CANCELLED' && String(h.plan_code || '').startsWith('SUB_'))
             });
           } catch (commErr) {
             console.warn('[Partner Commission] Auto-record skipped:', commErr);
@@ -6296,11 +6296,17 @@
     let partnerCommissions = [];
     let partnerPayouts = [];
     let partnerGlobalRules = {
-      first_sale_rate: 0,
-      renewal_rate: 0,
-      deduction_percent: 0,
+      first_sale_rate: 40,
+      renewal_rate: 20,
+      wallet_rate: 20,
+      deduction_percent: 2.5,
       min_payout_threshold: 500,
-      payout_cycle_note: 'Monthly on 5th'
+      payout_cycle_note: 'Monthly on 5th',
+      tiers: [
+        { id: 'BRONZE', name: 'Bronze', min_shops: 0, first_sale_rate: 40, renewal_rate: 20, wallet_rate: 20 },
+        { id: 'SILVER', name: 'Silver', min_shops: 11, first_sale_rate: 45, renewal_rate: 25, wallet_rate: 25 },
+        { id: 'GOLD', name: 'Gold', min_shops: 31, first_sale_rate: 50, renewal_rate: 30, wallet_rate: 30 }
+      ]
     };
     let editingPartnerId = null;
     let activePartnerDetailId = null;
@@ -6323,16 +6329,60 @@
       }
     }
 
+    function getNormalizedPartnerTiers() {
+      const defaults = [
+        { id: 'BRONZE', name: 'Bronze', min_shops: 0, first_sale_rate: 40, renewal_rate: 20, wallet_rate: 20 },
+        { id: 'SILVER', name: 'Silver', min_shops: 11, first_sale_rate: 45, renewal_rate: 25, wallet_rate: 25 },
+        { id: 'GOLD', name: 'Gold', min_shops: 31, first_sale_rate: 50, renewal_rate: 30, wallet_rate: 30 }
+      ];
+      const raw = Array.isArray(partnerGlobalRules.tiers) && partnerGlobalRules.tiers.length === 3
+        ? partnerGlobalRules.tiers
+        : defaults;
+      return [...raw].sort((a, b) => Number(a.min_shops || 0) - Number(b.min_shops || 0));
+    }
+
+    function getPartnerActivePaidShopCount(partnerId) {
+      if (!partnerId) return 0;
+      const now = Date.now();
+      return partnerAllLicenses.filter(l => {
+        if (l.partner_id !== partnerId || l.is_installed === false || l.is_active === false || l.plan_type === 'TRIAL') return false;
+        const expMs = l.expires_at ? new Date(l.expires_at).getTime() : null;
+        return !expMs || expMs > now || Number(l.pages_granted || 0) > 0;
+      }).length;
+    }
+
     function getPartnerEffectiveRates(partner) {
       const useGlobal = !partner || partner.use_global_rates !== false;
-      const firstRate = useGlobal
-        ? Number(partnerGlobalRules.first_sale_rate || 0)
-        : Number(partner.first_sale_rate ?? partnerGlobalRules.first_sale_rate ?? 0);
-      const renewRate = useGlobal
-        ? Number(partnerGlobalRules.renewal_rate || 0)
-        : Number(partner.renewal_rate ?? partnerGlobalRules.renewal_rate ?? 0);
       const deductionPct = Number(partnerGlobalRules.deduction_percent || 0);
-      return { useGlobal, firstRate, renewRate, deductionPct };
+      const activePaid = partner ? getPartnerActivePaidShopCount(partner.id) : 0;
+      const tiers = getNormalizedPartnerTiers();
+      let matchedTier = tiers[0];
+      for (const t of tiers) {
+        if (activePaid >= Number(t.min_shops || 0)) matchedTier = t;
+      }
+
+      if (!useGlobal) {
+        return {
+          useGlobal: false,
+          tierId: 'CUSTOM',
+          tierName: 'Custom',
+          activePaid,
+          firstRate: Number(partner.first_sale_rate ?? matchedTier.first_sale_rate ?? 0),
+          renewRate: Number(partner.renewal_rate ?? matchedTier.renewal_rate ?? 0),
+          walletRate: Number(partner.wallet_rate ?? partner.renewal_rate ?? matchedTier.wallet_rate ?? 0),
+          deductionPct
+        };
+      }
+      return {
+        useGlobal: true,
+        tierId: matchedTier.id || 'BRONZE',
+        tierName: matchedTier.name || 'Bronze',
+        activePaid,
+        firstRate: Number(matchedTier.first_sale_rate ?? partnerGlobalRules.first_sale_rate ?? 0),
+        renewRate: Number(matchedTier.renewal_rate ?? partnerGlobalRules.renewal_rate ?? 0),
+        walletRate: Number(matchedTier.wallet_rate ?? matchedTier.renewal_rate ?? 0),
+        deductionPct
+      };
     }
 
     function populatePartnerDropdowns() {
@@ -6372,7 +6422,9 @@
       const el = document.getElementById('partnerGlobalRulesSummary');
       if (!el) return;
       const r = partnerGlobalRules;
-      el.innerHTML = `First Sale: <strong class="text-white">${Number(r.first_sale_rate || 0)}%</strong> &bull; Renewal: <strong class="text-white">${Number(r.renewal_rate || 0)}%</strong> &bull; Tax/Gateway Deduction: <strong class="text-white">${Number(r.deduction_percent || 0)}%</strong> &bull; Min Payout: <strong class="text-white">₹${Number(r.min_payout_threshold || 0).toLocaleString()}</strong> &bull; Cycle: <strong class="text-white">${escapeHtml(r.payout_cycle_note || 'Monthly')}</strong>`;
+      const tiers = getNormalizedPartnerTiers();
+      const tierStr = tiers.map(t => `${t.name} (${t.min_shops}+): <strong class="text-white">${t.first_sale_rate}%/${t.renewal_rate}%/${t.wallet_rate}%</strong>`).join(' &bull; ');
+      el.innerHTML = `${tierStr} <span class="text-slate-500">(Sub 1st / Renew / Wallet)</span> &bull; Deduction: <strong class="text-white">${Number(r.deduction_percent || 0)}%</strong> &bull; Min Payout: <strong class="text-white">₹${Number(r.min_payout_threshold || 0).toLocaleString()}</strong>`;
     }
 
     async function loadMarketingData(showSpinner = false) {
@@ -6522,8 +6574,11 @@
             ${st.shops.length > 0 ? `<button type="button" onclick="event.stopPropagation(); filterFleetByPartner('${p.id}')" class="mt-1 text-[10px] font-bold text-violet-300 hover:text-violet-200 underline cursor-pointer">View in Fleet →</button>` : ''}
           </td>
           <td class="py-3 px-4">
-            <div class="font-semibold ${rates.useGlobal ? 'text-slate-200' : 'text-amber-300'}">${rates.firstRate}% First / ${rates.renewRate}% Renew</div>
-            <div class="text-[10px] text-slate-400">${rates.useGlobal ? 'Global Default' : 'Custom Partner Rate'}</div>
+            <div class="flex items-center gap-1.5">
+              <span class="px-1.5 py-0.5 rounded text-[10px] font-bold ${rates.tierId === 'GOLD' ? 'bg-amber-500/20 text-amber-300 border border-amber-400/40' : rates.tierId === 'SILVER' ? 'bg-slate-400/20 text-slate-200 border border-slate-400/40' : rates.tierId === 'CUSTOM' ? 'bg-violet-500/20 text-violet-200 border border-violet-400/40' : 'bg-orange-500/20 text-orange-300 border border-orange-400/40'}">${escapeHtml(rates.tierName)}</span>
+              <span class="font-semibold text-slate-200">${rates.firstRate}% / ${rates.renewRate}% / ${rates.walletRate}%</span>
+            </div>
+            <div class="text-[10px] text-slate-400 mt-0.5">${rates.useGlobal ? 'Sub 1st / Renew / Wallet' : 'Custom Partner Override'}</div>
           </td>
           <td class="py-3 px-4">
             <div class="font-bold text-emerald-400">₹${Math.round(st.clientRevenue).toLocaleString('en-IN')}</div>
@@ -6556,9 +6611,24 @@
     }
 
     function openPartnerRulesModal() {
-      document.getElementById('ruleFirstSaleRate').value = String(partnerGlobalRules.first_sale_rate ?? 0);
-      document.getElementById('ruleRenewalRate').value = String(partnerGlobalRules.renewal_rate ?? 0);
-      document.getElementById('ruleDeductionPct').value = String(partnerGlobalRules.deduction_percent ?? 0);
+      const tiers = getNormalizedPartnerTiers();
+      const [b, s, g] = tiers;
+      document.getElementById('tierBronzeMin').value = String(b.min_shops ?? 0);
+      document.getElementById('tierBronzeFirst').value = String(b.first_sale_rate ?? 40);
+      document.getElementById('tierBronzeRenew').value = String(b.renewal_rate ?? 20);
+      document.getElementById('tierBronzeWallet').value = String(b.wallet_rate ?? 20);
+
+      document.getElementById('tierSilverMin').value = String(s.min_shops ?? 11);
+      document.getElementById('tierSilverFirst').value = String(s.first_sale_rate ?? 45);
+      document.getElementById('tierSilverRenew').value = String(s.renewal_rate ?? 25);
+      document.getElementById('tierSilverWallet').value = String(s.wallet_rate ?? 25);
+
+      document.getElementById('tierGoldMin').value = String(g.min_shops ?? 31);
+      document.getElementById('tierGoldFirst').value = String(g.first_sale_rate ?? 50);
+      document.getElementById('tierGoldRenew').value = String(g.renewal_rate ?? 30);
+      document.getElementById('tierGoldWallet').value = String(g.wallet_rate ?? 30);
+
+      document.getElementById('ruleDeductionPct').value = String(partnerGlobalRules.deduction_percent ?? 2.5);
       document.getElementById('ruleMinPayout').value = String(partnerGlobalRules.min_payout_threshold ?? 500);
       document.getElementById('rulePayoutCycle').value = partnerGlobalRules.payout_cycle_note || 'Monthly on 5th';
       document.getElementById('partnerRulesModal').classList.remove('hidden');
@@ -6571,12 +6641,22 @@
 
     async function savePartnerGlobalRules(event) {
       event.preventDefault();
+      const pct = (id) => Math.max(0, Math.min(100, parseFloat(document.getElementById(id).value) || 0));
+      const num = (id) => Math.max(0, parseInt(document.getElementById(id).value, 10) || 0);
+      const tiers = [
+        { id: 'BRONZE', name: 'Bronze', min_shops: num('tierBronzeMin'), first_sale_rate: pct('tierBronzeFirst'), renewal_rate: pct('tierBronzeRenew'), wallet_rate: pct('tierBronzeWallet') },
+        { id: 'SILVER', name: 'Silver', min_shops: num('tierSilverMin'), first_sale_rate: pct('tierSilverFirst'), renewal_rate: pct('tierSilverRenew'), wallet_rate: pct('tierSilverWallet') },
+        { id: 'GOLD', name: 'Gold', min_shops: num('tierGoldMin'), first_sale_rate: pct('tierGoldFirst'), renewal_rate: pct('tierGoldRenew'), wallet_rate: pct('tierGoldWallet') }
+      ].sort((a, b) => a.min_shops - b.min_shops);
+
       const payload = {
-        first_sale_rate: Math.max(0, Math.min(100, parseFloat(document.getElementById('ruleFirstSaleRate').value) || 0)),
-        renewal_rate: Math.max(0, Math.min(100, parseFloat(document.getElementById('ruleRenewalRate').value) || 0)),
+        first_sale_rate: tiers[0].first_sale_rate,
+        renewal_rate: tiers[0].renewal_rate,
+        wallet_rate: tiers[0].wallet_rate,
         deduction_percent: Math.max(0, Math.min(50, parseFloat(document.getElementById('ruleDeductionPct').value) || 0)),
         min_payout_threshold: Math.max(0, parseFloat(document.getElementById('ruleMinPayout').value) || 0),
-        payout_cycle_note: (document.getElementById('rulePayoutCycle').value || 'Monthly on 5th').trim()
+        payout_cycle_note: (document.getElementById('rulePayoutCycle').value || 'Monthly on 5th').trim(),
+        tiers
       };
       const cleanUrl = (cloudConfig?.url || '').trim().replace(/\/$/, '');
       const res = await fetch(`${cleanUrl}/rest/v1/system_config?on_conflict=key`, {
@@ -6597,7 +6677,7 @@
       updateGlobalRulesBanner();
       renderMarketingPartnersTable();
       closePartnerRulesModal();
-      alert('✓ Dynamic global partnership share rules saved to cloud!');
+      alert('✓ Dynamic 3-Tier partnership share slabs saved to cloud!');
     }
 
     function togglePartnerCustomRatesUi() {
@@ -6698,8 +6778,9 @@
       document.getElementById('pfPasswordHint').innerText = p ? 'Leave blank to keep current password' : 'Min 6 chars (hashed with salt before saving)';
       document.getElementById('pfStatus').value = p?.status || 'ACTIVE';
       document.getElementById('pfUseGlobalRates').checked = p ? (p.use_global_rates !== false) : true;
-      document.getElementById('pfFirstSaleRate').value = p?.first_sale_rate ?? partnerGlobalRules.first_sale_rate ?? 0;
-      document.getElementById('pfRenewalRate').value = p?.renewal_rate ?? partnerGlobalRules.renewal_rate ?? 0;
+      document.getElementById('pfFirstSaleRate').value = p?.first_sale_rate ?? partnerGlobalRules.first_sale_rate ?? 40;
+      document.getElementById('pfRenewalRate').value = p?.renewal_rate ?? partnerGlobalRules.renewal_rate ?? 20;
+      document.getElementById('pfWalletRate').value = p?.wallet_rate ?? p?.renewal_rate ?? partnerGlobalRules.wallet_rate ?? 20;
       document.getElementById('pfUpiId').value = p?.upi_id || '';
       document.getElementById('pfPanNumber').value = p?.pan_number || '';
       document.getElementById('pfBankDetails').value = p?.bank_details || '';
@@ -6744,6 +6825,7 @@
         use_global_rates: useGlobal,
         first_sale_rate: useGlobal ? null : Math.max(0, Math.min(100, parseFloat(document.getElementById('pfFirstSaleRate').value) || 0)),
         renewal_rate: useGlobal ? null : Math.max(0, Math.min(100, parseFloat(document.getElementById('pfRenewalRate').value) || 0)),
+        wallet_rate: useGlobal ? null : Math.max(0, Math.min(100, parseFloat(document.getElementById('pfWalletRate').value) || 0)),
         upi_id: document.getElementById('pfUpiId').value.trim() || null,
         pan_number: document.getElementById('pfPanNumber').value.trim().toUpperCase() || null,
         bank_details: document.getElementById('pfBankDetails').value.trim() || null,
@@ -6793,7 +6875,9 @@
       const partner = getPartnerById(partnerId);
       if (!partner || partner.status !== 'ACTIVE') return;
       const rates = getPartnerEffectiveRates(partner);
-      const ratePct = isRenewal ? rates.renewRate : rates.firstRate;
+      const isWallet = String(planCode || '').toUpperCase().startsWith('WALLET');
+      const ratePct = isWallet ? rates.walletRate : (isRenewal ? rates.renewRate : rates.firstRate);
+      const payType = isWallet ? 'WALLET_TOPUP' : (isRenewal ? 'RENEWAL' : 'FIRST_SALE');
       if (ratePct <= 0 || grossAmount <= 0) return;
 
       const deductionAmt = Math.round((grossAmount * (rates.deductionPct / 100)) * 100) / 100;
@@ -6814,7 +6898,7 @@
           shop_name: shopName,
           plan_code: planCode,
           plan_name: planName,
-          payment_type: isRenewal ? 'RENEWAL' : 'FIRST_SALE',
+          payment_type: payType,
           payment_ref: paymentRef || null,
           invoice_number: invoiceNumber || null,
           gross_amount: grossAmount,
@@ -6823,7 +6907,7 @@
           rate_percent: ratePct,
           commission_amount: commAmt,
           status: 'APPROVED',
-          notes: `Auto-recorded on payment verification (${rates.useGlobal ? 'Global' : 'Custom'} ${ratePct}%)`
+          notes: `Auto-recorded (${rates.tierName} ${ratePct}% • ${payType})`
         })
       });
       loadMarketingData(false);
@@ -7005,6 +7089,18 @@
         body: JSON.stringify({ revoked_at: new Date().toISOString() })
       });
       if (!silent) alert(`✓ All active sessions revoked for ${p.full_name}.`);
+    }
+
+    function onManualCommTypeChange() {
+      const p = getPartnerById(activePartnerDetailId);
+      if (!p) return;
+      const rates = getPartnerEffectiveRates(p);
+      const t = document.getElementById('pdCommType')?.value || 'FIRST_SALE';
+      const inp = document.getElementById('pdCommRateInput');
+      if (!inp) return;
+      if (t === 'FIRST_SALE') inp.value = String(rates.firstRate);
+      else if (t === 'RENEWAL') inp.value = String(rates.renewRate);
+      else if (t === 'WALLET_TOPUP') inp.value = String(rates.walletRate);
     }
 
     async function submitManualCommissionEntry(event) {
@@ -7349,32 +7445,59 @@
     </div>
   </div>
   <!-- ========================================================================= -->
-  <!-- MODAL: DYNAMIC GLOBAL PARTNERSHIP SHARE RULES                             -->
+  <!-- MODAL: DYNAMIC 3-TIER GLOBAL PARTNERSHIP SHARE SLABS                      -->
   <!-- ========================================================================= -->
   <div id="partnerRulesModal" class="fixed inset-0 z-[130] hidden bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 no-print">
-    <div class="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden">
+    <div class="w-full max-w-2xl bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
       <div class="px-5 py-4 border-b border-slate-800 bg-slate-950/70 flex items-center justify-between">
         <div class="flex items-center gap-2.5">
           <div class="p-2 rounded-lg bg-violet-500/20 text-violet-300"><i data-lucide="percent" class="w-5 h-5"></i></div>
           <div>
-            <h2 class="text-sm font-bold text-white">Dynamic Global Share Rules</h2>
-            <p class="text-[11px] text-slate-400">Applies to all partners using Global Default (never hardcoded)</p>
+            <h2 class="text-sm font-bold text-white">Dynamic 3-Tier Partnership Share Slabs</h2>
+            <p class="text-[11px] text-slate-400">100% cloud-configurable across Subscriptions &amp; Per-Page Wallets (never hardcoded)</p>
           </div>
         </div>
         <button type="button" onclick="closePartnerRulesModal()" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer"><i data-lucide="x" class="w-4 h-4"></i></button>
       </div>
-      <form onsubmit="savePartnerGlobalRules(event)" class="p-5 space-y-3.5 text-xs">
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="block text-[11px] font-bold text-slate-300 mb-1">First Sale Share (%)</label>
-            <input id="ruleFirstSaleRate" type="number" step="0.5" min="0" max="100" required class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white focus:outline-none focus:border-violet-500" />
-          </div>
-          <div>
-            <label class="block text-[11px] font-bold text-slate-300 mb-1">Renewal Share (%)</label>
-            <input id="ruleRenewalRate" type="number" step="0.5" min="0" max="100" required class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white focus:outline-none focus:border-violet-500" />
-          </div>
+      <form onsubmit="savePartnerGlobalRules(event)" class="p-5 overflow-y-auto admin-scroll space-y-4 text-xs">
+        <div class="overflow-x-auto rounded-xl border border-slate-800">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead class="bg-slate-950 text-slate-400 text-[10px] uppercase">
+              <tr>
+                <th class="py-2.5 px-3">Partner Tier</th>
+                <th class="py-2.5 px-3">Min Paid Shops</th>
+                <th class="py-2.5 px-3">Sub First Sale %</th>
+                <th class="py-2.5 px-3">Sub Renewal %</th>
+                <th class="py-2.5 px-3">Page Wallet %</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-800/80">
+              <tr class="bg-slate-900/60">
+                <td class="py-2.5 px-3 font-bold text-orange-300">Bronze</td>
+                <td class="py-2 px-3"><input id="tierBronzeMin" type="number" min="0" required class="w-20 px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-white font-mono" /></td>
+                <td class="py-2 px-3"><input id="tierBronzeFirst" type="number" step="0.5" min="0" max="100" required class="w-20 px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-white font-mono" /></td>
+                <td class="py-2 px-3"><input id="tierBronzeRenew" type="number" step="0.5" min="0" max="100" required class="w-20 px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-white font-mono" /></td>
+                <td class="py-2 px-3"><input id="tierBronzeWallet" type="number" step="0.5" min="0" max="100" required class="w-20 px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-white font-mono" /></td>
+              </tr>
+              <tr class="bg-slate-900/60">
+                <td class="py-2.5 px-3 font-bold text-slate-200">Silver</td>
+                <td class="py-2 px-3"><input id="tierSilverMin" type="number" min="1" required class="w-20 px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-white font-mono" /></td>
+                <td class="py-2 px-3"><input id="tierSilverFirst" type="number" step="0.5" min="0" max="100" required class="w-20 px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-white font-mono" /></td>
+                <td class="py-2 px-3"><input id="tierSilverRenew" type="number" step="0.5" min="0" max="100" required class="w-20 px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-white font-mono" /></td>
+                <td class="py-2 px-3"><input id="tierSilverWallet" type="number" step="0.5" min="0" max="100" required class="w-20 px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-white font-mono" /></td>
+              </tr>
+              <tr class="bg-slate-900/60">
+                <td class="py-2.5 px-3 font-bold text-amber-300">Gold</td>
+                <td class="py-2 px-3"><input id="tierGoldMin" type="number" min="1" required class="w-20 px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-white font-mono" /></td>
+                <td class="py-2 px-3"><input id="tierGoldFirst" type="number" step="0.5" min="0" max="100" required class="w-20 px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-white font-mono" /></td>
+                <td class="py-2 px-3"><input id="tierGoldRenew" type="number" step="0.5" min="0" max="100" required class="w-20 px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-white font-mono" /></td>
+                <td class="py-2 px-3"><input id="tierGoldWallet" type="number" step="0.5" min="0" max="100" required class="w-20 px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-white font-mono" /></td>
+              </tr>
+            </tbody>
+          </table>
         </div>
-        <div class="grid grid-cols-2 gap-3">
+        <p class="text-[10px] text-slate-400">Upgrading a shop from a Per-Page Wallet to its first Unlimited Subscription automatically earns the partner's <strong>Sub First Sale %</strong>.</p>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
             <label class="block text-[11px] font-bold text-slate-300 mb-1">Tax / Gateway Deduction (%)</label>
             <input id="ruleDeductionPct" type="number" step="0.5" min="0" max="50" required class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white focus:outline-none focus:border-violet-500" />
@@ -7384,14 +7507,14 @@
             <label class="block text-[11px] font-bold text-slate-300 mb-1">Min Payout Threshold (₹)</label>
             <input id="ruleMinPayout" type="number" step="50" min="0" required class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white focus:outline-none focus:border-violet-500" />
           </div>
+          <div>
+            <label class="block text-[11px] font-bold text-slate-300 mb-1">Payout Cycle Note</label>
+            <input id="rulePayoutCycle" type="text" placeholder="e.g. Monthly on 5th" class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white focus:outline-none focus:border-violet-500" />
+          </div>
         </div>
-        <div>
-          <label class="block text-[11px] font-bold text-slate-300 mb-1">Payout Cycle Note</label>
-          <input id="rulePayoutCycle" type="text" placeholder="e.g. Monthly on 5th" class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white focus:outline-none focus:border-violet-500" />
-        </div>
-        <div class="flex justify-end gap-2 pt-2">
+        <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
           <button type="button" onclick="closePartnerRulesModal()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold cursor-pointer">Cancel</button>
-          <button type="submit" class="px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-bold shadow-lg shadow-violet-600/25 cursor-pointer">Save Global Rules</button>
+          <button type="submit" class="px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-bold shadow-lg shadow-violet-600/25 cursor-pointer">Save Dynamic Slabs</button>
         </div>
       </form>
     </div>
@@ -7489,14 +7612,18 @@
             <span class="font-bold text-violet-200">Use Global Default Share Rules</span>
             <span class="text-[10px] text-slate-400">(Uncheck to assign custom % for this partner)</span>
           </label>
-          <div id="pfCustomRatesBox" class="hidden grid grid-cols-2 gap-3 pt-1">
+          <div id="pfCustomRatesBox" class="hidden grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
             <div>
-              <label class="block text-[11px] font-semibold text-slate-300 mb-1">Custom First Sale Share (%)</label>
+              <label class="block text-[11px] font-semibold text-slate-300 mb-1">Sub First Sale (%)</label>
               <input id="pfFirstSaleRate" type="number" step="0.5" min="0" max="100" class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-violet-500" />
             </div>
             <div>
-              <label class="block text-[11px] font-semibold text-slate-300 mb-1">Custom Renewal Share (%)</label>
+              <label class="block text-[11px] font-semibold text-slate-300 mb-1">Sub Renewal (%)</label>
               <input id="pfRenewalRate" type="number" step="0.5" min="0" max="100" class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-violet-500" />
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-300 mb-1">Page Wallet (%)</label>
+              <input id="pfWalletRate" type="number" step="0.5" min="0" max="100" class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-violet-500" />
             </div>
           </div>
         </div>
@@ -7647,9 +7774,10 @@
             </div>
             <div>
               <label class="block text-[10px] font-bold text-slate-400 mb-1">Type</label>
-              <select id="pdCommType" class="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs">
-                <option value="FIRST_SALE">First Sale</option>
-                <option value="RENEWAL">Renewal</option>
+              <select id="pdCommType" onchange="onManualCommTypeChange()" class="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs">
+                <option value="FIRST_SALE">Sub First Sale</option>
+                <option value="RENEWAL">Sub Renewal</option>
+                <option value="WALLET_TOPUP">Page Wallet</option>
                 <option value="ADJUSTMENT">Adjustment</option>
               </select>
             </div>
