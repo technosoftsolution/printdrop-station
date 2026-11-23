@@ -116,8 +116,9 @@
       </div>
 
       <div class="flex flex-nowrap items-center gap-1.5 sm:gap-2 shrink-0">
-        <button type="button" onclick="refreshDashboard(true)" class="min-h-[40px] min-w-[40px] p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition cursor-pointer flex items-center justify-center shrink-0" title="Refresh Sales Data">
-          <i id="hdrRefreshIcon" data-lucide="refresh-cw" class="w-4 h-4"></i>
+        <button type="button" onclick="refreshDashboard(true)" class="min-h-[40px] flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 text-xs font-bold border border-slate-700 transition cursor-pointer whitespace-nowrap shrink-0" title="Fetch latest shopkeepers, revenue share &amp; payouts">
+          <i id="hdrRefreshIcon" data-lucide="refresh-cw" class="w-3.5 h-3.5 text-emerald-400"></i>
+          <span>Refresh</span>
         </button>
 
         <!-- Partner Settings Dropdown (Strictly Scoped to Partner Sales Features) -->
@@ -631,6 +632,23 @@
       renderShopsTab();
     }
 
+    function dismissPartnerSyncBanner() {
+      if (window._partnerSyncAutoHideTimer) {
+        clearTimeout(window._partnerSyncAutoHideTimer);
+        window._partnerSyncAutoHideTimer = null;
+      }
+      const p = partnerData?.partner;
+      if (p?.data_sync_approved_at) {
+        const dismissKey = `pd_dismissed_sync_${p.partner_code || 'ME'}`;
+        try { localStorage.setItem(dismissKey, p.data_sync_approved_at); } catch (_) {}
+      }
+      const syncBanner = document.getElementById('partnerSyncStatusBanner');
+      if (syncBanner) {
+        syncBanner.className = 'hidden';
+        syncBanner.innerHTML = '';
+      }
+    }
+
     function renderDashboard() {
       if (!partnerData) return;
       const p = partnerData.partner || {};
@@ -734,14 +752,25 @@
 
       const syncBanner = document.getElementById('partnerSyncStatusBanner');
       if (syncBanner) {
+        if (window._partnerSyncAutoHideTimer) {
+          clearTimeout(window._partnerSyncAutoHideTimer);
+          window._partnerSyncAutoHideTimer = null;
+        }
+        const dismissKey = `pd_dismissed_sync_${p.partner_code || 'ME'}`;
         if (p.data_sync_status === 'REQUESTED') {
           const reqDt = p.data_sync_requested_at ? new Date(p.data_sync_requested_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
-          syncBanner.className = 'p-3 rounded-2xl bg-amber-950/35 border border-amber-500/40 text-amber-200 text-xs font-semibold flex flex-wrap items-center justify-between gap-2';
+          syncBanner.className = 'p-3 rounded-2xl bg-amber-950/35 border border-amber-500/40 text-amber-200 text-xs font-semibold flex items-center justify-between gap-2';
           syncBanner.innerHTML = `<span class="inline-flex items-center gap-2"><i data-lucide="clock" class="w-4 h-4 text-amber-400 animate-pulse shrink-0"></i>Customer Data Restore / Sync Requested ${reqDt ? '(' + escapeHtml(reqDt) + ')' : ''} — Waiting for Software Provider approval.</span>`;
-        } else if (p.data_sync_status === 'SYNCED' && p.data_sync_approved_at) {
+        } else if (p.data_sync_status === 'SYNCED' && p.data_sync_approved_at && localStorage.getItem(dismissKey) !== p.data_sync_approved_at) {
           const appDt = new Date(p.data_sync_approved_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
-          syncBanner.className = 'p-3 rounded-2xl bg-emerald-950/30 border border-emerald-500/35 text-emerald-200 text-xs font-semibold flex flex-wrap items-center justify-between gap-2';
-          syncBanner.innerHTML = `<span class="inline-flex items-center gap-2"><i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400 shrink-0"></i>Verified Customer Data Synced by Software Provider (${escapeHtml(appDt)}).</span>`;
+          syncBanner.className = 'p-3 rounded-2xl bg-emerald-950/30 border border-emerald-500/35 text-emerald-200 text-xs font-semibold flex items-center justify-between gap-2';
+          syncBanner.innerHTML = `
+            <span class="inline-flex items-center gap-2"><i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400 shrink-0"></i>Verified Customer Data Synced by Software Provider (${escapeHtml(appDt)}).</span>
+            <button type="button" onclick="dismissPartnerSyncBanner()" aria-label="Dismiss notification" title="Dismiss" class="p-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/30 text-emerald-200 transition cursor-pointer shrink-0">
+              <i data-lucide="x" class="w-3.5 h-3.5"></i>
+            </button>
+          `;
+          window._partnerSyncAutoHideTimer = setTimeout(() => dismissPartnerSyncBanner(), 10000);
         } else {
           syncBanner.className = 'hidden';
           syncBanner.innerHTML = '';
