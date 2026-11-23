@@ -294,7 +294,8 @@ BEGIN
       'phone', COALESCE(v_provider->>'phone', ''),
       'whatsapp', COALESCE(v_provider->>'whatsapp', ''),
       'email', COALESCE(v_provider->>'email', ''),
-      'default_trial_days', v_trial_days
+      'default_trial_days', v_trial_days,
+      'plans', COALESCE(v_plans_cfg->'plans', '[]'::jsonb)
     ),
     'shops', v_shops,
     'commissions', v_comms,

@@ -1626,6 +1626,16 @@
       const trialLabelShort = trialDays === 30 ? '1 MONTH (30 DAYS)' : `${trialDays} DAYS`;
       const trialLabelInline = trialDays === 30 ? '1-Month (30-Day) Free Trial' : `${trialDays}-Day Free Trial`;
 
+      // Resolve live commercial plans dynamically from Supabase (never hardcoded)
+      const activePlans = (Array.isArray(prov.plans) ? prov.plans : []).filter(pl => pl && pl.isActive !== false);
+      const walletPlans = activePlans.filter(pl => pl.category === 'WALLET').sort((a, b) => Number(a.amount || 0) - Number(b.amount || 0));
+      const unlimPlans = activePlans.filter(pl => pl.category === 'UNLIMITED').sort((a, b) => Number(a.durationDays || 0) - Number(b.durationDays || 0));
+
+      const starterWallet = walletPlans[0] || { amount: 80, pages: 200 };
+      const monthlySub = unlimPlans.find(pl => pl.code === 'SUB_MONTHLY') || unlimPlans[0] || { amount: 299, durationDays: 30 };
+      const annualSub = unlimPlans.find(pl => pl.code === 'SUB_ANNUAL') || unlimPlans[unlimPlans.length - 1] || { amount: 2299, durationDays: 365 };
+      const annualPerMo = Math.round(Number(annualSub.amount || 2299) / Math.max(1, Math.round(Number(annualSub.durationDays || 365) / 30)));
+
       const btnSt = document.getElementById('lkBtnStandee');
       const btnFl = document.getElementById('lkBtnFlyer');
       const btnHi = document.getElementById('lkBtnHi');
@@ -1762,18 +1772,18 @@
             <div style="margin: 0 24px 18px; padding: 14px 18px; border-radius: 14px; background: #f8fafc; border: 1.5px solid #e2e8f0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; text-align: center;">
               <div>
                 <div style="font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase;">Pay-As-You-Go Wallet</div>
-                <div style="font-size: 18px; font-weight: 900; color: #0f172a; margin-top: 2px;">From ₹80</div>
-                <div style="font-size: 11px; color: #475569;">No Expiry • Lifetime Pages</div>
+                <div style="font-size: 18px; font-weight: 900; color: #0f172a; margin-top: 2px;">From ₹${Number(starterWallet.amount || 80).toLocaleString('en-IN')}</div>
+                <div style="font-size: 11px; color: #475569; font-weight: 600;">${Number(starterWallet.pages || 200).toLocaleString('en-IN')} Pages &bull; No Expiry</div>
               </div>
               <div style="border-left: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0;">
                 <div style="font-size: 10px; font-weight: 800; color: #4f46e5; text-transform: uppercase;">Unlimited Monthly</div>
-                <div style="font-size: 18px; font-weight: 900; color: #4f46e5; margin-top: 2px;">₹299 / mo</div>
+                <div style="font-size: 18px; font-weight: 900; color: #4f46e5; margin-top: 2px;">₹${Number(monthlySub.amount || 299).toLocaleString('en-IN')} / mo</div>
                 <div style="font-size: 11px; color: #475569;">Unlimited Prints &amp; Orders</div>
               </div>
               <div>
                 <div style="font-size: 10px; font-weight: 800; color: #059669; text-transform: uppercase;">Best Value Annual</div>
-                <div style="font-size: 18px; font-weight: 900; color: #059669; margin-top: 2px;">₹2,299 / yr</div>
-                <div style="font-size: 11px; color: #475569;">Just ₹191/month!</div>
+                <div style="font-size: 18px; font-weight: 900; color: #059669; margin-top: 2px;">₹${Number(annualSub.amount || 2299).toLocaleString('en-IN')} / yr</div>
+                <div style="font-size: 11px; color: #475569;">Just ₹${annualPerMo.toLocaleString('en-IN')}/month!</div>
               </div>
             </div>
 
