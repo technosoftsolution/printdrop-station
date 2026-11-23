@@ -1582,9 +1582,12 @@
     // --- 6. PRINTABLE BILINGUAL FIELD PARTNER LAUNCH KIT (STANDEE + PITCH FLYER) ---
     let launchKitTemplate = 'STANDEE';
     let launchKitLang = 'HI';
+    let launchKitHeadline = 'Make Your Print Counter Smart & Digital';
 
     function openLaunchKitModal(template = 'STANDEE') {
       launchKitTemplate = template;
+      const hlSel = document.getElementById('lkHeadlineSelect');
+      if (hlSel) hlSel.value = launchKitHeadline;
       renderLaunchKitSheet();
       document.getElementById('printableLaunchKitModal')?.classList.remove('hidden');
       lucide.createIcons();
@@ -1601,6 +1604,11 @@
 
     function setLaunchKitLang(lang) {
       launchKitLang = lang;
+      renderLaunchKitSheet();
+    }
+
+    function setLaunchKitHeadline(val) {
+      launchKitHeadline = val || 'Make Your Print Counter Smart & Digital';
       renderLaunchKitSheet();
     }
 
@@ -1628,6 +1636,8 @@
       if (btnFl) btnFl.className = launchKitTemplate === 'FLYER' ? act : idl;
       if (btnHi) btnHi.className = launchKitLang === 'HI' ? act : idl;
       if (btnMr) btnMr.className = launchKitLang === 'MR' ? act : idl;
+      const hlWrap = document.getElementById('lkHeadlineWrap');
+      if (hlWrap) hlWrap.classList.toggle('hidden', launchKitTemplate !== 'FLYER');
 
       const isMr = launchKitLang === 'MR';
       const copy = isMr ? {
@@ -1641,7 +1651,7 @@
         s3d: 'प्रिंट झाल्यानंतर तुमची फाइल दुकानदाराच्या PC मधून ऑटो-डिलीट होते!',
         qrHint: 'दुकानाचा स्थायी QR कोड येथे दिसेल',
         privacy: '१००% ग्राहक गोपनीयता — प्रिंट नंतर फाइल्स कायमच्या डिलीट होतात',
-        flyerSub: 'व्हॉट्सॲप वेबचा त्रास संपवा — तुमचे झेरॉक्स / प्रिंट दुकान स्मार्ट बनवा!'
+        flyerSub: 'व्हॉट्सॲप वेबचा त्रास संपवा — तुमचे प्रिंट काउंटर स्मार्ट आणि डिजिटल बनवा!'
       } : {
         noWa: 'व्हाट्सएप की जरूरत नहीं!',
         sub: '4G/5G से QR स्कैन करें • 10 सेकंड में फास्ट प्रिंट • 100% प्राइवेसी',
@@ -1653,7 +1663,7 @@
         s3d: 'प्रिंट होते ही आपकी फाइल दुकान के PC से ऑटो-डिलीट हो जाती है!',
         qrHint: 'दुकान का स्थायी QR कोड यहाँ लगेगा',
         privacy: '100% ग्राहक प्राइवेसी — प्रिंट के बाद फाइल दुकान के कंप्यूटर से डिलीट',
-        flyerSub: 'WhatsApp Web की झंझट खत्म करें — अपनी Xerox / Print दुकान को स्मार्ट बनाएं!'
+        flyerSub: 'WhatsApp Web की झंझट खत्म करें — अपने प्रिंट काउंटर को स्मार्ट और डिजिटल बनाएं!'
       };
 
       if (launchKitTemplate === 'STANDEE') {
@@ -1717,7 +1727,7 @@
               <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px;">
                 <div>
                   <div style="font-size: 11px; font-weight: 800; color: #a5b4fc; text-transform: uppercase; letter-spacing: 0.08em;">${provName}</div>
-                  <h1 style="font-size: 26px; font-weight: 900; margin: 4px 0;">Upgrade Your Xerox &amp; Print Shop Today</h1>
+                  <h1 style="font-size: 25px; font-weight: 900; margin: 4px 0;">${escapeHtml(launchKitHeadline)}</h1>
                   <div style="font-size: 13.5px; font-weight: 600; color: #fde68a;">${copy.flyerSub}</div>
                 </div>
                 <div style="background: #10b981; color: #022c22; padding: 8px 14px; border-radius: 12px; font-weight: 900; font-size: 12px; text-align: center; white-space: nowrap;">
@@ -2025,6 +2035,17 @@
           </button>
           <button type="button" onclick="closeLaunchKitModal()" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer"><i data-lucide="x" class="w-4 h-4"></i></button>
         </div>
+      </div>
+      <div id="lkHeadlineWrap" class="no-print hidden px-4 py-2.5 border-b border-slate-800 bg-slate-900/90 flex flex-wrap items-center gap-2 text-xs">
+        <label for="lkHeadlineSelect" class="font-bold text-slate-300 whitespace-nowrap">Flyer Headline:</label>
+        <select id="lkHeadlineSelect" onchange="setLaunchKitHeadline(this.value)" class="flex-1 min-w-[220px] px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-white font-semibold text-xs focus:outline-none focus:border-violet-500">
+          <option value="Make Your Print Counter Smart & Digital">Make Your Print Counter Smart &amp; Digital</option>
+          <option value="Upgrade Your Print Counter Today">Upgrade Your Print Counter Today</option>
+          <option value="Upgrade Your Document Printing Desk">Upgrade Your Document Printing Desk</option>
+          <option value="Transform Your Print Counter — Zero WhatsApp!">Transform Your Print Counter — Zero WhatsApp!</option>
+          <option value="Smart Digital Printing for Your Shop">Smart Digital Printing for Your Shop</option>
+          <option value="Faster, Smarter Digital Printing Counter">Faster, Smarter Digital Printing Counter</option>
+        </select>
       </div>
       <div class="p-4 sm:p-6 overflow-y-auto partner-scroll bg-slate-950/60">
         <div id="launchKitSheet" class="max-w-[780px] mx-auto"></div>
