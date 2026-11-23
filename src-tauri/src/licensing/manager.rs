@@ -139,7 +139,7 @@ impl LicenseManager {
             .map_err(|e| format!("DB query error: {}", e))?;
 
         if !exists {
-            info!("No existing license found. Auto-provisioning signed 14-Day Free Trial...");
+            info!("No existing license found. Auto-provisioning signed 30-Day (1 Month) Free Trial...");
             let trial = create_signed_trial_license(&self.hwid);
             let now_epoch = Utc::now().timestamp();
             let now_iso = Utc::now().to_rfc3339();

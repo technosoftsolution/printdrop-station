@@ -106,16 +106,22 @@ pub fn verify_license_signature(payload: &LicensePayload) -> bool {
     false
 }
 
-/// Creates a cryptographically signed trial license for the current machine
-pub fn create_signed_trial_license(hwid: &str) -> LicensePayload {
+/// Default free trial duration (1 month = 30 days) and test pages
+pub const DEFAULT_TRIAL_DAYS: i64 = 30;
+pub const DEFAULT_TRIAL_PAGES: u64 = 300;
+
+/// Creates a cryptographically signed trial license with dynamic duration & pages
+pub fn create_signed_trial_license_with_policy(hwid: &str, trial_days: i64, trial_pages: u64) -> LicensePayload {
+    let safe_days = trial_days.clamp(1, 365);
+    let safe_pages = trial_pages.clamp(10, 100_000);
     let now = chrono::Utc::now();
     let issued_at = now.to_rfc3339();
-    let expires_at = (now + chrono::Duration::days(14)).to_rfc3339();
+    let expires_at = (now + chrono::Duration::days(safe_days)).to_rfc3339();
 
     let canonical = format_canonical_license_string(
         hwid,
         &LicensePlanType::Trial,
-        Some(300), // 300 free test pages
+        Some(safe_pages),
         &issued_at,
         Some(&expires_at),
     );
@@ -129,7 +135,7 @@ pub fn create_signed_trial_license(hwid: &str) -> LicensePayload {
         city: None,
         phone: None,
         plan_type: LicensePlanType::Trial,
-        pages_granted: Some(300),
+        pages_granted: Some(safe_pages),
         issued_at,
         expires_at: Some(expires_at),
         signature,
@@ -139,6 +145,11 @@ pub fn create_signed_trial_license(hwid: &str) -> LicensePayload {
         payment_reference: None,
         invoice_number: None,
     }
+}
+
+/// Creates a cryptographically signed trial license for the current machine (default 30 days / 1 month)
+pub fn create_signed_trial_license(hwid: &str) -> LicensePayload {
+    create_signed_trial_license_with_policy(hwid, DEFAULT_TRIAL_DAYS, DEFAULT_TRIAL_PAGES)
 }
 
 /// Decodes an activation key into a LicensePayload and validates its cryptographic signature

@@ -83,6 +83,8 @@ DECLARE
   v_partner public.marketing_partners%ROWTYPE;
   v_rules JSONB;
   v_provider JSONB;
+  v_plans_cfg JSONB;
+  v_trial_days INTEGER := 30;
   v_eff_first NUMERIC(5,2);
   v_eff_renew NUMERIC(5,2);
   v_eff_wallet NUMERIC(5,2);
@@ -142,6 +144,17 @@ BEGIN
   IF v_provider IS NOT NULL AND jsonb_typeof(v_provider) = 'string' THEN
     v_provider := (v_provider #>> '{}')::jsonb;
   END IF;
+
+  SELECT value INTO v_plans_cfg
+  FROM public.system_config
+  WHERE key = 'commercial_plans_config'
+  LIMIT 1;
+
+  IF v_plans_cfg IS NOT NULL AND jsonb_typeof(v_plans_cfg) = 'string' THEN
+    v_plans_cfg := (v_plans_cfg #>> '{}')::jsonb;
+  END IF;
+
+  v_trial_days := COALESCE((v_plans_cfg->'trialPolicy'->>'defaultDays')::int, 30);
 
   -- Count active paid shops for dynamic tier calculation
   SELECT COUNT(*)::int INTO v_active_paid_shops
@@ -280,7 +293,8 @@ BEGIN
       'business_name', COALESCE(v_provider->>'business_name', 'TechnoSoft Solution'),
       'phone', COALESCE(v_provider->>'phone', ''),
       'whatsapp', COALESCE(v_provider->>'whatsapp', ''),
-      'email', COALESCE(v_provider->>'email', '')
+      'email', COALESCE(v_provider->>'email', ''),
+      'default_trial_days', v_trial_days
     ),
     'shops', v_shops,
     'commissions', v_comms,
