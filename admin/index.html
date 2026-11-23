@@ -5729,14 +5729,15 @@
           unlimContainer.appendChild(row);
         } else {
           const pages = plan.pages || 100;
-          const rate = plan.ratePerPage !== undefined && plan.ratePerPage !== null
-            ? plan.ratePerPage
-            : Number((plan.amount / Math.max(1, pages)).toFixed(3));
+          const exactRate = (plan.amount && pages)
+            ? Number((plan.amount / Math.max(1, pages)).toFixed(4))
+            : (plan.ratePerPage !== undefined && plan.ratePerPage !== null ? Number(plan.ratePerPage) : 0.20);
+          const paiseVal = (exactRate * 100).toFixed(2);
           const row = document.createElement('div');
           row.className = 'grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-center p-3 rounded-xl bg-slate-900 border border-slate-800';
           row.innerHTML = `
             <div class="sm:col-span-1 flex items-center gap-1.5">
-              <input type="checkbox" ${plan.isActive !== false ? 'checked' : ''} onchange="updatePlanField(${idx}, 'isActive', this.checked)" class="rounded bg-slate-950 border-slate-700 text-amber-500">
+              <input type="checkbox" ${plan.isActive !== false ? 'checked' : ''} onchange="updatePlanField(${idx}, 'isActive', this.checked)" class="rounded bg-slate-950 border border-slate-700 text-amber-500">
               <span class="text-[10px] text-slate-400">Active</span>
             </div>
             <div class="sm:col-span-3">
@@ -5748,8 +5749,8 @@
               <input type="number" min="1" id="walletPages_${idx}" value="${pages}" oninput="updateWalletPagesOrRate(${idx}, 'pages', this.value)" class="w-full px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-xs text-amber-300 font-bold">
             </div>
             <div class="sm:col-span-2">
-              <label class="block text-[10px] text-slate-400 mb-0.5">Rate / Page (₹/pg)</label>
-              <input type="number" step="0.005" min="0.01" id="walletRate_${idx}" value="${rate}" oninput="updateWalletPagesOrRate(${idx}, 'rate', this.value)" class="w-full px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-xs text-cyan-300 font-bold">
+              <label class="block text-[10px] text-slate-400 mb-0.5">Rate / Page (Paise)</label>
+              <input type="number" step="0.01" min="0.01" id="walletRate_${idx}" value="${paiseVal}" oninput="updateWalletPagesOrRate(${idx}, 'paise', this.value)" class="w-full px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-xs text-cyan-300 font-bold font-mono">
             </div>
             <div class="sm:col-span-2">
               <label class="block text-[10px] text-slate-400 mb-0.5">Pack Price (₹)</label>
@@ -5811,19 +5812,17 @@
         p.name = `${baseName} (${p.pages.toLocaleString()} Pgs)`;
         const nameInput = document.getElementById(`walletName_${idx}`);
         if (nameInput) nameInput.value = p.name;
+      } else if (field === 'paise') {
+        const paise = Math.max(0.01, parseFloat(val) || 10);
+        p.ratePerPage = Number((paise / 100).toFixed(4));
       } else {
-        p.ratePerPage = Math.max(0.01, parseFloat(val) || 0.1);
+        p.ratePerPage = Math.max(0.0001, parseFloat(val) || 0.1);
       }
       const pages = p.pages || 100;
       const rate = p.ratePerPage !== undefined ? p.ratePerPage : (p.amount / pages);
       p.amount = Math.max(1, Math.round(pages * rate));
       p.description = `${pages.toLocaleString()} Prepaid Pages • No Expiration Date`;
-      const formatPaiseLabel = (r) => {
-        if (r >= 1) return `₹${r.toFixed(2)} per page`;
-        const paise = Math.round(r * 1000) / 10;
-        return `${Number.isInteger(paise) ? paise : paise.toFixed(1)}p per page`;
-      };
-      p.perMonthOrPage = formatPaiseLabel(rate);
+      p.perMonthOrPage = rate >= 1 ? `₹${rate.toFixed(2)} per page` : `${(rate * 100).toFixed(2)}p per page`;
       const amtEl = document.getElementById(`walletAmt_${idx}`);
       if (amtEl) amtEl.value = p.amount;
     }
@@ -5834,12 +5833,11 @@
       const amt = Math.max(1, parseFloat(val) || 1);
       p.amount = amt;
       const pages = Math.max(1, p.pages || 100);
-      const rate = Number((amt / pages).toFixed(3));
+      const rate = Number((amt / pages).toFixed(4));
       p.ratePerPage = rate;
-      const paise = Math.round(rate * 1000) / 10;
-      p.perMonthOrPage = rate >= 1 ? `₹${rate.toFixed(2)} per page` : `${Number.isInteger(paise) ? paise : paise.toFixed(1)}p per page`;
+      p.perMonthOrPage = rate >= 1 ? `₹${rate.toFixed(2)} per page` : `${(rate * 100).toFixed(2)}p per page`;
       const rateEl = document.getElementById(`walletRate_${idx}`);
-      if (rateEl) rateEl.value = Number(rate.toFixed(3));
+      if (rateEl) rateEl.value = (rate * 100).toFixed(2);
     }
 
     function addUnlimitedPlanRow() {
