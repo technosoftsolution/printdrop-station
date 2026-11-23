@@ -181,15 +181,26 @@
   <main id="dashboardMain" class="safe-main hidden flex-1 max-w-6xl w-full mx-auto px-3 sm:px-6 py-4 sm:py-5 space-y-4 sm:space-y-5">
 
     <!-- Offline Backup Read-Only Snapshot Banner -->
-    <div id="offlineArchiveBanner" class="hidden p-3.5 rounded-2xl bg-cyan-950/45 border border-cyan-500/45 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+    <div id="offlineArchiveBanner" class="hidden p-3.5 rounded-2xl bg-cyan-950/45 border border-cyan-500/45 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
       <div class="flex items-center gap-2.5 text-xs text-cyan-200">
         <i data-lucide="archive" class="w-4 h-4 text-cyan-400 shrink-0"></i>
         <span id="offlineArchiveText">Viewing Offline Backup Snapshot (Read-Only)</span>
       </div>
-      <button type="button" onclick="exitOfflineArchiveMode()" class="px-3 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold shrink-0 cursor-pointer">
-        Return to Live Cloud Data
-      </button>
+      <div class="flex flex-wrap items-center gap-2 shrink-0">
+        <button type="button" onclick="restoreProfileFromOfflineSnapshot()" class="min-h-[36px] px-3 py-1.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold cursor-pointer">
+          Restore Profile to Live
+        </button>
+        <button type="button" onclick="downloadExcelPartnerBackup()" class="min-h-[36px] px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold cursor-pointer">
+          Export Snapshot Excel
+        </button>
+        <button type="button" onclick="exitOfflineArchiveMode()" class="min-h-[36px] px-3 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold cursor-pointer">
+          Return to Live Cloud Data
+        </button>
+      </div>
     </div>
+
+    <!-- Partner Data Sync Status Pill (Requested / Synced by Provider) -->
+    <div id="partnerSyncStatusBanner" class="hidden p-3 rounded-2xl text-xs font-semibold flex flex-wrap items-center justify-between gap-2"></div>
 
     <!-- Partner Profile & Dynamic Share Rule Strip -->
     <div class="p-4 rounded-2xl bg-gradient-to-r from-slate-900 via-violet-950/35 to-slate-900 border border-violet-500/25 shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-3">
@@ -672,6 +683,22 @@
           expBanner.classList.remove('hidden');
         } else {
           expBanner.classList.add('hidden');
+        }
+      }
+
+      const syncBanner = document.getElementById('partnerSyncStatusBanner');
+      if (syncBanner) {
+        if (p.data_sync_status === 'REQUESTED') {
+          const reqDt = p.data_sync_requested_at ? new Date(p.data_sync_requested_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+          syncBanner.className = 'p-3 rounded-2xl bg-amber-950/35 border border-amber-500/40 text-amber-200 text-xs font-semibold flex flex-wrap items-center justify-between gap-2';
+          syncBanner.innerHTML = `<span class="inline-flex items-center gap-2"><i data-lucide="clock" class="w-4 h-4 text-amber-400 animate-pulse shrink-0"></i>Customer Data Restore / Sync Requested ${reqDt ? '(' + escapeHtml(reqDt) + ')' : ''} — Waiting for Software Provider approval.</span>`;
+        } else if (p.data_sync_status === 'SYNCED' && p.data_sync_approved_at) {
+          const appDt = new Date(p.data_sync_approved_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+          syncBanner.className = 'p-3 rounded-2xl bg-emerald-950/30 border border-emerald-500/35 text-emerald-200 text-xs font-semibold flex flex-wrap items-center justify-between gap-2';
+          syncBanner.innerHTML = `<span class="inline-flex items-center gap-2"><i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400 shrink-0"></i>Verified Customer Data Synced by Software Provider (${escapeHtml(appDt)}).</span>`;
+        } else {
+          syncBanner.className = 'hidden';
+          syncBanner.innerHTML = '';
         }
       }
 
@@ -1299,6 +1326,56 @@
       document.getElementById('offlineArchiveBanner')?.classList.add('hidden');
     }
 
+    async function restoreProfileFromOfflineSnapshot() {
+      const p = partnerData?.partner;
+      const token = sessionStorage.getItem(TOKEN_STORAGE_KEY);
+      if (!p || !token) return;
+      if (!confirm('Restore your Profile & Payout Details (Phone, Email, UPI, Bank, PAN) from this offline snapshot to the live portal?\n\nNote: Shopkeeper & commission records remain protected by the Software Provider.')) return;
+      try {
+        const res = await callPartnerRpc('partner_portal_update_profile', {
+          p_token: token,
+          p_phone: p.phone || '',
+          p_email: p.email || '',
+          p_upi_id: p.upi_id || '',
+          p_bank_details: p.bank_details || '',
+          p_pan_number: p.pan_number || ''
+        });
+        if (!res?.ok) {
+          alert(`Profile restore failed: ${res?.error || 'Unknown error'}`);
+          return;
+        }
+        livePartnerDataBackup = null;
+        document.getElementById('offlineArchiveBanner')?.classList.add('hidden');
+        await refreshDashboard(true);
+        alert('✓ Your Profile & Payout Details have been restored to the live portal!');
+      } catch (err) {
+        alert(`Profile restore failed: ${err.message}`);
+      }
+    }
+
+    async function submitPartnerDataSyncRequest() {
+      const statusEl = document.getElementById('pbStatus');
+      const note = (document.getElementById('pbSyncNote')?.value || '').trim();
+      const token = sessionStorage.getItem(TOKEN_STORAGE_KEY);
+      if (!token) return;
+      if (statusEl) statusEl.innerText = 'Sending request to Software Provider...';
+      try {
+        const res = await callPartnerRpc('partner_portal_request_data_sync', {
+          p_token: token,
+          p_note: note
+        });
+        if (!res?.ok) {
+          if (statusEl) statusEl.innerText = `❌ ${res?.error || 'Request failed.'}`;
+          return;
+        }
+        if (document.getElementById('pbSyncNote')) document.getElementById('pbSyncNote').value = '';
+        if (statusEl) statusEl.innerText = '✅ Request sent! The Software Provider will see your request flashing on the Admin Portal.';
+        await refreshDashboard(false);
+      } catch (err) {
+        if (statusEl) statusEl.innerText = `❌ Request failed: ${err.message}`;
+      }
+    }
+
     // --- 3. SELF-SERVICE PROFILE & PAYOUT DETAILS ---
     function openPartnerProfileModal() {
       const p = partnerData?.partner || {};
@@ -1499,6 +1576,18 @@
           </div>
           <button type="button" onclick="loadEncryptedPartnerBackup()" class="w-full py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold cursor-pointer">
             Decrypt &amp; View Offline Snapshot
+          </button>
+        </div>
+
+        <!-- Request Provider to Restore / Sync Customers Data -->
+        <div class="p-3.5 rounded-xl bg-amber-950/20 border border-amber-500/35 space-y-2.5">
+          <div>
+            <div class="font-bold text-amber-300">Request Customer Data Restore / Sync</div>
+            <div class="text-[11px] text-slate-400">Notify the Software Provider to verify &amp; push your shopkeepers list to your live portal</div>
+          </div>
+          <input id="pbSyncNote" type="text" maxlength="200" placeholder="Optional note (e.g. Missing 2 shops or verify client list)" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-amber-400" />
+          <button type="button" onclick="submitPartnerDataSyncRequest()" class="w-full py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-slate-950 font-extrabold cursor-pointer">
+            Request to Download / Restore Customers Data
           </button>
         </div>
 

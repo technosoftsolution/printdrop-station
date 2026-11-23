@@ -295,6 +295,7 @@
           <i data-lucide="users" class="w-3.5 h-3.5 text-violet-400"></i>
           <span>Marketing Partners</span>
           <span id="tabPartnersCount" class="px-1.5 py-0.5 rounded-full text-[10px] bg-violet-500/20 text-violet-300 font-mono">0</span>
+          <span id="tabPartnersSyncBadge" class="hidden px-1.5 py-0.5 rounded-full text-[10px] bg-amber-500/25 text-amber-300 border border-amber-400/50 font-bold animate-pulse">🔔 0 Req</span>
         </button>
       </div>
 
@@ -6407,6 +6408,16 @@
 
         const countEl = document.getElementById('tabPartnersCount');
         if (countEl) countEl.innerText = String(marketingPartners.length);
+        const syncReqCount = marketingPartners.filter(p => p.data_sync_status === 'REQUESTED').length;
+        const syncBadgeEl = document.getElementById('tabPartnersSyncBadge');
+        if (syncBadgeEl) {
+          if (syncReqCount > 0) {
+            syncBadgeEl.innerText = `🔔 ${syncReqCount} Sync Req`;
+            syncBadgeEl.classList.remove('hidden');
+          } else {
+            syncBadgeEl.classList.add('hidden');
+          }
+        }
 
         updateGlobalRulesBanner();
         populatePartnerDropdowns();
@@ -6485,8 +6496,9 @@
       filtered.forEach(p => {
         const st = computePartnerStats(p.id);
         const rates = getPartnerEffectiveRates(p);
+        const isSyncRequested = p.data_sync_status === 'REQUESTED';
         const tr = document.createElement('tr');
-        tr.className = 'hover:bg-slate-800/40 transition cursor-pointer';
+        tr.className = `${isSyncRequested ? 'bg-amber-950/20 border-l-2 border-l-amber-400 ' : ''}hover:bg-slate-800/40 transition cursor-pointer`;
         tr.onclick = (e) => {
           if (e.target.closest('button') || e.target.closest('a')) return;
           openPartnerDetailModal(p.id);
@@ -6496,6 +6508,7 @@
             <div class="font-bold text-white text-xs flex items-center gap-1.5 flex-wrap">
               <span>${escapeHtml(p.full_name)}</span>
               <span class="font-mono text-[10px] px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-300 border border-violet-500/35">${escapeHtml(p.partner_code)}</span>
+              ${isSyncRequested ? `<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/25 text-amber-300 border border-amber-400/60 animate-pulse" title="${escapeHtml(p.data_sync_request_note || 'Partner requested Customer Data Restore / Sync')}">🔔 Data Restore Requested</span>` : ''}
             </div>
             <div class="text-[10px] text-slate-400 mt-0.5">📍 ${escapeHtml(p.city || 'City not set')}${p.territory ? ` &bull; ${escapeHtml(p.territory)}` : ''}</div>
           </td>
@@ -6866,6 +6879,19 @@
         if (sec) sec.classList.toggle('hidden', activePartnerDetailTab !== t);
       });
 
+      // Populate Data Sync / Restore Request Banner & Push Customers Checklist
+      const syncBox = document.getElementById('pdDataSyncRequestBox');
+      if (syncBox) {
+        if (p.data_sync_status === 'REQUESTED') {
+          const reqAt = p.data_sync_requested_at ? new Date(p.data_sync_requested_at).toLocaleString('en-IN') : 'Just now';
+          document.getElementById('pdDataSyncMeta').innerText = `Requested at ${reqAt}${p.data_sync_request_note ? ' • Note: "' + p.data_sync_request_note + '"' : ''}`;
+          syncBox.classList.remove('hidden');
+        } else {
+          syncBox.classList.add('hidden');
+        }
+      }
+      renderPartnerPushChecklist(p, st.shops);
+
       // Populate shops table
       const shopsTbody = document.getElementById('pdShopsTableBody');
       if (shopsTbody) {
@@ -7069,6 +7095,101 @@
       document.getElementById('pdPayoutPeriod').value = '';
       await loadMarketingData(false);
       alert(`✓ Payout of ₹${amount.toLocaleString('en-IN')} recorded for ${p.full_name}!`);
+    }
+
+    function togglePartnerPushPanel() {
+      document.getElementById('pdPushCustomersPanel')?.classList.toggle('hidden');
+    }
+
+    function renderPartnerPushChecklist(partner, assignedShops) {
+      const listEl = document.getElementById('pdPushChecklist');
+      if (!listEl) return;
+      const assignedHwids = new Set(assignedShops.map(s => s.hwid));
+      const unassigned = (stations || []).filter(s => !s.partner_id && s.is_installed !== false);
+      const combined = [
+        ...assignedShops.map(s => ({ ...s, _preAssigned: true })),
+        ...unassigned.filter(s => !assignedHwids.has(s.hwid)).map(s => ({ ...s, _preAssigned: false }))
+      ];
+
+      if (combined.length === 0) {
+        listEl.innerHTML = '<div class="text-slate-500 text-[11px] py-2">No active shopkeepers available in fleet.</div>';
+        return;
+      }
+
+      listEl.innerHTML = combined.map(s => {
+        const cleanShop = (s.shop_name || 'Retail Station').replace(/\s*\((Trial|Trial Mode)\)\s*/gi, '').trim();
+        return `
+          <label class="flex items-center justify-between gap-2 p-2 rounded-lg bg-slate-900/90 border ${s._preAssigned ? 'border-violet-500/40' : 'border-slate-800'} hover:border-violet-500/60 cursor-pointer">
+            <div class="flex items-center gap-2 min-w-0">
+              <input type="checkbox" class="pd-push-shop-cb rounded border-slate-600 text-violet-500" value="${escapeHtml(s.hwid)}" ${s._preAssigned ? 'checked' : ''} />
+              <div class="min-w-0">
+                <div class="font-bold text-white truncate">${escapeHtml(cleanShop)}</div>
+                <div class="text-[10px] text-slate-400 truncate">${escapeHtml(s.owner_name || 'Owner')} &bull; ${escapeHtml(s.city || 'No city')}</div>
+              </div>
+            </div>
+            <span class="text-[9px] font-bold px-1.5 py-0.5 rounded whitespace-nowrap ${s._preAssigned ? 'bg-violet-500/20 text-violet-300' : 'bg-slate-800 text-slate-400'}">${s._preAssigned ? 'Linked' : 'Direct'}</span>
+          </label>
+        `;
+      }).join('');
+    }
+
+    function selectAllPartnerPushCheckboxes(checked) {
+      document.querySelectorAll('.pd-push-shop-cb').forEach(cb => { cb.checked = checked; });
+    }
+
+    async function approveAndPushPartnerCustomers() {
+      const p = getPartnerById(activePartnerDetailId);
+      if (!p) return;
+      const checkedHwids = Array.from(document.querySelectorAll('.pd-push-shop-cb:checked')).map(cb => cb.value);
+      const cleanUrl = (cloudConfig?.url || '').trim().replace(/\/$/, '');
+      const headers = {
+        'apikey': cloudConfig.key,
+        'Authorization': `Bearer ${cloudConfig.key}`,
+        'Content-Type': 'application/json'
+      };
+      const nowIso = new Date().toISOString();
+
+      try {
+        // Assign any newly checked unassigned shops to this partner
+        const currentlyAssigned = new Set(partnerAllLicenses.filter(l => l.partner_id === p.id).map(l => l.hwid));
+        const toAssign = checkedHwids.filter(h => !currentlyAssigned.has(h));
+        for (const hwid of toAssign) {
+          await fetch(`${cleanUrl}/rest/v1/licenses?hwid=eq.${encodeURIComponent(hwid)}`, {
+            method: 'PATCH',
+            headers,
+            body: JSON.stringify({ partner_id: p.id, partner_attributed_at: nowIso })
+          });
+        }
+
+        // Mark sync request as SYNCED & approved
+        const res = await fetch(`${cleanUrl}/rest/v1/marketing_partners?id=eq.${p.id}`, {
+          method: 'PATCH',
+          headers,
+          body: JSON.stringify({
+            data_sync_status: 'SYNCED',
+            data_sync_approved_at: nowIso,
+            updated_at: nowIso
+          })
+        });
+        if (!res.ok) throw new Error(await res.text());
+
+        await Promise.all([loadMarketingData(false), loadStations()]);
+        alert(`✓ Verified Customer Data (${checkedHwids.length} shop${checkedHwids.length === 1 ? '' : 's'}) pushed to ${p.full_name}'s live Sales Portal!`);
+      } catch (err) {
+        alert(`Failed to push customer data: ${err.message}`);
+      }
+    }
+
+    async function dismissPartnerSyncRequest() {
+      const p = getPartnerById(activePartnerDetailId);
+      if (!p) return;
+      const cleanUrl = (cloudConfig?.url || '').trim().replace(/\/$/, '');
+      await fetch(`${cleanUrl}/rest/v1/marketing_partners?id=eq.${p.id}`, {
+        method: 'PATCH',
+        headers: { 'apikey': cloudConfig.key, 'Authorization': `Bearer ${cloudConfig.key}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data_sync_status: 'DISMISSED', updated_at: new Date().toISOString() })
+      });
+      await loadMarketingData(false);
     }
   </script>
 
@@ -7462,7 +7583,45 @@
       <!-- Tab Content -->
       <div class="flex-1 overflow-y-auto admin-scroll p-5 text-xs space-y-4">
         <!-- Tab 1: Shops -->
-        <div id="pdTabSec_SHOPS">
+        <div id="pdTabSec_SHOPS" class="space-y-3">
+          <!-- Flashing Partner Data Restore / Sync Request Banner -->
+          <div id="pdDataSyncRequestBox" class="hidden p-3.5 rounded-xl bg-amber-950/35 border border-amber-400/50 space-y-2.5">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div class="flex items-center gap-2 text-amber-300 font-bold text-xs">
+                <span class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping"></span>
+                <span>Partner Requested Customer Data Restore / Sync</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <button type="button" onclick="dismissPartnerSyncRequest()" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-bold cursor-pointer">Dismiss</button>
+                <button type="button" onclick="document.getElementById('pdPushCustomersPanel').classList.remove('hidden')" class="px-3 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 text-[11px] font-extrabold cursor-pointer">Select &amp; Push Customers</button>
+              </div>
+            </div>
+            <div id="pdDataSyncMeta" class="text-[11px] text-amber-200/85"></div>
+          </div>
+
+          <!-- Provider Multi-Select Customer Push Panel -->
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Attributed Shopkeepers</span>
+            <button type="button" onclick="togglePartnerPushPanel()" class="px-2.5 py-1 rounded-lg bg-violet-600/25 hover:bg-violet-600/40 border border-violet-500/40 text-violet-200 text-[11px] font-bold cursor-pointer">
+              Select &amp; Push Customers to Partner Portal
+            </button>
+          </div>
+          <div id="pdPushCustomersPanel" class="hidden p-3.5 rounded-xl bg-slate-950/80 border border-violet-500/35 space-y-2.5">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div class="text-[11px] text-slate-300 font-semibold">Select shopkeepers to verify &amp; push to this partner's live portal:</div>
+              <div class="flex items-center gap-2 text-[10px]">
+                <button type="button" onclick="selectAllPartnerPushCheckboxes(true)" class="text-violet-300 hover:underline font-bold cursor-pointer">Select All</button>
+                <span class="text-slate-600">|</span>
+                <button type="button" onclick="selectAllPartnerPushCheckboxes(false)" class="text-slate-400 hover:underline font-bold cursor-pointer">Clear</button>
+              </div>
+            </div>
+            <div id="pdPushChecklist" class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto admin-scroll"></div>
+            <div class="flex justify-end gap-2 pt-1">
+              <button type="button" onclick="togglePartnerPushPanel()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold cursor-pointer">Close</button>
+              <button type="button" onclick="approveAndPushPartnerCustomers()" class="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-extrabold cursor-pointer">Approve &amp; Push to Partner Portal</button>
+            </div>
+          </div>
+
           <div class="overflow-x-auto rounded-xl border border-slate-800">
             <table class="w-full text-left border-collapse text-xs">
               <thead class="bg-slate-950 text-slate-400 text-[10px] uppercase">
