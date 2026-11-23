@@ -441,6 +441,25 @@ export const LicenseActivationModal: React.FC<LicenseActivationModalProps> = ({
     return 4;
   };
 
+  const formatPaiseValue = (rate: number): string => {
+    const p = Math.round(rate * 1000) / 10;
+    return Number.isInteger(p) ? `${p}` : p.toFixed(1);
+  };
+
+  const formatRatePerPageLabel = (
+    rate: number,
+    suffix: 'p' | 'p/pg' | 'p per page' | ' paise' = 'p per page'
+  ): string => {
+    if (rate >= 1) {
+      return suffix === 'p'
+        ? `₹${rate.toFixed(2)}`
+        : suffix === 'p/pg'
+        ? `₹${rate.toFixed(2)}/pg`
+        : `₹${rate.toFixed(2)} per page`;
+    }
+    return `${formatPaiseValue(rate)}${suffix}`;
+  };
+
   const getUpsellRecommendation = (pages: number) => {
     const minP = Math.max(1, customRules.minPages || 200);
     const p = Math.max(minP, pages);
@@ -458,7 +477,7 @@ export const LicenseActivationModal: React.FC<LicenseActivationModalProps> = ({
         const extraPages = slab.threshold - p;
         const diff = slab.cost - currentCost;
         if (diff <= 0 || (extraPages <= slab.threshold * 0.25 && diff <= 60)) {
-          const rateLabel = slab.rate >= 1 ? `₹${slab.rate.toFixed(2)}` : `${Math.round(slab.rate * 100)}p`;
+          const rateLabel = formatRatePerPageLabel(slab.rate, 'p');
           return {
             targetPages: slab.threshold,
             targetCost: slab.cost,
@@ -481,7 +500,7 @@ export const LicenseActivationModal: React.FC<LicenseActivationModalProps> = ({
     setCustomPagesDraft(pages.toString());
     const amount = getCustomPageAmount(pages);
     const rate = getCustomPageRate(pages);
-    const rateLabel = rate >= 1 ? `₹${rate.toFixed(2)}/pg` : `${Math.round(rate * 100)}p/pg`;
+    const rateLabel = formatRatePerPageLabel(rate, 'p/pg');
     const customPlan: PlanOption = {
       code: `WALLET_CUSTOM_${pages}`,
       name: `Custom Pack (${pages.toLocaleString()} Pgs)`,
@@ -1849,7 +1868,9 @@ export const LicenseActivationModal: React.FC<LicenseActivationModalProps> = ({
                         </div>
 
                         <div className="text-xs sm:text-[13px] font-bold text-emerald-400 tracking-tight flex items-center gap-1">
-                          {plan.perMonthOrPage || (plan.pages && plan.pages > 0 ? `₹${(plan.amount / plan.pages).toFixed(2)} per page` : '')}
+                          {plan.category === 'WALLET' && plan.pages && plan.pages > 0
+                            ? formatRatePerPageLabel(plan.amount / plan.pages, 'p per page')
+                            : (plan.perMonthOrPage || (plan.pages && plan.pages > 0 ? formatRatePerPageLabel(plan.amount / plan.pages, 'p per page') : ''))}
                         </div>
 
                         <p className="text-[11px] text-slate-400 pt-0.5 leading-relaxed font-normal">
@@ -1897,7 +1918,7 @@ export const LicenseActivationModal: React.FC<LicenseActivationModalProps> = ({
                     range: `${customRules.minPages || 200} – ${customRules.tier1MaxPages || 499} pgs`,
                     milestone: customRules.minPages || 200,
                     rate: customRules.tier1Rate || 0.40,
-                    rateText: `${Math.round((customRules.tier1Rate || 0.40) * 100)}p`,
+                    rateText: formatRatePerPageLabel(customRules.tier1Rate || 0.40, 'p'),
                     badge: 'Base Rate',
                     badgeColor: 'text-slate-400 bg-slate-800/80 border-slate-700',
                   },
@@ -1907,7 +1928,7 @@ export const LicenseActivationModal: React.FC<LicenseActivationModalProps> = ({
                     range: `500 – ${customRules.tier2MaxPages || 1999} pgs`,
                     milestone: 500,
                     rate: customRules.tier2Rate || 0.30,
-                    rateText: `${Math.round((customRules.tier2Rate || 0.30) * 100)}p`,
+                    rateText: formatRatePerPageLabel(customRules.tier2Rate || 0.30, 'p'),
                     badge: `Save ${Math.max(1, Math.round((1 - (customRules.tier2Rate || 0.30) / baseRate) * 100))}%`,
                     badgeColor: 'text-emerald-300 bg-emerald-500/20 border-emerald-500/30',
                   },
@@ -1917,7 +1938,7 @@ export const LicenseActivationModal: React.FC<LicenseActivationModalProps> = ({
                     range: `2,000 – ${customRules.tier3MaxPages || 4999} pgs`,
                     milestone: 2000,
                     rate: customRules.tier3Rate || 0.20,
-                    rateText: `${Math.round((customRules.tier3Rate || 0.20) * 100)}p`,
+                    rateText: formatRatePerPageLabel(customRules.tier3Rate || 0.20, 'p'),
                     badge: `Save ${Math.max(1, Math.round((1 - (customRules.tier3Rate || 0.20) / baseRate) * 100))}%`,
                     badgeColor: 'text-cyan-300 bg-cyan-500/20 border-cyan-500/30',
                   },
@@ -1927,7 +1948,7 @@ export const LicenseActivationModal: React.FC<LicenseActivationModalProps> = ({
                     range: `5,000 – ${customRules.tier4MaxPages || 9999} pgs`,
                     milestone: 5000,
                     rate: customRules.tier4Rate || 0.15,
-                    rateText: `${Math.round((customRules.tier4Rate || 0.15) * 100)}p`,
+                    rateText: formatRatePerPageLabel(customRules.tier4Rate || 0.15, 'p'),
                     badge: `Save ${Math.max(1, Math.round((1 - (customRules.tier4Rate || 0.15) / baseRate) * 100))}%`,
                     badgeColor: 'text-indigo-300 bg-indigo-500/20 border-indigo-500/30',
                   },
@@ -1937,7 +1958,7 @@ export const LicenseActivationModal: React.FC<LicenseActivationModalProps> = ({
                     range: '10,000+ pgs',
                     milestone: 10000,
                     rate: customRules.tier5Rate || 0.10,
-                    rateText: `${Math.round((customRules.tier5Rate || 0.10) * 100)}p`,
+                    rateText: formatRatePerPageLabel(customRules.tier5Rate || 0.10, 'p'),
                     badge: `Save ${Math.max(1, Math.round((1 - (customRules.tier5Rate || 0.10) / baseRate) * 100))}%`,
                     badgeColor: 'text-amber-300 bg-amber-500/20 border-amber-500/30 font-black',
                   },
@@ -2123,7 +2144,7 @@ export const LicenseActivationModal: React.FC<LicenseActivationModalProps> = ({
                         <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-emerald-950/70 border border-emerald-500/50 shadow-inner">
                           <span className="text-[10px] text-slate-400 font-medium">Applied Rate:</span>
                           <strong className="text-xs sm:text-[13px] font-bold text-emerald-300">
-                            {currentRate >= 1 ? `₹${currentRate.toFixed(2)}` : `${Math.round(currentRate * 100)} paise`}
+                            {formatRatePerPageLabel(currentRate, ' paise')}
                             <span className="text-[10px] font-normal text-emerald-400"> / pg</span>
                           </strong>
                           {currentDiscountPercent > 0 && (
