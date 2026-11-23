@@ -2001,9 +2001,11 @@
 - [x] **Phase 2 — Isolated Individual Partner Sales Dashboard (`partner-portal/index.html`, `design-system/printdrop/pages/partner-portal.md`)**:
   - Mobile-first, true-responsive Sales Portal (`viewport-fit=cover`, fluid `clamp()` typography, zero-overflow 375px mobile cards with 1-tap Call/WhatsApp + sticky desktop tables, crisp 2px Lucide icons, `tabular-nums`, and fresh-login browser-reopen / `bfcache` session hardening).
   - Scoped Partner **Settings** dropdown with 5 self-service tools: **Change Password**, **Offline Personal Backup & Read-Only Archive Viewer** (AES-256-GCM `.pdpartner` + Excel `.csv` with UTF-8 BOM), **My Profile & Payout Details** (UPI/Bank/PAN/Phone/Email), **Sales & Referral Toolkit** (English & Hindi WhatsApp pitches), and **Sign Out All Devices**.
-- [x] **24/7 HTTPS Deployment & Regression Gate**:
-  - Published both portals to `github-pages-site/admin/index.html` and `github-pages-site/partner/index.html` (`https://technosoftsolution.github.io/printdrop-station/admin/` and `/partner/`) — accessible 24/7 on any phone, tablet, or desktop without VPN or laptop running; also upgraded `scripts/serve-admin-portal.mjs` to serve both routes locally/Tailscale if needed.
+- [x] **24/7 HTTPS Deployment, Safe Offline Profile Restore, Provider-Gated Data Sync & `v1.0.20` OTA Release**:
+  - Published both portals to `github-pages-site/admin/index.html` and `github-pages-site/partner/index.html` (`https://technosoftsolution.github.io/printdrop-station/admin/` and `/partner/`) — accessible 24/7 on any phone, tablet, or desktop without VPN or laptop running; added 1-command `npm run portals:publish` (`scripts/publish-portals.ps1`) and preserved `scripts/serve-admin-portal.mjs` as a private Tailscale VPN backup option.
+  - Added Partner **Restore Profile to Live** from decrypted `.pdpartner` snapshots + **Request Customer Data Restore / Sync** (`partner_portal_request_data_sync` RPC) triggering flashing **`🔔 Data Restore Requested`** alerts on Admin Portal with a multi-select **Select & Push Customers to Partner Portal** approval panel (`supabase/migrations/20261123_partner_data_sync_requests.sql`).
   - Expanded `scripts/verify-regression.mjs` with Section `[5] Partner Sales Portal` — **29/29 checks passing (0.02s)**.
+  - Released **`v1.0.20`** via GitHub Actions CI/CD (bundling the 4G/5G stop/start tunnel multi-tenant HWID reconnect fix, compact mobile reconnect banner, regression gate, and Partner Portal milestones).
 
 
 

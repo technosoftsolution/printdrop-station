@@ -1,7 +1,7 @@
 {
   "name": "printdrop",
   "private": true,
-  "version": "1.0.19",
+  "version": "1.0.20",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -15,6 +15,7 @@
     "rollback-release": "powershell -ExecutionPolicy Bypass -File ./scripts/rollback-release.ps1",
     "support:hub": "powershell -ExecutionPolicy Bypass -File ./support-hub/start-support-hub.ps1",
     "admin:serve": "node ./scripts/serve-admin-portal.mjs",
+    "portals:publish": "powershell -ExecutionPolicy Bypass -File ./scripts/publish-portals.ps1",
     "test:regression": "node ./scripts/verify-regression.mjs",
     "test:smart": "node ./scripts/verify-regression.mjs --smart"
   },

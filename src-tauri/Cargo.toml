@@ -1,6 +1,6 @@
 [package]
 name = "printdrop"
-version = "1.0.19"
+version = "1.0.20"
 description = "PrintDrop Windows 11 Desktop Application"
 authors = ["PrintDrop Team"]
 edition = "2021"
