@@ -129,6 +129,48 @@ function checkAdminPortal() {
   );
 }
 
+function checkPartnerPortal() {
+  console.log("\n[5] Partner Sales Portal (partner-portal/index.html)");
+  const html = read("partner-portal/index.html");
+
+  validateInlineScripts(html, "partner-portal/index.html");
+
+  const requiredIds = [
+    "partnerLoginOverlay",
+    "plUsername",
+    "plPassword",
+    "dashboardMain",
+    "partnerSettingsMenu",
+    "shopsTableBody",
+    "shopsMobileCards",
+    "commissionsTableBody",
+    "payoutsTableBody",
+    "partnerPasswordModal",
+    "partnerBackupModal",
+    "partnerProfileModal",
+    "partnerToolkitModal",
+  ];
+  const missingIds = requiredIds.filter((id) => !html.includes(`id="${id}"`));
+  assert(
+    missingIds.length === 0,
+    missingIds.length === 0
+      ? `All ${requiredIds.length} critical Partner Portal DOM IDs present`
+      : `Missing Partner Portal DOM IDs: ${missingIds.join(", ")}`
+  );
+  assert(
+    /viewport-fit=cover/.test(html) && !/user-scalable\s*=\s*no/i.test(html),
+    "Partner Portal viewport allows pinch-zoom with viewport-fit=cover"
+  );
+  assert(
+    html.includes("touch-action: manipulation") && html.includes("prefers-reduced-motion"),
+    "Partner Portal enforces touch-action: manipulation & prefers-reduced-motion"
+  );
+  assert(
+    html.includes("navType !== 'reload'") && html.includes("event.persisted"),
+    "Partner Portal enforces fresh login on browser reopen & bfcache guard"
+  );
+}
+
 function checkDesktopFrontend() {
   console.log("\n[3] Desktop POS Frontend (src/App.tsx & src/index.css)");
   const css = read("src/index.css");
@@ -183,17 +225,20 @@ if (isSmart) {
     console.log("No uncommitted file changes detected — running fast static contract suite (~0.2s).");
     checkCustomerPortal();
     checkAdminPortal();
+    checkPartnerPortal();
     checkDesktopFrontend();
     checkRustContracts();
   } else {
     console.log("Changed files:", changed.join(", "));
     const touchedCustomer = changed.some((f) => f.includes("customer.html"));
     const touchedAdmin = changed.some((f) => f.includes("admin-portal/"));
+    const touchedPartner = changed.some((f) => f.includes("partner-portal/"));
     const touchedFrontend = changed.some((f) => f.startsWith("src/"));
     const touchedRust = changed.some((f) => f.startsWith("src-tauri/src/") && f.endsWith(".rs"));
 
     if (touchedCustomer) checkCustomerPortal();
     if (touchedAdmin) checkAdminPortal();
+    if (touchedPartner) checkPartnerPortal();
     if (touchedFrontend) {
       checkDesktopFrontend();
       console.log("\n[Smart] Running TypeScript check (npx tsc --noEmit)...");
@@ -204,13 +249,14 @@ if (isSmart) {
       checkRustContracts();
       console.log("\n[Smart] Rust files changed — run `cargo test --manifest-path src-tauri/Cargo.toml` when ready.");
     }
-    if (!touchedCustomer && !touchedAdmin && !touchedFrontend && !touchedRust) {
+    if (!touchedCustomer && !touchedAdmin && !touchedPartner && !touchedFrontend && !touchedRust) {
       pass("Docs/config-only change — no heavy code checks required");
     }
   }
 } else {
   checkCustomerPortal();
   checkAdminPortal();
+  checkPartnerPortal();
   checkDesktopFrontend();
   checkRustContracts();
 }

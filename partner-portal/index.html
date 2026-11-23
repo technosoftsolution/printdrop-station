@@ -1,0 +1,1610 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
+  <meta http-equiv="Pragma" content="no-cache">
+  <title>PrintDrop Partner Sales Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap');
+    :root {
+      --pd-bg-canvas: #090d16;
+      --pd-bg-surface: #111827;
+      --pd-border-subtle: #1e293b;
+      font-size: clamp(13px, 0.35vw + 0.35vh + 7.5px, 15.5px);
+    }
+    @media screen and (min-width: 1680px) and (min-height: 900px) {
+      :root { font-size: 16px; }
+    }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background-color: var(--pd-bg-canvas);
+      background-image: radial-gradient(circle at top center, rgba(124, 58, 237, 0.11) 0%, transparent 45%);
+      overscroll-behavior-y: contain;
+    }
+    .safe-header {
+      padding-top: env(safe-area-inset-top, 0px);
+    }
+    .safe-main {
+      padding-bottom: calc(2rem + env(safe-area-inset-bottom, 0px));
+    }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+    .tabular-nums { font-variant-numeric: tabular-nums; }
+    button, a, input, select, textarea { touch-action: manipulation; }
+    button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+      outline: 2px solid #8b5cf6;
+      outline-offset: 2px;
+    }
+    .partner-scroll {
+      scrollbar-width: thin;
+      scrollbar-color: rgba(100, 116, 139, 0.45) transparent;
+    }
+    .partner-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+    .partner-scroll::-webkit-scrollbar-thumb { background: rgba(100, 116, 139, 0.45); border-radius: 9999px; }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col overflow-x-hidden">
+
+  <!-- ========================================================================= -->
+  <!-- PARTNER LOGIN OVERLAY                                                     -->
+  <!-- ========================================================================= -->
+  <div id="partnerLoginOverlay" class="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden">
+      <div class="px-6 py-5 border-b border-slate-800 bg-gradient-to-r from-violet-950/60 via-slate-950 to-indigo-950/50 flex items-center gap-3">
+        <div class="w-11 h-11 rounded-xl bg-gradient-to-tr from-violet-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-violet-600/30 shrink-0">
+          <i data-lucide="briefcase" class="w-5 h-5 text-white"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-base font-extrabold text-white tracking-tight">PrintDrop Partner</h1>
+            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-300 border border-violet-500/35">SALES PORTAL</span>
+          </div>
+          <p class="text-xs text-slate-400">Sign in to view your shopkeepers, share &amp; payouts</p>
+        </div>
+      </div>
+
+      <form onsubmit="handlePartnerLogin(event)" class="p-6 space-y-4 text-xs">
+        <div class="space-y-1.5">
+          <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400">Partner ID</label>
+          <input id="plUsername" type="text" autocomplete="username" required placeholder="Enter your Partner ID" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 font-mono uppercase text-white text-sm focus:outline-none focus:border-violet-500" />
+        </div>
+        <div class="space-y-1.5">
+          <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400">Password</label>
+          <div class="relative">
+            <input id="plPassword" type="password" autocomplete="current-password" required placeholder="Enter your password" class="w-full pl-3.5 pr-11 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-sm focus:outline-none focus:border-violet-500" />
+            <button type="button" onclick="togglePasswordVisibility('plPassword', this)" aria-label="Show password" title="Show / Hide Password" class="absolute inset-y-0 right-0 px-3 flex items-center text-slate-400 hover:text-violet-300 transition cursor-pointer">
+              <i data-lucide="eye" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </div>
+        <div id="plErrorMsg" class="hidden p-3 rounded-xl bg-rose-500/15 border border-rose-500/40 text-rose-300 font-semibold"></div>
+        <button id="plSubmitBtn" type="submit" class="w-full py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-bold text-sm shadow-lg shadow-violet-600/30 transition cursor-pointer">
+          Sign In to Sales Dashboard
+        </button>
+        <p class="text-[11px] text-slate-500 text-center">
+          Credentials are issued and managed by the PrintDrop Software Provider.
+        </p>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- TOP NAVIGATION BAR (ZERO TECHNICAL ADMIN CONTROLS)                        -->
+  <!-- ========================================================================= -->
+  <header class="safe-header border-b border-slate-800 bg-slate-900/85 backdrop-blur sticky top-0 z-30">
+    <div class="max-w-6xl mx-auto px-3 sm:px-6 h-16 flex flex-nowrap items-center justify-between gap-2 sm:gap-3">
+      <div class="flex items-center gap-2.5 sm:gap-3 min-w-0 shrink">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-violet-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-violet-600/25 shrink-0">
+          <i data-lucide="trending-up" class="w-5 h-5 text-white"></i>
+        </div>
+        <div class="min-w-0">
+          <div class="flex items-center gap-1.5 sm:gap-2 min-w-0">
+            <h1 class="text-sm sm:text-base font-extrabold text-white truncate">PrintDrop Sales</h1>
+            <span id="hdrPartnerCode" class="hidden sm:inline-flex font-mono text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-300 border border-violet-500/35 whitespace-nowrap shrink-0">PD-XXXX</span>
+          </div>
+          <p id="hdrPartnerSubtitle" class="text-[11px] text-slate-400 truncate">Marketing Partner Dashboard</p>
+        </div>
+      </div>
+
+      <div class="flex flex-nowrap items-center gap-1.5 sm:gap-2 shrink-0">
+        <button type="button" onclick="refreshDashboard(true)" class="min-h-[40px] min-w-[40px] p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition cursor-pointer flex items-center justify-center shrink-0" title="Refresh Sales Data">
+          <i id="hdrRefreshIcon" data-lucide="refresh-cw" class="w-4 h-4"></i>
+        </button>
+
+        <!-- Partner Settings Dropdown (Strictly Scoped to Partner Sales Features) -->
+        <div id="partnerSettingsWrap" class="relative shrink-0" onmouseenter="if(window.matchMedia('(hover: hover) and (pointer: fine)').matches) openPartnerSettingsMenu()" onmouseleave="if(window.matchMedia('(hover: hover) and (pointer: fine)').matches) scheduleClosePartnerSettingsMenu()">
+          <button type="button" onclick="event.stopPropagation(); togglePartnerSettingsMenu()" class="min-h-[40px] flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 text-xs font-bold border border-slate-700 transition cursor-pointer whitespace-nowrap">
+            <i data-lucide="settings" class="w-4 h-4 text-violet-400"></i>
+            <span class="hidden sm:inline">Settings</span>
+            <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400"></i>
+          </button>
+          <div id="partnerSettingsMenu" class="hidden absolute right-0 mt-1.5 w-64 max-w-[calc(100vw-1.5rem)] max-h-[calc(100vh-5rem)] overflow-y-auto overscroll-contain partner-scroll rounded-2xl bg-slate-900 border border-slate-700/80 shadow-2xl shadow-black/70 ring-1 ring-slate-600/40 py-1.5 z-50">
+            <button type="button" onclick="closePartnerSettingsMenu(); openPartnerPasswordModal()" class="w-full px-3.5 py-2.5 text-left text-xs font-semibold text-slate-200 hover:bg-slate-800/90 flex items-center gap-2.5 transition cursor-pointer">
+              <i data-lucide="key-round" class="w-4 h-4 text-cyan-400 shrink-0"></i>
+              <div>
+                <div class="text-white font-bold">Change Password</div>
+                <div class="text-[10px] text-slate-400">Update your login password</div>
+              </div>
+            </button>
+            <button type="button" onclick="closePartnerSettingsMenu(); openPartnerBackupModal()" class="w-full px-3.5 py-2.5 text-left text-xs font-semibold text-slate-200 hover:bg-slate-800/90 flex items-center gap-2.5 transition cursor-pointer">
+              <i data-lucide="database-backup" class="w-4 h-4 text-emerald-400 shrink-0"></i>
+              <div>
+                <div class="text-white font-bold">Offline Backup &amp; Archive</div>
+                <div class="text-[10px] text-slate-400">Encrypted &amp; Excel personal backup</div>
+              </div>
+            </button>
+            <button type="button" onclick="closePartnerSettingsMenu(); openPartnerProfileModal()" class="w-full px-3.5 py-2.5 text-left text-xs font-semibold text-slate-200 hover:bg-slate-800/90 flex items-center gap-2.5 transition cursor-pointer">
+              <i data-lucide="user-cog" class="w-4 h-4 text-violet-400 shrink-0"></i>
+              <div>
+                <div class="text-white font-bold">My Profile &amp; Payout Details</div>
+                <div class="text-[10px] text-slate-400">Update UPI, bank, phone &amp; PAN</div>
+              </div>
+            </button>
+            <button type="button" onclick="closePartnerSettingsMenu(); openPartnerToolkitModal()" class="w-full px-3.5 py-2.5 text-left text-xs font-semibold text-slate-200 hover:bg-slate-800/90 flex items-center gap-2.5 transition cursor-pointer">
+              <i data-lucide="megaphone" class="w-4 h-4 text-amber-400 shrink-0"></i>
+              <div>
+                <div class="text-white font-bold">Sales &amp; Referral Toolkit</div>
+                <div class="text-[10px] text-slate-400">English &amp; Hindi WhatsApp pitches</div>
+              </div>
+            </button>
+            <div class="my-1 border-t border-slate-800"></div>
+            <button type="button" onclick="closePartnerSettingsMenu(); handlePartnerLogoutAll()" class="w-full px-3.5 py-2.5 text-left text-xs font-semibold text-rose-300 hover:bg-rose-950/50 flex items-center gap-2.5 transition cursor-pointer">
+              <i data-lucide="shield-off" class="w-4 h-4 text-rose-400 shrink-0"></i>
+              <div>
+                <div class="text-rose-200 font-bold">Sign Out All Devices</div>
+                <div class="text-[10px] text-rose-300/70">Revoke all active phone/PC logins</div>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        <button type="button" onclick="handlePartnerLogout()" class="min-h-[40px] flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 text-xs font-bold border border-rose-500/35 transition cursor-pointer whitespace-nowrap shrink-0" title="Sign Out">
+          <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
+          <span class="hidden sm:inline">Logout</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ========================================================================= -->
+  <!-- MAIN DASHBOARD CONTENT                                                    -->
+  <!-- ========================================================================= -->
+  <main id="dashboardMain" class="safe-main hidden flex-1 max-w-6xl w-full mx-auto px-3 sm:px-6 py-4 sm:py-5 space-y-4 sm:space-y-5">
+
+    <!-- Offline Backup Read-Only Snapshot Banner -->
+    <div id="offlineArchiveBanner" class="hidden p-3.5 rounded-2xl bg-cyan-950/45 border border-cyan-500/45 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div class="flex items-center gap-2.5 text-xs text-cyan-200">
+        <i data-lucide="archive" class="w-4 h-4 text-cyan-400 shrink-0"></i>
+        <span id="offlineArchiveText">Viewing Offline Backup Snapshot (Read-Only)</span>
+      </div>
+      <button type="button" onclick="exitOfflineArchiveMode()" class="px-3 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold shrink-0 cursor-pointer">
+        Return to Live Cloud Data
+      </button>
+    </div>
+
+    <!-- Partner Profile & Dynamic Share Rule Strip -->
+    <div class="p-4 rounded-2xl bg-gradient-to-r from-slate-900 via-violet-950/35 to-slate-900 border border-violet-500/25 shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-3">
+      <div class="space-y-1 min-w-0">
+        <div class="flex flex-wrap items-center gap-2">
+          <h2 id="dashPartnerName" class="text-base font-extrabold text-white">Partner Name</h2>
+          <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">Active Partner</span>
+        </div>
+        <div id="dashPartnerMeta" class="text-xs text-slate-300 flex flex-wrap items-center gap-x-3 gap-y-1">
+          <span>📍 City</span>
+          <span>•</span>
+          <span>UPI: Not set</span>
+        </div>
+        <div id="dashShareRuleText" class="text-[11px] text-violet-200/90 tabular-nums">
+          Revenue Share: <strong>0% First Sale</strong> &bull; <strong>0% Renewal</strong> &bull; Payout Cycle: Monthly on 5th
+        </div>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2 shrink-0">
+        <button type="button" onclick="copyPartnerCode()" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-violet-500/40 text-violet-200 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer">
+          <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+          <span id="copyCodeBtnText">Copy Partner Code</span>
+        </button>
+        <a id="providerSupportWhatsApp" href="#" target="_blank" class="hidden px-3 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/35 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex items-center gap-1.5 transition">
+          <i data-lucide="message-circle" class="w-3.5 h-3.5"></i>
+          <span>Contact Provider</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- Expiring Soon Retention Alert (Shown when partner has shops expiring in <= 7 days) -->
+    <div id="expiringAlertBanner" class="hidden p-3.5 rounded-2xl bg-amber-950/35 border border-amber-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div class="flex items-center gap-2.5 text-xs text-amber-200">
+        <i data-lucide="bell-ring" class="w-4 h-4 text-amber-400 shrink-0 animate-pulse"></i>
+        <span id="expiringAlertText">Some of your shopkeepers are expiring soon — follow up to help them renew!</span>
+      </div>
+      <button type="button" onclick="filterExpiringSoon()" class="px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/35 border border-amber-500/40 text-amber-200 text-xs font-bold shrink-0 cursor-pointer">
+        View Expiring Shops →
+      </button>
+    </div>
+
+    <!-- 4-Card KPI Bento Grid -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
+      <div class="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-sm">
+        <div class="flex items-center justify-between text-xs text-slate-400 font-medium">
+          <span>My Shopkeepers</span>
+          <span class="w-7 h-7 rounded-lg bg-indigo-500/15 text-indigo-400 flex items-center justify-center"><i data-lucide="store" class="w-3.5 h-3.5"></i></span>
+        </div>
+        <div id="kpiTotalShops" class="text-2xl font-extrabold text-white mt-1.5 tabular-nums">0</div>
+        <div id="kpiShopsBreakdown" class="text-[11px] text-slate-400 mt-0.5 tabular-nums">0 paid • 0 trial</div>
+      </div>
+
+      <div class="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-sm">
+        <div class="flex items-center justify-between text-xs text-slate-400 font-medium">
+          <span>Total Revenue Share</span>
+          <span class="w-7 h-7 rounded-lg bg-violet-500/15 text-violet-400 flex items-center justify-center"><i data-lucide="indian-rupee" class="w-3.5 h-3.5"></i></span>
+        </div>
+        <div id="kpiTotalEarned" class="text-2xl font-extrabold text-violet-300 mt-1.5 tabular-nums">₹0</div>
+        <div id="kpiClientBilledSub" class="text-[11px] text-slate-400 mt-0.5 tabular-nums">Client Billed: ₹0</div>
+      </div>
+
+      <div class="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-sm">
+        <div class="flex items-center justify-between text-xs text-slate-400 font-medium">
+          <span>Paid by Provider</span>
+          <span class="w-7 h-7 rounded-lg bg-emerald-500/15 text-emerald-400 flex items-center justify-center"><i data-lucide="check-circle-2" class="w-3.5 h-3.5"></i></span>
+        </div>
+        <div id="kpiTotalPaid" class="text-2xl font-extrabold text-emerald-400 mt-1.5 tabular-nums">₹0</div>
+        <div id="kpiPayoutCountSub" class="text-[11px] text-slate-400 mt-0.5 tabular-nums">0 settlements received</div>
+      </div>
+
+      <div class="p-4 rounded-2xl bg-amber-950/25 border border-amber-500/35 shadow-sm">
+        <div class="flex items-center justify-between text-xs text-amber-300 font-semibold">
+          <span>Pending Payout</span>
+          <span class="w-7 h-7 rounded-lg bg-amber-500/20 text-amber-300 flex items-center justify-center"><i data-lucide="clock" class="w-3.5 h-3.5"></i></span>
+        </div>
+        <div id="kpiPendingPayout" class="text-2xl font-extrabold text-amber-300 mt-1.5 tabular-nums">₹0</div>
+        <div id="kpiMinThresholdSub" class="text-[11px] text-amber-200/75 mt-0.5 tabular-nums">Min payout: ₹500</div>
+      </div>
+    </div>
+
+    <!-- Main Tabbed Workspace -->
+    <div class="rounded-2xl bg-slate-900/70 border border-slate-800 overflow-hidden shadow-xl">
+      <div class="px-4 pt-3 border-b border-slate-800 bg-slate-950/50 flex items-center gap-2 overflow-x-auto">
+        <button id="tabBtnShops" type="button" onclick="switchPartnerTab('SHOPS')" class="px-4 py-2 text-xs font-bold rounded-t-xl border-b-2 border-violet-500 text-white bg-slate-900/80 flex items-center gap-2 whitespace-nowrap cursor-pointer">
+          <i data-lucide="store" class="w-3.5 h-3.5 text-violet-400"></i>
+          <span>My Shopkeepers</span>
+          <span id="tabCountShops" class="px-1.5 py-0.5 rounded-full text-[10px] bg-violet-500/20 text-violet-300 font-mono">0</span>
+        </button>
+        <button id="tabBtnCommissions" type="button" onclick="switchPartnerTab('COMMISSIONS')" class="px-4 py-2 text-xs font-bold rounded-t-xl border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-2 whitespace-nowrap cursor-pointer">
+          <i data-lucide="receipt" class="w-3.5 h-3.5 text-indigo-400"></i>
+          <span>Revenue Share Ledger</span>
+          <span id="tabCountComms" class="px-1.5 py-0.5 rounded-full text-[10px] bg-slate-800 text-slate-300 font-mono">0</span>
+        </button>
+        <button id="tabBtnPayouts" type="button" onclick="switchPartnerTab('PAYOUTS')" class="px-4 py-2 text-xs font-bold rounded-t-xl border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-2 whitespace-nowrap cursor-pointer">
+          <i data-lucide="wallet" class="w-3.5 h-3.5 text-emerald-400"></i>
+          <span>Payouts Received</span>
+          <span id="tabCountPayouts" class="px-1.5 py-0.5 rounded-full text-[10px] bg-slate-800 text-slate-300 font-mono">0</span>
+        </button>
+      </div>
+
+      <!-- TAB 1: MY SHOPKEEPERS -->
+      <div id="tabPanelShops">
+        <div class="p-4 border-b border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div class="relative w-full sm:w-80">
+            <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3.5 top-2.5"></i>
+            <input id="shopSearchInput" type="search" autocomplete="off" oninput="renderShopsTab()" placeholder="Search shop, owner, phone, city..." class="w-full pl-10 pr-4 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-violet-500" />
+          </div>
+          <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
+            <select id="shopStatusFilter" onchange="renderShopsTab()" class="px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-200 focus:outline-none focus:border-violet-500">
+              <option value="ALL">All Status</option>
+              <option value="ACTIVE">Active Paid Plans</option>
+              <option value="TRIAL">Free Trial</option>
+              <option value="EXPIRING">Expiring (≤ 7 Days)</option>
+              <option value="EXPIRED">Expired</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Mobile Cards (< 640px, zero horizontal scroll) -->
+        <div id="shopsMobileCards" class="sm:hidden divide-y divide-slate-800/80"></div>
+
+        <!-- Desktop / Tablet Table (>= 640px) -->
+        <div class="hidden sm:block overflow-x-auto partner-scroll">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead class="sticky top-0 z-10">
+              <tr class="border-b border-slate-800 bg-slate-950/90 backdrop-blur text-slate-400 font-semibold uppercase tracking-wider text-[11px]">
+                <th class="py-3 px-4">Shopkeeper &amp; Contact</th>
+                <th class="py-3 px-4">Location</th>
+                <th class="py-3 px-4">Current Plan</th>
+                <th class="py-3 px-4">Status &amp; Renewal</th>
+                <th class="py-3 px-4 text-right">Amount Paid</th>
+              </tr>
+            </thead>
+            <tbody id="shopsTableBody" class="divide-y divide-slate-800/80 text-slate-300 tabular-nums"></tbody>
+          </table>
+        </div>
+        <div id="shopsEmptyState" class="hidden py-12 text-center text-slate-500 space-y-2 px-4">
+          <i data-lucide="store" class="w-8 h-8 mx-auto text-slate-600"></i>
+          <p class="text-sm font-semibold text-slate-300">No shopkeepers found</p>
+          <p class="text-xs text-slate-400">When the Software Provider tags your onboarded shops to your Partner ID, they will appear here automatically.</p>
+        </div>
+      </div>
+
+      <!-- TAB 2: REVENUE SHARE LEDGER -->
+      <div id="tabPanelCommissions" class="hidden">
+        <div id="commissionsMobileCards" class="sm:hidden divide-y divide-slate-800/80"></div>
+        <div class="hidden sm:block overflow-x-auto partner-scroll">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead class="sticky top-0 z-10">
+              <tr class="border-b border-slate-800 bg-slate-950/90 backdrop-blur text-slate-400 font-semibold uppercase tracking-wider text-[11px]">
+                <th class="py-3 px-4">Date</th>
+                <th class="py-3 px-4">Shopkeeper &amp; Plan</th>
+                <th class="py-3 px-4">Type</th>
+                <th class="py-3 px-4">Gross / Net Base</th>
+                <th class="py-3 px-4">Share %</th>
+                <th class="py-3 px-4 text-right">Your Share (₹)</th>
+                <th class="py-3 px-4">Status</th>
+              </tr>
+            </thead>
+            <tbody id="commissionsTableBody" class="divide-y divide-slate-800/80 text-slate-300 tabular-nums"></tbody>
+          </table>
+        </div>
+        <div id="commissionsEmptyState" class="hidden py-12 text-center text-slate-500 space-y-2 px-4">
+          <i data-lucide="receipt" class="w-8 h-8 mx-auto text-slate-600"></i>
+          <p class="text-sm font-semibold text-slate-300">No revenue share entries yet</p>
+          <p class="text-xs text-slate-400">Your commission entries will appear here whenever your shopkeepers purchase or renew a paid plan.</p>
+        </div>
+      </div>
+
+      <!-- TAB 3: PAYOUTS RECEIVED -->
+      <div id="tabPanelPayouts" class="hidden">
+        <div class="p-3.5 sm:p-4 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2">
+          <div class="text-xs text-slate-400">Verified settlements sent by the Software Provider</div>
+          <button type="button" onclick="exportPartnerStatementCsv()" class="min-h-[38px] px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-bold flex items-center gap-1.5 cursor-pointer whitespace-nowrap">
+            <i data-lucide="download" class="w-3.5 h-3.5"></i>
+            <span>Export CSV Statement</span>
+          </button>
+        </div>
+        <div id="payoutsMobileCards" class="sm:hidden divide-y divide-slate-800/80"></div>
+        <div class="hidden sm:block overflow-x-auto partner-scroll">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead class="sticky top-0 z-10">
+              <tr class="border-b border-slate-800 bg-slate-950/90 backdrop-blur text-slate-400 font-semibold uppercase tracking-wider text-[11px]">
+                <th class="py-3 px-4">Paid Date</th>
+                <th class="py-3 px-4">Amount Paid</th>
+                <th class="py-3 px-4">Payment Mode</th>
+                <th class="py-3 px-4">UTR / Transaction Ref</th>
+                <th class="py-3 px-4">Period / Remarks</th>
+              </tr>
+            </thead>
+            <tbody id="payoutsTableBody" class="divide-y divide-slate-800/80 text-slate-300 tabular-nums"></tbody>
+          </table>
+        </div>
+        <div id="payoutsEmptyState" class="hidden py-12 text-center text-slate-500 space-y-2 px-4">
+          <i data-lucide="wallet" class="w-8 h-8 mx-auto text-slate-600"></i>
+          <p class="text-sm font-semibold text-slate-300">No payouts received yet</p>
+          <p class="text-xs text-slate-400">Once the Software Provider settles your pending balance, the UTR &amp; receipt details will appear here.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Compact Referral Pitch Footer -->
+    <div class="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+      <div class="text-slate-300">
+        <strong class="text-white">Onboarding a new Xerox / Print Shop?</strong> Share your Partner Code <span id="footerPartnerCode" class="font-mono text-violet-300 font-bold">PD-XXXX</span> with the Software Provider or shopkeeper during setup.
+      </div>
+      <button type="button" onclick="shareWhatsAppPitch()" class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 shrink-0 cursor-pointer">
+        <i data-lucide="share-2" class="w-3.5 h-3.5"></i>
+        <span>Share PrintDrop Pitch on WhatsApp</span>
+      </button>
+    </div>
+  </main>
+
+  <script>
+    const SB_URL = 'https://nslcrlvuulgqtrdqrkgv.supabase.co';
+    const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5zbGNybHZ1dWxncXRyZHFya2d2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQxNTI4NzEsImV4cCI6MjEwOTcyODg3MX0.lpRc097A_PFCD-eJVhyQZmPFxexhSGjM2dhCE0LNdxk';
+    const TOKEN_STORAGE_KEY = 'printdrop_partner_session_token';
+
+    let partnerData = null;
+    let activeTab = 'SHOPS';
+
+    function escapeHtml(str) {
+      return String(str ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function togglePasswordVisibility(inputId, btnEl) {
+      const inp = document.getElementById(inputId);
+      if (!inp) return;
+      const isHidden = inp.type === 'password';
+      inp.type = isHidden ? 'text' : 'password';
+      if (btnEl) {
+        btnEl.setAttribute('aria-label', isHidden ? 'Hide password' : 'Show password');
+        btnEl.innerHTML = `<i data-lucide="${isHidden ? 'eye-off' : 'eye'}" class="w-4 h-4"></i>`;
+        lucide.createIcons();
+      }
+    }
+
+    function cleanPhone(phone) {
+      const digits = String(phone || '').replace(/[^\d]/g, '');
+      if (digits.length === 10) return '91' + digits;
+      return digits;
+    }
+
+    function getCalendarDaysRemaining(isoStr) {
+      if (!isoStr) return null;
+      const expDt = new Date(isoStr);
+      if (isNaN(expDt.getTime())) return null;
+      const now = new Date();
+      const todayMid = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const expMid = new Date(expDt.getFullYear(), expDt.getMonth(), expDt.getDate());
+      return Math.round((expMid - todayMid) / (1000 * 60 * 60 * 24));
+    }
+
+    function formatPlanName(code) {
+      const map = {
+        TRIAL: 'Free Trial',
+        WALLET_PAGES: 'Page Wallet',
+        SUB_MONTHLY: '1 Month Unlimited',
+        SUB_QUARTERLY: '3 Months Unlimited',
+        SUB_HALF_YEARLY: '6 Months Unlimited',
+        SUB_ANNUAL: '1 Year Unlimited'
+      };
+      return map[code] || code || 'Standard Plan';
+    }
+
+    async function callPartnerRpc(fnName, payload) {
+      const res = await fetch(`${SB_URL}/rest/v1/rpc/${fnName}`, {
+        method: 'POST',
+        headers: {
+          'apikey': SB_KEY,
+          'Authorization': `Bearer ${SB_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload),
+        cache: 'no-store'
+      });
+      if (!res.ok) {
+        const txt = await res.text();
+        throw new Error(`HTTP ${res.status}: ${txt}`);
+      }
+      return await res.json();
+    }
+
+    window.addEventListener('DOMContentLoaded', async () => {
+      lucide.createIcons();
+      // Always require fresh login on new browser/tab open (even if mobile/desktop browser restores tabs)
+      const navEntry = performance.getEntriesByType ? performance.getEntriesByType('navigation')[0] : null;
+      const navType = navEntry ? navEntry.type : 'navigate';
+      if (navType !== 'reload') {
+        const staleToken = sessionStorage.getItem(TOKEN_STORAGE_KEY);
+        sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+        if (staleToken) {
+          callPartnerRpc('partner_portal_logout', { p_token: staleToken }).catch(() => {});
+        }
+      }
+      const existingToken = sessionStorage.getItem(TOKEN_STORAGE_KEY);
+      if (existingToken) {
+        await refreshDashboard(false);
+      } else {
+        document.getElementById('plUsername')?.focus();
+      }
+    });
+
+    // Prevent browser back/forward cache (bfcache) from restoring a logged-in screen
+    window.addEventListener('pageshow', (event) => {
+      if (event.persisted) {
+        sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+        partnerData = null;
+        document.getElementById('dashboardMain')?.classList.add('hidden');
+        document.getElementById('partnerLoginOverlay')?.classList.remove('hidden');
+      }
+    });
+
+    async function handlePartnerLogin(event) {
+      event.preventDefault();
+      const errEl = document.getElementById('plErrorMsg');
+      const btn = document.getElementById('plSubmitBtn');
+      const username = (document.getElementById('plUsername')?.value || '').trim();
+      const password = document.getElementById('plPassword')?.value || '';
+      if (errEl) errEl.classList.add('hidden');
+      if (btn) { btn.disabled = true; btn.innerText = 'Signing in...'; }
+
+      try {
+        const result = await callPartnerRpc('partner_portal_login', {
+          p_username: username,
+          p_password: password
+        });
+        if (!result || !result.ok || !result.token) {
+          if (errEl) {
+            errEl.innerText = result?.error || 'Invalid username or password.';
+            errEl.classList.remove('hidden');
+          }
+          return;
+        }
+        sessionStorage.setItem(TOKEN_STORAGE_KEY, result.token);
+        const pwdEl = document.getElementById('plPassword');
+        if (pwdEl) pwdEl.value = '';
+        await refreshDashboard(false);
+      } catch (err) {
+        if (errEl) {
+          errEl.innerText = `Unable to sign in: ${err.message}`;
+          errEl.classList.remove('hidden');
+        }
+      } finally {
+        if (btn) { btn.disabled = false; btn.innerText = 'Sign In to Sales Dashboard'; }
+      }
+    }
+
+    async function handlePartnerLogout() {
+      const token = sessionStorage.getItem(TOKEN_STORAGE_KEY);
+      sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+      partnerData = null;
+      if (token) {
+        callPartnerRpc('partner_portal_logout', { p_token: token }).catch(() => {});
+      }
+      document.getElementById('dashboardMain')?.classList.add('hidden');
+      document.getElementById('partnerLoginOverlay')?.classList.remove('hidden');
+      document.getElementById('plUsername')?.focus();
+    }
+
+    async function refreshDashboard(showSpin = false) {
+      const token = sessionStorage.getItem(TOKEN_STORAGE_KEY);
+      if (!token) return;
+      const icon = document.getElementById('hdrRefreshIcon');
+      if (showSpin && icon) icon.classList.add('animate-spin');
+
+      try {
+        const data = await callPartnerRpc('partner_portal_dashboard', { p_token: token });
+        if (!data || !data.ok) {
+          sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+          document.getElementById('dashboardMain')?.classList.add('hidden');
+          document.getElementById('partnerLoginOverlay')?.classList.remove('hidden');
+          const errEl = document.getElementById('plErrorMsg');
+          if (errEl && data?.error) {
+            errEl.innerText = data.error;
+            errEl.classList.remove('hidden');
+          }
+          return;
+        }
+
+        partnerData = data;
+        document.getElementById('partnerLoginOverlay')?.classList.add('hidden');
+        document.getElementById('dashboardMain')?.classList.remove('hidden');
+        renderDashboard();
+      } catch (err) {
+        console.error('Partner dashboard error:', err);
+      } finally {
+        const liveIcon = document.getElementById('hdrRefreshIcon');
+        if (liveIcon) liveIcon.classList.remove('animate-spin');
+        if (icon) icon.classList.remove('animate-spin');
+      }
+    }
+
+    function switchPartnerTab(tab) {
+      activeTab = tab;
+      const idleCls = 'px-4 py-2 text-xs font-bold rounded-t-xl border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-2 whitespace-nowrap cursor-pointer';
+      const activeCls = 'px-4 py-2 text-xs font-bold rounded-t-xl border-b-2 border-violet-500 text-white bg-slate-900/80 flex items-center gap-2 whitespace-nowrap cursor-pointer';
+
+      document.getElementById('tabBtnShops').className = tab === 'SHOPS' ? activeCls : idleCls;
+      document.getElementById('tabBtnCommissions').className = tab === 'COMMISSIONS' ? activeCls : idleCls;
+      document.getElementById('tabBtnPayouts').className = tab === 'PAYOUTS' ? activeCls : idleCls;
+
+      document.getElementById('tabPanelShops').classList.toggle('hidden', tab !== 'SHOPS');
+      document.getElementById('tabPanelCommissions').classList.toggle('hidden', tab !== 'COMMISSIONS');
+      document.getElementById('tabPanelPayouts').classList.toggle('hidden', tab !== 'PAYOUTS');
+      lucide.createIcons();
+    }
+
+    function filterExpiringSoon() {
+      switchPartnerTab('SHOPS');
+      const sel = document.getElementById('shopStatusFilter');
+      if (sel) sel.value = 'EXPIRING';
+      renderShopsTab();
+    }
+
+    function renderDashboard() {
+      if (!partnerData) return;
+      const p = partnerData.partner || {};
+      const prov = partnerData.provider || {};
+      const shops = partnerData.shops || [];
+      const comms = partnerData.commissions || [];
+      const payouts = partnerData.payouts || [];
+
+      document.getElementById('hdrPartnerCode').innerText = p.partner_code || 'PARTNER';
+      document.getElementById('hdrPartnerSubtitle').innerText = `${p.full_name || 'Marketing Partner'}${p.city ? ' • ' + p.city : ''}`;
+      document.getElementById('dashPartnerName').innerText = p.full_name || 'Partner';
+      document.getElementById('footerPartnerCode').innerText = p.partner_code || 'PD-XXXX';
+      document.getElementById('dashPartnerMeta').innerHTML = `
+        <span class="inline-flex items-center gap-1"><i data-lucide="map-pin" class="w-3.5 h-3.5 text-violet-400 shrink-0"></i>${escapeHtml(p.city || 'Location not set')}${p.territory ? ' (' + escapeHtml(p.territory) + ')' : ''}</span>
+        <span class="text-slate-600">&bull;</span>
+        <span class="inline-flex items-center gap-1"><i data-lucide="qr-code" class="w-3.5 h-3.5 text-emerald-400 shrink-0"></i>UPI: <strong class="font-mono text-slate-200">${escapeHtml(p.upi_id || 'Not configured')}</strong></span>
+      `;
+      document.getElementById('dashShareRuleText').innerHTML =
+        `Revenue Share: <strong class="text-white">${Number(p.effective_first_sale_rate || 0)}% First Sale</strong> &bull; <strong class="text-white">${Number(p.effective_renewal_rate || 0)}% Renewal</strong>` +
+        (Number(p.deduction_percent || 0) > 0 ? ` &bull; Net after ${Number(p.deduction_percent)}% fee/tax` : '') +
+        ` &bull; Payout Cycle: <strong class="text-white">${escapeHtml(p.payout_cycle_note || 'Monthly')}</strong>`;
+
+      const waLink = document.getElementById('providerSupportWhatsApp');
+      const provPhone = cleanPhone(prov.whatsapp || prov.phone || '');
+      if (waLink && provPhone) {
+        waLink.href = `https://wa.me/${provPhone}?text=${encodeURIComponent(`Hi ${prov.business_name || 'PrintDrop'}, this is ${p.full_name} (${p.partner_code}).`)}`;
+        waLink.classList.remove('hidden');
+      }
+
+      // Compute KPIs
+      const paidShops = shops.filter(s => s.plan_type !== 'TRIAL' && s.is_active !== false);
+      const trialShops = shops.filter(s => s.plan_type === 'TRIAL');
+      const expiringSoonCount = shops.filter(s => {
+        const d = getCalendarDaysRemaining(s.expires_at);
+        return s.is_active !== false && d !== null && d > 0 && d <= 7;
+      }).length;
+
+      const clientBilled = shops.reduce((sum, s) => sum + Number(s.amount_paid || 0), 0);
+      const totalEarned = comms.reduce((sum, c) => sum + Number(c.commission_amount || 0), 0);
+      const totalPaid = payouts.reduce((sum, py) => sum + Number(py.amount || 0), 0);
+      const pendingPayout = Math.max(0, Math.round((totalEarned - totalPaid) * 100) / 100);
+
+      document.getElementById('kpiTotalShops').innerText = String(shops.length);
+      document.getElementById('kpiShopsBreakdown').innerText = `${paidShops.length} paid • ${trialShops.length} trial`;
+      document.getElementById('kpiTotalEarned').innerText = `₹${totalEarned.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+      document.getElementById('kpiClientBilledSub').innerText = `Client Billed: ₹${Math.round(clientBilled).toLocaleString('en-IN')}`;
+      document.getElementById('kpiTotalPaid').innerText = `₹${totalPaid.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+      document.getElementById('kpiPayoutCountSub').innerText = `${payouts.length} settlement${payouts.length === 1 ? '' : 's'} received`;
+      document.getElementById('kpiPendingPayout').innerText = `₹${pendingPayout.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+      document.getElementById('kpiMinThresholdSub').innerText = `Min payout: ₹${Number(p.min_payout_threshold || 0).toLocaleString('en-IN')}`;
+
+      document.getElementById('tabCountShops').innerText = String(shops.length);
+      document.getElementById('tabCountComms').innerText = String(comms.length);
+      document.getElementById('tabCountPayouts').innerText = String(payouts.length);
+
+      const expBanner = document.getElementById('expiringAlertBanner');
+      if (expBanner) {
+        if (expiringSoonCount > 0) {
+          document.getElementById('expiringAlertText').innerText = `${expiringSoonCount} of your shopkeeper${expiringSoonCount === 1 ? '' : 's'} expire within 7 days — follow up now to help them renew and keep your recurring share active!`;
+          expBanner.classList.remove('hidden');
+        } else {
+          expBanner.classList.add('hidden');
+        }
+      }
+
+      renderShopsTab();
+      renderCommissionsTab();
+      renderPayoutsTab();
+      lucide.createIcons();
+    }
+
+    function renderShopsTab() {
+      const tbody = document.getElementById('shopsTableBody');
+      const mobileCards = document.getElementById('shopsMobileCards');
+      const empty = document.getElementById('shopsEmptyState');
+      if (!tbody || !partnerData) return;
+
+      const q = (document.getElementById('shopSearchInput')?.value || '').toLowerCase().trim();
+      const filter = document.getElementById('shopStatusFilter')?.value || 'ALL';
+
+      const filtered = (partnerData.shops || []).filter(s => {
+        if (q) {
+          const hay = `${s.shop_name || ''} ${s.owner_name || ''} ${s.phone || ''} ${s.city || ''}`.toLowerCase();
+          if (!hay.includes(q)) return false;
+        }
+        const days = getCalendarDaysRemaining(s.expires_at);
+        const isTrial = s.plan_type === 'TRIAL';
+        const isExpired = days !== null && days <= 0 && s.plan_type !== 'WALLET_PAGES';
+        const isExpiring = days !== null && days > 0 && days <= 7;
+
+        if (filter === 'ACTIVE' && (isTrial || isExpired || s.is_active === false)) return false;
+        if (filter === 'TRIAL' && (!isTrial || isExpired || s.is_active === false)) return false;
+        if (filter === 'EXPIRING' && (!isExpiring || s.is_active === false)) return false;
+        if (filter === 'EXPIRED' && !isExpired) return false;
+        return true;
+      });
+
+      tbody.innerHTML = '';
+      if (mobileCards) mobileCards.innerHTML = '';
+      if (filtered.length === 0) {
+        empty?.classList.remove('hidden');
+        return;
+      }
+      empty?.classList.add('hidden');
+
+      const buildItem = (s) => {
+        const cleanShop = (s.shop_name || 'Retail Station').replace(/\s*\((Trial|Trial Mode)\)\s*/gi, '').trim();
+        const days = getCalendarDaysRemaining(s.expires_at);
+        const isTrial = s.plan_type === 'TRIAL';
+        const isExpired = days !== null && days <= 0 && s.plan_type !== 'WALLET_PAGES';
+        const isExpiring = days !== null && days > 0 && days <= 7;
+        const phoneClean = cleanPhone(s.phone);
+
+        let badge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 whitespace-nowrap shrink-0">Active</span>';
+        if (s.is_active === false) {
+          badge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30 whitespace-nowrap shrink-0">Suspended</span>';
+        } else if (isExpired) {
+          badge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-950 text-rose-300 border border-rose-700 whitespace-nowrap shrink-0">${isTrial ? 'Trial Expired' : 'Expired'}</span>`;
+        } else if (isTrial) {
+          badge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 whitespace-nowrap shrink-0">Trial (${days !== null ? days + 'd left' : 'Active'})</span>`;
+        } else if (isExpiring) {
+          badge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse whitespace-nowrap shrink-0">Expiring ${days}d</span>`;
+        }
+
+        const expiryText = s.plan_type === 'WALLET_PAGES'
+          ? 'Lifetime Page Wallet'
+          : (s.expires_at ? `Valid till ${new Date(s.expires_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}` : 'Active');
+
+        return { cleanShop, isTrial, phoneClean, badge, expiryText };
+      };
+
+      tbody.innerHTML = filtered.map(s => {
+        const { cleanShop, isTrial, phoneClean, badge, expiryText } = buildItem(s);
+        return `
+          <tr class="hover:bg-slate-800/35 transition">
+            <td class="py-3 px-4">
+              <div class="font-bold text-white">${escapeHtml(cleanShop)}</div>
+              <div class="text-[11px] text-slate-400 flex items-center gap-2 mt-0.5 flex-wrap">
+                <span class="inline-flex items-center gap-1"><i data-lucide="user" class="w-3 h-3 text-slate-500"></i>${escapeHtml(s.owner_name || 'Owner')}</span>
+                ${phoneClean ? `<a href="https://wa.me/${phoneClean}" target="_blank" class="inline-flex items-center gap-1 text-emerald-400 hover:underline font-medium"><i data-lucide="phone" class="w-3 h-3"></i>${escapeHtml(s.phone)}</a>` : ''}
+              </div>
+            </td>
+            <td class="py-3 px-4 text-slate-300">${escapeHtml(s.city || 'Not set')}</td>
+            <td class="py-3 px-4">
+              <div class="font-semibold ${isTrial ? 'text-amber-300' : 'text-indigo-300'}">${formatPlanName(s.plan_type)}</div>
+              ${s.pages_granted ? `<div class="text-[10px] text-slate-400">${Number(s.pages_granted).toLocaleString('en-IN')} pages</div>` : ''}
+            </td>
+            <td class="py-3 px-4">
+              <div>${badge}</div>
+              <div class="text-[10px] text-slate-400 mt-1">${expiryText}</div>
+            </td>
+            <td class="py-3 px-4 text-right font-bold text-emerald-400">₹${Number(s.amount_paid || 0).toLocaleString('en-IN')}</td>
+          </tr>
+        `;
+      }).join('');
+
+      if (mobileCards) {
+        mobileCards.innerHTML = filtered.map(s => {
+          const { cleanShop, isTrial, phoneClean, badge, expiryText } = buildItem(s);
+          return `
+            <div class="p-3.5 space-y-2 tabular-nums">
+              <div class="flex items-start justify-between gap-2">
+                <div class="min-w-0">
+                  <div class="font-bold text-white text-sm truncate">${escapeHtml(cleanShop)}</div>
+                  <div class="text-[11px] text-slate-400 truncate">${escapeHtml(s.owner_name || 'Owner')} &bull; ${escapeHtml(s.city || 'Not set')}</div>
+                </div>
+                ${badge}
+              </div>
+              <div class="flex items-center justify-between text-xs pt-0.5">
+                <div>
+                  <span class="font-semibold ${isTrial ? 'text-amber-300' : 'text-indigo-300'}">${formatPlanName(s.plan_type)}</span>
+                  <span class="text-[11px] text-slate-400 block">${expiryText}</span>
+                </div>
+                <div class="text-right font-extrabold text-emerald-400 text-sm">₹${Number(s.amount_paid || 0).toLocaleString('en-IN')}</div>
+              </div>
+              ${phoneClean ? `
+                <div class="flex items-center gap-2 pt-1">
+                  <a href="tel:${phoneClean}" class="flex-1 min-h-[38px] rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold flex items-center justify-center gap-1.5 border border-slate-700">
+                    <i data-lucide="phone" class="w-3.5 h-3.5 text-indigo-400"></i><span>Call</span>
+                  </a>
+                  <a href="https://wa.me/${phoneClean}" target="_blank" class="flex-1 min-h-[38px] rounded-xl bg-emerald-600/20 hover:bg-emerald-600/35 text-emerald-300 text-xs font-bold flex items-center justify-center gap-1.5 border border-emerald-500/40">
+                    <i data-lucide="message-circle" class="w-3.5 h-3.5"></i><span>WhatsApp</span>
+                  </a>
+                </div>
+              ` : ''}
+            </div>
+          `;
+        }).join('');
+      }
+      lucide.createIcons();
+    }
+
+    function renderCommissionsTab() {
+      const tbody = document.getElementById('commissionsTableBody');
+      const mobileCards = document.getElementById('commissionsMobileCards');
+      const empty = document.getElementById('commissionsEmptyState');
+      if (!tbody || !partnerData) return;
+      const comms = partnerData.commissions || [];
+      tbody.innerHTML = '';
+      if (mobileCards) mobileCards.innerHTML = '';
+      if (comms.length === 0) {
+        empty?.classList.remove('hidden');
+        return;
+      }
+      empty?.classList.add('hidden');
+
+      tbody.innerHTML = comms.map(c => `
+        <tr class="hover:bg-slate-800/35 transition">
+          <td class="py-3 px-4 text-slate-400">${new Date(c.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
+          <td class="py-3 px-4">
+            <div class="font-bold text-white">${escapeHtml(c.shop_name)}</div>
+            <div class="text-[10px] text-slate-400">${escapeHtml(c.plan_name || c.plan_code || '')}${c.invoice_number ? ' • ' + escapeHtml(c.invoice_number) : ''}</div>
+          </td>
+          <td class="py-3 px-4"><span class="px-2 py-0.5 rounded bg-slate-800 text-slate-200 text-[10px] font-semibold whitespace-nowrap">${escapeHtml(c.payment_type)}</span></td>
+          <td class="py-3 px-4 text-slate-300">₹${Number(c.gross_amount || 0).toLocaleString('en-IN')} <span class="text-[10px] text-slate-500">(Net ₹${Number(c.net_amount || 0).toLocaleString('en-IN')})</span></td>
+          <td class="py-3 px-4 font-mono text-violet-300 font-bold">${Number(c.rate_percent || 0)}%</td>
+          <td class="py-3 px-4 text-right font-extrabold text-emerald-400">₹${Number(c.commission_amount || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</td>
+          <td class="py-3 px-4">
+            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap ${c.status === 'PAID' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'}">${escapeHtml(c.status)}</span>
+          </td>
+        </tr>
+      `).join('');
+
+      if (mobileCards) {
+        mobileCards.innerHTML = comms.map(c => `
+          <div class="p-3.5 space-y-1.5 tabular-nums">
+            <div class="flex items-start justify-between gap-2">
+              <div class="min-w-0">
+                <div class="font-bold text-white text-sm truncate">${escapeHtml(c.shop_name)}</div>
+                <div class="text-[11px] text-slate-400">${new Date(c.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })} &bull; ${escapeHtml(c.payment_type)}</div>
+              </div>
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap shrink-0 ${c.status === 'PAID' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'}">${escapeHtml(c.status)}</span>
+            </div>
+            <div class="flex items-center justify-between text-xs pt-0.5">
+              <span class="text-slate-400">Gross ₹${Number(c.gross_amount || 0).toLocaleString('en-IN')} &bull; <strong class="font-mono text-violet-300">${Number(c.rate_percent || 0)}%</strong></span>
+              <span class="font-extrabold text-emerald-400 text-sm">₹${Number(c.commission_amount || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
+            </div>
+          </div>
+        `).join('');
+      }
+    }
+
+    function renderPayoutsTab() {
+      const tbody = document.getElementById('payoutsTableBody');
+      const mobileCards = document.getElementById('payoutsMobileCards');
+      const empty = document.getElementById('payoutsEmptyState');
+      if (!tbody || !partnerData) return;
+      const payouts = partnerData.payouts || [];
+      tbody.innerHTML = '';
+      if (mobileCards) mobileCards.innerHTML = '';
+      if (payouts.length === 0) {
+        empty?.classList.remove('hidden');
+        return;
+      }
+      empty?.classList.add('hidden');
+
+      tbody.innerHTML = payouts.map(py => `
+        <tr class="hover:bg-slate-800/35 transition">
+          <td class="py-3 px-4 text-slate-300">${new Date(py.paid_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
+          <td class="py-3 px-4 font-extrabold text-emerald-400">₹${Number(py.amount || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</td>
+          <td class="py-3 px-4 text-slate-200 font-semibold">${escapeHtml(py.payment_mode || 'UPI')}</td>
+          <td class="py-3 px-4 font-mono text-cyan-300">${escapeHtml(py.utr_reference || '—')}</td>
+          <td class="py-3 px-4 text-slate-400">${escapeHtml(py.period_label || py.notes || '—')}</td>
+        </tr>
+      `).join('');
+
+      if (mobileCards) {
+        mobileCards.innerHTML = payouts.map(py => `
+          <div class="p-3.5 space-y-1 tabular-nums">
+            <div class="flex items-center justify-between gap-2">
+              <span class="font-extrabold text-emerald-400 text-base">₹${Number(py.amount || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 whitespace-nowrap">${escapeHtml(py.payment_mode || 'UPI')}</span>
+            </div>
+            <div class="text-[11px] text-slate-300">${new Date(py.paid_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}${py.period_label ? ' &bull; ' + escapeHtml(py.period_label) : ''}</div>
+            <div class="text-[11px] font-mono text-cyan-300 break-all">UTR: ${escapeHtml(py.utr_reference || '—')}</div>
+          </div>
+        `).join('');
+      }
+    }
+
+    function copyPartnerCode() {
+      const code = partnerData?.partner?.partner_code || '';
+      if (!code) return;
+      navigator.clipboard?.writeText(code).catch(() => {});
+      const el = document.getElementById('copyCodeBtnText');
+      if (el) {
+        el.innerText = `Copied ${code}!`;
+        setTimeout(() => { el.innerText = 'Copy Partner Code'; }, 2000);
+      }
+    }
+
+    function shareWhatsAppPitch() {
+      const p = partnerData?.partner || {};
+      const msg = `Hello! Upgrade your Xerox / Print shop with PrintDrop Counter OS — customers scan a QR code on 4G/5G (no WhatsApp chaos!), auto-billing, instant silent printing & 100% customer privacy.\n\nMention my Partner Code: ${p.partner_code || ''} for quick onboarding & free trial!`;
+      window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank', 'noopener');
+    }
+
+    function exportPartnerStatementCsv() {
+      if (!partnerData) return;
+      const p = partnerData.partner || {};
+      const payouts = partnerData.payouts || [];
+      let csv = `PrintDrop Partner Payout Statement\nPartner Name,"${(p.full_name || '').replace(/"/g, '""')}"\nPartner Code,${p.partner_code || ''}\nGenerated,${new Date().toISOString()}\n\nPaid Date,Amount (INR),Mode,UTR Reference,Period / Notes\n`;
+      payouts.forEach(py => {
+        csv += `"${new Date(py.paid_at).toLocaleDateString('en-IN')}",${Number(py.amount || 0)},"${(py.payment_mode || '').replace(/"/g, '""')}","${(py.utr_reference || '').replace(/"/g, '""')}","${(py.period_label || py.notes || '').replace(/"/g, '""')}"\n`;
+      });
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `PrintDrop_Payouts_${p.partner_code || 'Partner'}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    // =========================================================================
+    // PARTNER SETTINGS MENU & ALL 5 SELF-SERVICE FEATURES
+    // =========================================================================
+    let partnerSettingsCloseTimer = null;
+    let livePartnerDataBackup = null;
+
+    function openPartnerSettingsMenu() {
+      if (partnerSettingsCloseTimer) { clearTimeout(partnerSettingsCloseTimer); partnerSettingsCloseTimer = null; }
+      document.getElementById('partnerSettingsMenu')?.classList.remove('hidden');
+    }
+
+    function closePartnerSettingsMenu() {
+      if (partnerSettingsCloseTimer) { clearTimeout(partnerSettingsCloseTimer); partnerSettingsCloseTimer = null; }
+      document.getElementById('partnerSettingsMenu')?.classList.add('hidden');
+    }
+
+    function scheduleClosePartnerSettingsMenu() {
+      if (partnerSettingsCloseTimer) clearTimeout(partnerSettingsCloseTimer);
+      partnerSettingsCloseTimer = setTimeout(() => closePartnerSettingsMenu(), 160);
+    }
+
+    function togglePartnerSettingsMenu() {
+      const m = document.getElementById('partnerSettingsMenu');
+      if (!m) return;
+      if (m.classList.contains('hidden')) openPartnerSettingsMenu();
+      else closePartnerSettingsMenu();
+    }
+
+    document.addEventListener('click', (e) => {
+      const wrap = document.getElementById('partnerSettingsWrap');
+      if (wrap && !wrap.contains(e.target)) closePartnerSettingsMenu();
+    });
+
+    // --- 1. CHANGE PASSWORD ---
+    function openPartnerPasswordModal() {
+      document.getElementById('pcpCurrent').value = '';
+      document.getElementById('pcpNew').value = '';
+      document.getElementById('pcpConfirm').value = '';
+      document.getElementById('pcpStatus').innerText = '';
+      document.getElementById('partnerPasswordModal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function closePartnerPasswordModal() {
+      document.getElementById('partnerPasswordModal')?.classList.add('hidden');
+    }
+
+    async function submitPartnerPasswordChange(event) {
+      event.preventDefault();
+      const statusEl = document.getElementById('pcpStatus');
+      const cur = document.getElementById('pcpCurrent').value;
+      const next = document.getElementById('pcpNew').value;
+      const conf = document.getElementById('pcpConfirm').value;
+
+      if (next.length < 6) {
+        statusEl.innerText = '⚠️ New password must be at least 6 characters.';
+        return;
+      }
+      if (next !== conf) {
+        statusEl.innerText = '⚠️ New password and confirmation do not match.';
+        return;
+      }
+      const token = sessionStorage.getItem(TOKEN_STORAGE_KEY);
+      if (!token) return;
+
+      statusEl.innerText = 'Updating password...';
+      try {
+        const res = await callPartnerRpc('partner_portal_change_password', {
+          p_token: token,
+          p_current_password: cur,
+          p_new_password: next
+        });
+        if (!res?.ok) {
+          statusEl.innerText = `❌ ${res?.error || 'Password update failed.'}`;
+          return;
+        }
+        statusEl.innerText = '✅ Password updated successfully!';
+        setTimeout(() => closePartnerPasswordModal(), 1100);
+      } catch (err) {
+        statusEl.innerText = `❌ Error: ${err.message}`;
+      }
+    }
+
+    // --- 2. OFFLINE BACKUP (ENCRYPTED AES-256-GCM + EXCEL CSV) & READ-ONLY ARCHIVE RESTORE ---
+    function openPartnerBackupModal() {
+      document.getElementById('pbEncryptPass').value = '';
+      document.getElementById('pbDecryptPass').value = '';
+      const f = document.getElementById('pbRestoreFile');
+      if (f) f.value = '';
+      document.getElementById('pbStatus').innerText = '';
+      document.getElementById('partnerBackupModal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function closePartnerBackupModal() {
+      document.getElementById('partnerBackupModal')?.classList.add('hidden');
+    }
+
+    function bytesToBase64(bytes) {
+      let bin = '';
+      for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+      return btoa(bin);
+    }
+
+    function base64ToBytes(b64) {
+      const bin = atob(b64);
+      const out = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+      return out;
+    }
+
+    function pureJsSha256Bytes(str) {
+      const utf8 = unescape(encodeURIComponent(str));
+      const rightRotate = (v, a) => (v >>> a) | (v << (32 - a));
+      const maxWord = Math.pow(2, 32);
+      const words = [];
+      const bitLen = utf8.length * 8;
+      const hash = pureJsSha256Bytes.h = pureJsSha256Bytes.h || [];
+      const k = pureJsSha256Bytes.k = pureJsSha256Bytes.k || [];
+      let pc = k.length;
+      const comp = {};
+      for (let c = 2; pc < 64; c++) {
+        if (!comp[c]) {
+          for (let i = 0; i < 313; i += c) comp[i] = c;
+          hash[pc] = (Math.pow(c, 0.5) * maxWord) | 0;
+          k[pc++] = (Math.pow(c, 1 / 3) * maxWord) | 0;
+        }
+      }
+      let msg = utf8 + '\x80';
+      while (msg.length % 64 - 56) msg += '\x00';
+      for (let i = 0; i < msg.length; i++) words[i >> 2] |= msg.charCodeAt(i) << ((3 - i) % 4) * 8;
+      words[words.length] = (bitLen / maxWord) | 0;
+      words[words.length] = bitLen;
+      const h = hash.slice(0, 8);
+      for (let j = 0; j < words.length;) {
+        const w = words.slice(j, j += 16);
+        const old = h.slice(0);
+        for (let i = 0; i < 64; i++) {
+          const w15 = w[i - 15], w2 = w[i - 2], a = h[0], e = h[4];
+          const t1 = h[7] + (rightRotate(e, 6) ^ rightRotate(e, 11) ^ rightRotate(e, 25)) + ((e & h[5]) ^ ((~e) & h[6])) + k[i] + (w[i] = (i < 16) ? w[i] : (w[i - 16] + (rightRotate(w15, 7) ^ rightRotate(w15, 18) ^ (w15 >>> 3)) + w[i - 7] + (rightRotate(w2, 17) ^ rightRotate(w2, 19) ^ (w2 >>> 10))) | 0);
+          const t2 = (rightRotate(a, 2) ^ rightRotate(a, 13) ^ rightRotate(a, 22)) + ((a & h[1]) ^ (a & h[2]) ^ (h[1] & h[2]));
+          h.unshift((t1 + t2) | 0);
+          h.pop();
+          h[4] = (h[4] + t1) | 0;
+        }
+        for (let i = 0; i < 8; i++) h[i] = (h[i] + old[i]) | 0;
+      }
+      const out = new Uint8Array(32);
+      for (let i = 0; i < 8; i++) {
+        out[i * 4] = (h[i] >>> 24) & 255;
+        out[i * 4 + 1] = (h[i] >>> 16) & 255;
+        out[i * 4 + 2] = (h[i] >>> 8) & 255;
+        out[i * 4 + 3] = h[i] & 255;
+      }
+      return out;
+    }
+
+    function xorStreamCipher(dataBytes, pass, saltHex) {
+      const out = new Uint8Array(dataBytes.length);
+      let blockIdx = 0;
+      let keyBlock = pureJsSha256Bytes(`${saltHex}:${pass}:0`);
+      for (let i = 0; i < dataBytes.length; i++) {
+        const b = i & 31;
+        if (i > 0 && b === 0) {
+          blockIdx++;
+          keyBlock = pureJsSha256Bytes(`${saltHex}:${pass}:${blockIdx}`);
+        }
+        out[i] = dataBytes[i] ^ keyBlock[b];
+      }
+      return out;
+    }
+
+    async function encryptPartnerPayload(obj, passphrase) {
+      const jsonStr = JSON.stringify(obj);
+      const dataBytes = new TextEncoder().encode(jsonStr);
+      const salt = new Uint8Array(16);
+      window.crypto?.getRandomValues ? window.crypto.getRandomValues(salt) : salt.forEach((_, i) => salt[i] = Math.floor(Math.random() * 256));
+
+      if (window.crypto && window.crypto.subtle) {
+        const iv = new Uint8Array(12);
+        window.crypto.getRandomValues(iv);
+        const keyMat = await crypto.subtle.importKey('raw', new TextEncoder().encode(passphrase), 'PBKDF2', false, ['deriveKey']);
+        const aesKey = await crypto.subtle.deriveKey(
+          { name: 'PBKDF2', salt, iterations: 120000, hash: 'SHA-256' },
+          keyMat,
+          { name: 'AES-GCM', length: 256 },
+          false,
+          ['encrypt']
+        );
+        const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, aesKey, dataBytes);
+        return {
+          format: 'PRINTDROP_PARTNER_BACKUP_V1',
+          alg: 'AES-256-GCM',
+          exported_at: new Date().toISOString(),
+          partner_code: obj.partner?.partner_code || '',
+          salt: bytesToBase64(salt),
+          iv: bytesToBase64(iv),
+          ciphertext: bytesToBase64(new Uint8Array(ct))
+        };
+      }
+
+      // Fallback when opened locally via file:// (where browsers disable crypto.subtle)
+      const saltHex = Array.from(salt, b => b.toString(16).padStart(2, '0')).join('');
+      const cipherBytes = xorStreamCipher(dataBytes, passphrase, saltHex);
+      const mac = bytesToBase64(pureJsSha256Bytes(`${saltHex}:${passphrase}:MAC:${jsonStr}`));
+      return {
+        format: 'PRINTDROP_PARTNER_BACKUP_V1',
+        alg: 'SHA256-STREAM-V1',
+        exported_at: new Date().toISOString(),
+        partner_code: obj.partner?.partner_code || '',
+        salt: saltHex,
+        mac,
+        ciphertext: bytesToBase64(cipherBytes)
+      };
+    }
+
+    async function decryptPartnerPayload(envelope, passphrase) {
+      if (!envelope || envelope.format !== 'PRINTDROP_PARTNER_BACKUP_V1') {
+        throw new Error('Invalid backup file format.');
+      }
+      if (envelope.alg === 'AES-256-GCM') {
+        if (!window.crypto || !window.crypto.subtle) {
+          throw new Error('This AES-GCM backup requires HTTPS/localhost to decrypt.');
+        }
+        const salt = base64ToBytes(envelope.salt);
+        const iv = base64ToBytes(envelope.iv);
+        const ct = base64ToBytes(envelope.ciphertext);
+        const keyMat = await crypto.subtle.importKey('raw', new TextEncoder().encode(passphrase), 'PBKDF2', false, ['deriveKey']);
+        const aesKey = await crypto.subtle.deriveKey(
+          { name: 'PBKDF2', salt, iterations: 120000, hash: 'SHA-256' },
+          keyMat,
+          { name: 'AES-GCM', length: 256 },
+          false,
+          ['decrypt']
+        );
+        const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, aesKey, ct);
+        return JSON.parse(new TextDecoder().decode(pt));
+      }
+      if (envelope.alg === 'SHA256-STREAM-V1') {
+        const cipherBytes = base64ToBytes(envelope.ciphertext);
+        const plainBytes = xorStreamCipher(cipherBytes, passphrase, envelope.salt);
+        const jsonStr = new TextDecoder().decode(plainBytes);
+        const expectedMac = bytesToBase64(pureJsSha256Bytes(`${envelope.salt}:${passphrase}:MAC:${jsonStr}`));
+        if (expectedMac !== envelope.mac) {
+          throw new Error('Wrong passphrase or corrupted backup file.');
+        }
+        return JSON.parse(jsonStr);
+      }
+      throw new Error('Unsupported encryption algorithm.');
+    }
+
+    async function downloadEncryptedPartnerBackup() {
+      const statusEl = document.getElementById('pbStatus');
+      const pass = document.getElementById('pbEncryptPass').value;
+      if (!partnerData) return;
+      if (pass.length < 6) {
+        statusEl.innerText = '⚠️ Enter an encryption passphrase of at least 6 characters.';
+        return;
+      }
+      statusEl.innerText = 'Encrypting your personal backup...';
+      try {
+        const envelope = await encryptPartnerPayload({
+          exported_at: new Date().toISOString(),
+          partner: partnerData.partner,
+          provider: partnerData.provider,
+          shops: partnerData.shops || [],
+          commissions: partnerData.commissions || [],
+          payouts: partnerData.payouts || []
+        }, pass);
+        const blob = new Blob([JSON.stringify(envelope, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const dateTag = new Date().toISOString().slice(0, 10);
+        a.href = url;
+        a.download = `PrintDrop_Partner_Backup_${partnerData.partner?.partner_code || 'ME'}_${dateTag}.pdpartner`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        statusEl.innerText = '✅ Encrypted backup downloaded! Keep your passphrase safe.';
+      } catch (err) {
+        statusEl.innerText = `❌ Backup failed: ${err.message}`;
+      }
+    }
+
+    function downloadExcelPartnerBackup() {
+      if (!partnerData) return;
+      const p = partnerData.partner || {};
+      const shops = partnerData.shops || [];
+      const comms = partnerData.commissions || [];
+      const payouts = partnerData.payouts || [];
+      const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+
+      let csv = '\uFEFF';
+      csv += `PrintDrop Marketing Partner Complete Offline Report\n`;
+      csv += `Partner Name,${esc(p.full_name)}\n`;
+      csv += `Partner ID,${esc(p.partner_code)}\n`;
+      csv += `City / Territory,${esc((p.city || '') + (p.territory ? ' - ' + p.territory : ''))}\n`;
+      csv += `Exported At,${esc(new Date().toLocaleString('en-IN'))}\n\n`;
+
+      csv += `=== MY SHOPKEEPERS (${shops.length}) ===\n`;
+      csv += `Shop Name,Owner Name,Phone,City,Plan,Status,Expiry Date,Amount Paid (INR)\n`;
+      shops.forEach(s => {
+        const cleanShop = (s.shop_name || '').replace(/\s*\((Trial|Trial Mode)\)\s*/gi, '').trim();
+        const exp = s.expires_at ? new Date(s.expires_at).toLocaleDateString('en-IN') : 'No Expiry';
+        csv += [esc(cleanShop), esc(s.owner_name || ''), esc(s.phone || ''), esc(s.city || ''), esc(formatPlanName(s.plan_type)), esc(s.is_active === false ? 'Suspended' : 'Active'), esc(exp), Number(s.amount_paid || 0)].join(',') + '\n';
+      });
+
+      csv += `\n=== REVENUE SHARE LEDGER (${comms.length}) ===\n`;
+      csv += `Date,Shop Name,Plan,Type,Gross (INR),Net Base (INR),Share %,Your Share (INR),Status\n`;
+      comms.forEach(c => {
+        csv += [esc(new Date(c.created_at).toLocaleDateString('en-IN')), esc(c.shop_name), esc(c.plan_name || c.plan_code || ''), esc(c.payment_type), Number(c.gross_amount || 0), Number(c.net_amount || 0), Number(c.rate_percent || 0), Number(c.commission_amount || 0), esc(c.status)].join(',') + '\n';
+      });
+
+      csv += `\n=== PAYOUTS RECEIVED (${payouts.length}) ===\n`;
+      csv += `Paid Date,Amount (INR),Mode,UTR / Ref,Period / Remarks\n`;
+      payouts.forEach(py => {
+        csv += [esc(new Date(py.paid_at).toLocaleDateString('en-IN')), Number(py.amount || 0), esc(py.payment_mode || ''), esc(py.utr_reference || ''), esc(py.period_label || py.notes || '')].join(',') + '\n';
+      });
+
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const dateTag = new Date().toISOString().slice(0, 10);
+      a.href = url;
+      a.download = `PrintDrop_Partner_Excel_${p.partner_code || 'ME'}_${dateTag}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      const statusEl = document.getElementById('pbStatus');
+      if (statusEl) statusEl.innerText = '✅ Excel-compatible (.csv) report downloaded!';
+    }
+
+    async function loadEncryptedPartnerBackup() {
+      const statusEl = document.getElementById('pbStatus');
+      const fileInp = document.getElementById('pbRestoreFile');
+      const pass = document.getElementById('pbDecryptPass').value;
+      const file = fileInp?.files?.[0];
+      if (!file) { statusEl.innerText = '⚠️ Select a .pdpartner backup file first.'; return; }
+      if (!pass) { statusEl.innerText = '⚠️ Enter the backup passphrase to decrypt.'; return; }
+
+      statusEl.innerText = 'Decrypting offline backup...';
+      try {
+        const text = await file.text();
+        const env = JSON.parse(text);
+        const restored = await decryptPartnerPayload(env, pass);
+        if (!livePartnerDataBackup) livePartnerDataBackup = partnerData;
+        partnerData = { ok: true, ...restored };
+        renderDashboard();
+        const banner = document.getElementById('offlineArchiveBanner');
+        const bText = document.getElementById('offlineArchiveText');
+        const snapDate = restored.exported_at ? new Date(restored.exported_at).toLocaleString('en-IN') : 'Offline File';
+        if (bText) bText.innerText = `Viewing Offline Backup Snapshot (Read-Only • Saved ${snapDate}) — Live cloud records are untouched.`;
+        if (banner) banner.classList.remove('hidden');
+        closePartnerBackupModal();
+        lucide.createIcons();
+      } catch (err) {
+        statusEl.innerText = `❌ Could not decrypt backup: ${err.message || 'Wrong passphrase or invalid file.'}`;
+      }
+    }
+
+    function exitOfflineArchiveMode() {
+      if (livePartnerDataBackup) {
+        partnerData = livePartnerDataBackup;
+        livePartnerDataBackup = null;
+        renderDashboard();
+      } else {
+        refreshDashboard(true);
+      }
+      document.getElementById('offlineArchiveBanner')?.classList.add('hidden');
+    }
+
+    // --- 3. SELF-SERVICE PROFILE & PAYOUT DETAILS ---
+    function openPartnerProfileModal() {
+      const p = partnerData?.partner || {};
+      document.getElementById('ppPartnerCodeReadonly').value = p.partner_code || '';
+      document.getElementById('ppPhone').value = p.phone || '';
+      document.getElementById('ppEmail').value = p.email || '';
+      document.getElementById('ppUpi').value = p.upi_id || '';
+      document.getElementById('ppBank').value = p.bank_details || '';
+      document.getElementById('ppPan').value = p.pan_number || '';
+      document.getElementById('ppStatus').innerText = '';
+      document.getElementById('partnerProfileModal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function closePartnerProfileModal() {
+      document.getElementById('partnerProfileModal')?.classList.add('hidden');
+    }
+
+    async function submitPartnerProfileUpdate(event) {
+      event.preventDefault();
+      const statusEl = document.getElementById('ppStatus');
+      const token = sessionStorage.getItem(TOKEN_STORAGE_KEY);
+      if (!token) return;
+      statusEl.innerText = 'Saving profile...';
+      try {
+        const res = await callPartnerRpc('partner_portal_update_profile', {
+          p_token: token,
+          p_phone: document.getElementById('ppPhone').value,
+          p_email: document.getElementById('ppEmail').value,
+          p_upi_id: document.getElementById('ppUpi').value,
+          p_bank_details: document.getElementById('ppBank').value,
+          p_pan_number: document.getElementById('ppPan').value
+        });
+        if (!res?.ok) {
+          statusEl.innerText = `❌ ${res?.error || 'Update failed.'}`;
+          return;
+        }
+        statusEl.innerText = '✅ Profile & payout details saved!';
+        await refreshDashboard(false);
+        setTimeout(() => closePartnerProfileModal(), 1000);
+      } catch (err) {
+        statusEl.innerText = `❌ Error: ${err.message}`;
+      }
+    }
+
+    // --- 4. SALES & REFERRAL TOOLKIT (ENGLISH + HINDI) ---
+    function openPartnerToolkitModal() {
+      const p = partnerData?.partner || {};
+      const code = p.partner_code || 'PD-PARTNER';
+      document.getElementById('tkPartnerCode').innerText = code;
+      document.getElementById('tkPitchEn').value =
+        `Hello! Upgrade your Xerox / Print shop with PrintDrop Counter OS:\n` +
+        `• Customers scan a QR code on 4G/5G (No WhatsApp chaos or phone storage full!)\n` +
+        `• Auto page-count billing & instant silent printing\n` +
+        `• 100% customer privacy with auto-delete after pickup\n\n` +
+        `Start your Free Trial today — mention my Partner ID: ${code}`;
+      document.getElementById('tkPitchHi').value =
+        `नमस्ते! अपनी Xerox / Print दुकान को PrintDrop Counter OS से अपग्रेड करें:\n` +
+        `• ग्राहक 4G/5G से सीधे QR स्कैन करके फाइल भेजें (WhatsApp झंझट खत्म!)\n` +
+        `• ऑटो बिलिंग और 1-क्लिक प्रिंटिंग\n` +
+        `• 100% ग्राहक प्राइवेसी (प्रिंट के बाद फाइल ऑटो-डिलीट)\n\n` +
+        `फ्री ट्रायल के लिए मेरा Partner ID बताएं: ${code}`;
+      document.getElementById('partnerToolkitModal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function closePartnerToolkitModal() {
+      document.getElementById('partnerToolkitModal')?.classList.add('hidden');
+    }
+
+    function copyToolkitText(textareaId, btnEl) {
+      const txt = document.getElementById(textareaId)?.value || '';
+      if (!txt) return;
+      navigator.clipboard?.writeText(txt).catch(() => {});
+      if (btnEl) {
+        const orig = btnEl.innerText;
+        btnEl.innerText = 'Copied!';
+        setTimeout(() => { btnEl.innerText = orig; }, 1600);
+      }
+    }
+
+    function sendToolkitWhatsApp(textareaId) {
+      const txt = document.getElementById(textareaId)?.value || '';
+      if (!txt) return;
+      window.open(`https://wa.me/?text=${encodeURIComponent(txt)}`, '_blank', 'noopener');
+    }
+
+    // --- 5. SIGN OUT ALL DEVICES ---
+    async function handlePartnerLogoutAll() {
+      if (!confirm('Sign out from ALL phones, tablets, and computers currently logged into your Partner Sales Portal?')) return;
+      const token = sessionStorage.getItem(TOKEN_STORAGE_KEY);
+      if (token) {
+        await callPartnerRpc('partner_portal_logout_all', { p_token: token }).catch(() => {});
+      }
+      sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+      partnerData = null;
+      livePartnerDataBackup = null;
+      document.getElementById('offlineArchiveBanner')?.classList.add('hidden');
+      document.getElementById('dashboardMain')?.classList.add('hidden');
+      document.getElementById('partnerLoginOverlay')?.classList.remove('hidden');
+      alert('✓ Signed out of all devices.');
+    }
+  </script>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL 1: CHANGE PASSWORD                                                  -->
+  <!-- ========================================================================= -->
+  <div id="partnerPasswordModal" class="fixed inset-0 z-50 hidden bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden">
+      <div class="px-5 py-4 border-b border-slate-800 bg-slate-950/70 flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <div class="p-2 rounded-lg bg-cyan-500/20 text-cyan-400"><i data-lucide="key-round" class="w-5 h-5"></i></div>
+          <div>
+            <h2 class="text-sm font-bold text-white">Change Password</h2>
+            <p class="text-[11px] text-slate-400">Your Partner ID remains immutable</p>
+          </div>
+        </div>
+        <button type="button" onclick="closePartnerPasswordModal()" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer"><i data-lucide="x" class="w-4 h-4"></i></button>
+      </div>
+      <form onsubmit="submitPartnerPasswordChange(event)" class="p-5 space-y-3.5 text-xs">
+        <div>
+          <label class="block text-[11px] font-bold text-slate-300 mb-1">Current Password</label>
+          <div class="relative">
+            <input id="pcpCurrent" type="password" required placeholder="Enter current password" class="w-full pl-3 pr-10 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white focus:outline-none focus:border-cyan-500" />
+            <button type="button" onclick="togglePasswordVisibility('pcpCurrent', this)" class="absolute inset-y-0 right-0 px-3 flex items-center text-slate-400 hover:text-cyan-300 cursor-pointer"><i data-lucide="eye" class="w-4 h-4"></i></button>
+          </div>
+        </div>
+        <div>
+          <label class="block text-[11px] font-bold text-slate-300 mb-1">New Password (min 6 chars)</label>
+          <div class="relative">
+            <input id="pcpNew" type="password" required minlength="6" placeholder="Enter new password" class="w-full pl-3 pr-10 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white focus:outline-none focus:border-cyan-500" />
+            <button type="button" onclick="togglePasswordVisibility('pcpNew', this)" class="absolute inset-y-0 right-0 px-3 flex items-center text-slate-400 hover:text-cyan-300 cursor-pointer"><i data-lucide="eye" class="w-4 h-4"></i></button>
+          </div>
+        </div>
+        <div>
+          <label class="block text-[11px] font-bold text-slate-300 mb-1">Confirm New Password</label>
+          <div class="relative">
+            <input id="pcpConfirm" type="password" required minlength="6" placeholder="Re-enter new password" class="w-full pl-3 pr-10 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white focus:outline-none focus:border-cyan-500" />
+            <button type="button" onclick="togglePasswordVisibility('pcpConfirm', this)" class="absolute inset-y-0 right-0 px-3 flex items-center text-slate-400 hover:text-cyan-300 cursor-pointer"><i data-lucide="eye" class="w-4 h-4"></i></button>
+          </div>
+        </div>
+        <div id="pcpStatus" class="text-xs font-semibold text-slate-300 min-h-[1.25rem]"></div>
+        <div class="flex justify-end gap-2 pt-1">
+          <button type="button" onclick="closePartnerPasswordModal()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold cursor-pointer">Cancel</button>
+          <button type="submit" class="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold cursor-pointer">Update Password</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL 2: OFFLINE PERSONAL BACKUP & ARCHIVE VIEWER (ENCRYPTED + EXCEL)     -->
+  <!-- ========================================================================= -->
+  <div id="partnerBackupModal" class="fixed inset-0 z-50 hidden bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+      <div class="px-5 py-4 border-b border-slate-800 bg-slate-950/70 flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <div class="p-2 rounded-lg bg-emerald-500/20 text-emerald-400"><i data-lucide="database-backup" class="w-5 h-5"></i></div>
+          <div>
+            <h2 class="text-sm font-bold text-white">Offline Personal Backup &amp; Archive</h2>
+            <p class="text-[11px] text-slate-400">Export your clients &amp; earnings to phone or laptop</p>
+          </div>
+        </div>
+        <button type="button" onclick="closePartnerBackupModal()" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer"><i data-lucide="x" class="w-4 h-4"></i></button>
+      </div>
+
+      <div class="p-5 overflow-y-auto partner-scroll space-y-4 text-xs">
+        <!-- Export Excel -->
+        <div class="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800 flex items-center justify-between gap-3">
+          <div>
+            <div class="font-bold text-white">Excel-Compatible Report (.csv)</div>
+            <div class="text-[11px] text-slate-400">All your Shopkeepers, Revenue Share Ledger &amp; Payouts</div>
+          </div>
+          <button type="button" onclick="downloadExcelPartnerBackup()" class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold shrink-0 cursor-pointer">
+            Download Excel
+          </button>
+        </div>
+
+        <!-- Export Encrypted -->
+        <div class="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800 space-y-2.5">
+          <div class="font-bold text-white">Encrypted Offline Backup (.pdpartner)</div>
+          <div class="relative">
+            <input id="pbEncryptPass" type="password" placeholder="Create backup passphrase (min 6 chars)" class="w-full pl-3 pr-10 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-emerald-500" />
+            <button type="button" onclick="togglePasswordVisibility('pbEncryptPass', this)" class="absolute inset-y-0 right-0 px-3 flex items-center text-slate-400 hover:text-emerald-300 cursor-pointer"><i data-lucide="eye" class="w-4 h-4"></i></button>
+          </div>
+          <button type="button" onclick="downloadEncryptedPartnerBackup()" class="w-full py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-bold cursor-pointer">
+            Download Encrypted Backup
+          </button>
+        </div>
+
+        <!-- Restore / Open Offline Archive -->
+        <div class="p-3.5 rounded-xl bg-slate-950/70 border border-cyan-500/30 space-y-2.5">
+          <div class="font-bold text-cyan-300">Open / Restore Offline Backup (Read-Only Viewer)</div>
+          <input id="pbRestoreFile" type="file" accept=".pdpartner,.json" class="w-full text-[11px] text-slate-300 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-slate-800 file:text-slate-200 file:font-bold hover:file:bg-slate-700" />
+          <div class="relative">
+            <input id="pbDecryptPass" type="password" placeholder="Enter backup passphrase to decrypt" class="w-full pl-3 pr-10 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-cyan-500" />
+            <button type="button" onclick="togglePasswordVisibility('pbDecryptPass', this)" class="absolute inset-y-0 right-0 px-3 flex items-center text-slate-400 hover:text-cyan-300 cursor-pointer"><i data-lucide="eye" class="w-4 h-4"></i></button>
+          </div>
+          <button type="button" onclick="loadEncryptedPartnerBackup()" class="w-full py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold cursor-pointer">
+            Decrypt &amp; View Offline Snapshot
+          </button>
+        </div>
+
+        <div id="pbStatus" class="text-xs font-semibold text-slate-300 min-h-[1.25rem]"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL 3: MY PROFILE & PAYOUT DETAILS (SELF-SERVICE)                       -->
+  <!-- ========================================================================= -->
+  <div id="partnerProfileModal" class="fixed inset-0 z-50 hidden bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden">
+      <div class="px-5 py-4 border-b border-slate-800 bg-slate-950/70 flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <div class="p-2 rounded-lg bg-violet-500/20 text-violet-300"><i data-lucide="user-cog" class="w-5 h-5"></i></div>
+          <div>
+            <h2 class="text-sm font-bold text-white">My Profile &amp; Payout Details</h2>
+            <p class="text-[11px] text-slate-400">Keep your UPI / Bank details updated for payouts</p>
+          </div>
+        </div>
+        <button type="button" onclick="closePartnerProfileModal()" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer"><i data-lucide="x" class="w-4 h-4"></i></button>
+      </div>
+      <form onsubmit="submitPartnerProfileUpdate(event)" class="p-5 space-y-3 text-xs">
+        <div>
+          <label class="block text-[11px] font-bold text-slate-400 mb-1">Partner ID (Immutable)</label>
+          <input id="ppPartnerCodeReadonly" type="text" readonly class="w-full px-3 py-2 rounded-xl bg-slate-950/60 border border-slate-800 font-mono text-violet-300 opacity-80 cursor-not-allowed" />
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-[11px] font-bold text-slate-300 mb-1">Mobile / WhatsApp</label>
+            <input id="ppPhone" type="text" placeholder="+91 98765 43210" class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white focus:outline-none focus:border-violet-500" />
+          </div>
+          <div>
+            <label class="block text-[11px] font-bold text-slate-300 mb-1">Email</label>
+            <input id="ppEmail" type="email" placeholder="you@example.com" class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white focus:outline-none focus:border-violet-500" />
+          </div>
+        </div>
+        <div>
+          <label class="block text-[11px] font-bold text-slate-300 mb-1">UPI ID (for Payout Settlements)</label>
+          <input id="ppUpi" type="text" placeholder="name@okhdfcbank" class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 font-mono text-white focus:outline-none focus:border-violet-500" />
+        </div>
+        <div>
+          <label class="block text-[11px] font-bold text-slate-300 mb-1">Bank Details (Optional)</label>
+          <input id="ppBank" type="text" placeholder="A/C No, IFSC, Bank Name" class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white focus:outline-none focus:border-violet-500" />
+        </div>
+        <div>
+          <label class="block text-[11px] font-bold text-slate-300 mb-1">PAN Number (Optional, for TDS)</label>
+          <input id="ppPan" type="text" placeholder="ABCDE1234F" class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 font-mono uppercase text-white focus:outline-none focus:border-violet-500" />
+        </div>
+        <div id="ppStatus" class="text-xs font-semibold text-slate-300 min-h-[1.25rem]"></div>
+        <div class="flex justify-end gap-2 pt-1">
+          <button type="button" onclick="closePartnerProfileModal()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold cursor-pointer">Cancel</button>
+          <button type="submit" class="px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-bold cursor-pointer">Save Details</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL 4: SALES & REFERRAL TOOLKIT (ENGLISH & HINDI)                       -->
+  <!-- ========================================================================= -->
+  <div id="partnerToolkitModal" class="fixed inset-0 z-50 hidden bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+      <div class="px-5 py-4 border-b border-slate-800 bg-slate-950/70 flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <div class="p-2 rounded-lg bg-amber-500/20 text-amber-400"><i data-lucide="megaphone" class="w-5 h-5"></i></div>
+          <div>
+            <h2 class="text-sm font-bold text-white">Sales &amp; Referral Toolkit</h2>
+            <p class="text-[11px] text-slate-400">Ready-to-send shopkeeper pitches with your Partner ID</p>
+          </div>
+        </div>
+        <button type="button" onclick="closePartnerToolkitModal()" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer"><i data-lucide="x" class="w-4 h-4"></i></button>
+      </div>
+      <div class="p-5 overflow-y-auto partner-scroll space-y-4 text-xs">
+        <div class="p-3 rounded-xl bg-violet-950/35 border border-violet-500/35 flex items-center justify-between">
+          <div>
+            <div class="text-[10px] text-slate-400 uppercase font-bold">Your Official Partner ID</div>
+            <div id="tkPartnerCode" class="font-mono text-base font-extrabold text-violet-300">PD-XXXX-XXXX</div>
+          </div>
+          <button type="button" onclick="copyPartnerCode()" class="px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 text-white font-bold cursor-pointer">Copy ID</button>
+        </div>
+
+        <div class="space-y-1.5">
+          <div class="flex items-center justify-between">
+            <label class="font-bold text-white">English Pitch (WhatsApp)</label>
+            <div class="flex items-center gap-1.5">
+              <button type="button" onclick="copyToolkitText('tkPitchEn', this)" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold cursor-pointer">Copy</button>
+              <button type="button" onclick="sendToolkitWhatsApp('tkPitchEn')" class="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold cursor-pointer">WhatsApp</button>
+            </div>
+          </div>
+          <textarea id="tkPitchEn" rows="5" readonly class="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 text-[11px] leading-relaxed"></textarea>
+        </div>
+
+        <div class="space-y-1.5">
+          <div class="flex items-center justify-between">
+            <label class="font-bold text-white">Hindi Pitch (हिंदी — WhatsApp)</label>
+            <div class="flex items-center gap-1.5">
+              <button type="button" onclick="copyToolkitText('tkPitchHi', this)" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold cursor-pointer">Copy</button>
+              <button type="button" onclick="sendToolkitWhatsApp('tkPitchHi')" class="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold cursor-pointer">WhatsApp</button>
+            </div>
+          </div>
+          <textarea id="tkPitchHi" rows="5" readonly class="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 text-[11px] leading-relaxed"></textarea>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

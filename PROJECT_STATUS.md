@@ -1986,6 +1986,25 @@
   - Shipped `v1.0.19` and verified live responsive UI improvement on **Awesome Xerox Center**.
   - Created reusable cross-project skill: `.agents/skills/true-responsive-ui-ux-engineering/SKILL.md` (and global copy at `C:\Users\satis\.gemini\config\skills\true-responsive-ui-ux-engineering\SKILL.md`).
 
+---
+
+## 79. Marketing Partners Dashboard (Phase 1), Isolated Individual Partner Sales Portal (Phase 2) & GitHub Pages 24/7 HTTPS Deployment
+
+- [x] **Supabase Multi-Table Partner Schema & Isolated RPCs (`supabase/migrations/20261123_marketing_partners_and_commissions.sql`, `20261123_partner_portal_rpcs.sql`)**:
+  - Created `marketing_partners`, `partner_sessions`, `partner_payouts`, and immutable `commission_ledger` tables + `partner_id` / `partner_attributed_at` columns on `licenses` + cloud-configurable `partner_commission_defaults` in `system_config` (never hardcoded).
+  - Deployed 6 `SECURITY DEFINER` PostgreSQL RPCs (`partner_portal_login`, `partner_portal_dashboard`, `partner_portal_logout`, `partner_portal_change_password`, `partner_portal_update_profile`, `partner_portal_logout_all`) enforcing strict database-level partner isolation with zero exposure of HWIDs, OTA, settings, or other partners' data.
+- [x] **Phase 1 — Software Provider Marketing Partners Dashboard (`admin-portal/index.html`)**:
+  - Added **Marketing Partners** tab & **Settings → Marketing Partners & Payouts** with dynamic Global Share Rules editor, 5-card KPI bento, Partner Directory, non-sequential immutable **Partner ID = Login ID** (`PD-<NAME4>-<4RAND>` via `crypto.getRandomValues` unambiguous alphabet), password mask/unmask eye toggles, Suspend/Activate & Force Logout controls, and Partner Drill-Down modal (Onboarded Shopkeepers, Commission Ledger, Payouts & UTR Settlement).
+  - Added clickable **`🤝 Partner Name (Code)`** tags on every shopkeeper row in Active Fleet + **`All Partners` / `Direct`** filter dropdown + 1-click partner attribution in Customer Drawer and Onboard Wizard.
+  - Upgraded **Admin Cloud Backup & Restore (v1.1.0)** to export & restore `marketing_partners`, `partner_payouts`, and `commission_ledger` in strict foreign-key order (`system_config → marketing_partners → licenses → partner_payouts → commission_ledger`).
+  - Fixed Lucide SVG DOM-replacement refresh spinner race and Android touchscreen `mouseenter` + `click` Settings dropdown toggle bug.
+- [x] **Phase 2 — Isolated Individual Partner Sales Dashboard (`partner-portal/index.html`, `design-system/printdrop/pages/partner-portal.md`)**:
+  - Mobile-first, true-responsive Sales Portal (`viewport-fit=cover`, fluid `clamp()` typography, zero-overflow 375px mobile cards with 1-tap Call/WhatsApp + sticky desktop tables, crisp 2px Lucide icons, `tabular-nums`, and fresh-login browser-reopen / `bfcache` session hardening).
+  - Scoped Partner **Settings** dropdown with 5 self-service tools: **Change Password**, **Offline Personal Backup & Read-Only Archive Viewer** (AES-256-GCM `.pdpartner` + Excel `.csv` with UTF-8 BOM), **My Profile & Payout Details** (UPI/Bank/PAN/Phone/Email), **Sales & Referral Toolkit** (English & Hindi WhatsApp pitches), and **Sign Out All Devices**.
+- [x] **24/7 HTTPS Deployment & Regression Gate**:
+  - Published both portals to `github-pages-site/admin/index.html` and `github-pages-site/partner/index.html` (`https://technosoftsolution.github.io/printdrop-station/admin/` and `/partner/`) — accessible 24/7 on any phone, tablet, or desktop without VPN or laptop running; also upgraded `scripts/serve-admin-portal.mjs` to serve both routes locally/Tailscale if needed.
+  - Expanded `scripts/verify-regression.mjs` with Section `[5] Partner Sales Portal` — **29/29 checks passing (0.02s)**.
+
 
 
 
