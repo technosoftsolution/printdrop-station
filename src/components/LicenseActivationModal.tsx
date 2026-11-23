@@ -442,8 +442,7 @@ export const LicenseActivationModal: React.FC<LicenseActivationModalProps> = ({
   };
 
   const formatPaiseValue = (rate: number): string => {
-    const p = Math.round(rate * 1000) / 10;
-    return Number.isInteger(p) ? `${p}` : p.toFixed(1);
+    return (rate * 100).toFixed(2);
   };
 
   const formatRatePerPageLabel = (
