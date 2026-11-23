@@ -2538,7 +2538,7 @@ export default function App() {
                     <KeyRound className="w-4 h-4" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-xs font-bold text-indigo-200">Station License &amp; HWID</div>
+                    <div className="text-xs font-bold text-indigo-200">Recharge Station &amp; Payment History</div>
                     <p className="text-[10px] text-slate-400 truncate mt-0.5">
                       {licenseState?.planDisplayName || "Free Trial Evaluation"} &bull; {licenseState?.hwid || "Hardware Bound"}
                     </p>

@@ -170,7 +170,7 @@ const FAQ_LIST: FaqItem[] = [
     category: "Licensing",
     question: "How do I get an official GST Tax Invoice for my software renewal?",
     answer:
-      "Go to Settings > Station License & HWID > Payment & Usage History tab. Click 'Print / Reissue Tax Invoice' next to any transaction to preview and print or save an official GST-compliant tax receipt and license certificate.",
+      "Go to Settings > Recharge Station & Payment History > Payment & Usage History tab. Click 'Print / Reissue Tax Invoice' next to any transaction to preview and print or save an official GST-compliant tax receipt and license certificate.",
   },
   {
     category: "Licensing",
@@ -397,7 +397,7 @@ export const HelpGuideModal: React.FC<HelpGuideModalProps> = ({
                   className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-amber-300 hover:bg-amber-950/40 border border-transparent hover:border-amber-900 transition"
                 >
                   <KeyRound className="w-3.5 h-3.5" />
-                  <span>Station License &amp; HWID</span>
+                  <span>Recharge Station &amp; Payment History</span>
                 </button>
               )}
               {onOpenContactUs && (
