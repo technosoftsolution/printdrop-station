@@ -50,6 +50,25 @@
         transition-duration: 0.01ms !important;
       }
     }
+    @media print {
+      @page { size: A4 portrait; margin: 10mm; }
+      body { background: #ffffff !important; color: #0f172a !important; }
+      body * { visibility: hidden; }
+      #printableLaunchKitModal:not(.hidden),
+      #printableLaunchKitModal:not(.hidden) * {
+        visibility: visible;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+      #printableLaunchKitModal:not(.hidden) {
+        position: absolute !important;
+        inset: 0 !important;
+        background: #ffffff !important;
+        padding: 0 !important;
+        display: block !important;
+      }
+      .no-print { display: none !important; }
+    }
   </style>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col overflow-x-hidden">
@@ -418,10 +437,16 @@
       <div class="text-slate-300">
         <strong class="text-white">Onboarding a new Xerox / Print Shop?</strong> Share your Partner Code <span id="footerPartnerCode" class="font-mono text-violet-300 font-bold">PD-XXXX</span> with the Software Provider or shopkeeper during setup.
       </div>
-      <button type="button" onclick="shareWhatsAppPitch()" class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 shrink-0 cursor-pointer">
-        <i data-lucide="share-2" class="w-3.5 h-3.5"></i>
-        <span>Share PrintDrop Pitch on WhatsApp</span>
-      </button>
+      <div class="flex flex-wrap items-center gap-2 shrink-0">
+        <button type="button" onclick="openLaunchKitModal('STANDEE')" class="min-h-[38px] px-3.5 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer">
+          <i data-lucide="printer" class="w-3.5 h-3.5"></i>
+          <span>Printable Launch Kit (PDF)</span>
+        </button>
+        <button type="button" onclick="shareWhatsAppPitch()" class="min-h-[38px] px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer">
+          <i data-lucide="share-2" class="w-3.5 h-3.5"></i>
+          <span>Share on WhatsApp</span>
+        </button>
+      </div>
     </div>
   </main>
 
@@ -1553,6 +1578,206 @@
       document.getElementById('partnerLoginOverlay')?.classList.remove('hidden');
       alert('✓ Signed out of all devices.');
     }
+
+    // --- 6. PRINTABLE BILINGUAL FIELD PARTNER LAUNCH KIT (STANDEE + PITCH FLYER) ---
+    let launchKitTemplate = 'STANDEE';
+    let launchKitLang = 'HI';
+
+    function openLaunchKitModal(template = 'STANDEE') {
+      launchKitTemplate = template;
+      renderLaunchKitSheet();
+      document.getElementById('printableLaunchKitModal')?.classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function closeLaunchKitModal() {
+      document.getElementById('printableLaunchKitModal')?.classList.add('hidden');
+    }
+
+    function setLaunchKitTemplate(tpl) {
+      launchKitTemplate = tpl;
+      renderLaunchKitSheet();
+    }
+
+    function setLaunchKitLang(lang) {
+      launchKitLang = lang;
+      renderLaunchKitSheet();
+    }
+
+    function renderLaunchKitSheet() {
+      const sheet = document.getElementById('launchKitSheet');
+      if (!sheet) return;
+      const p = partnerData?.partner || {};
+      const prov = partnerData?.provider || {};
+      const partnerName = escapeHtml(p.full_name || 'Authorized Partner');
+      const partnerCode = escapeHtml(p.partner_code || 'PD-PARTNER');
+      const partnerPhone = escapeHtml(p.phone || prov.phone || '');
+      const partnerCity = escapeHtml(p.city || '');
+      const provName = escapeHtml(prov.business_name || 'PrintDrop Counter OS');
+
+      const btnSt = document.getElementById('lkBtnStandee');
+      const btnFl = document.getElementById('lkBtnFlyer');
+      const btnHi = document.getElementById('lkBtnHi');
+      const btnMr = document.getElementById('lkBtnMr');
+      const act = 'px-3 py-1.5 rounded-lg bg-violet-600 text-white font-bold text-xs cursor-pointer';
+      const idl = 'px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 font-bold text-xs cursor-pointer';
+      if (btnSt) btnSt.className = launchKitTemplate === 'STANDEE' ? act : idl;
+      if (btnFl) btnFl.className = launchKitTemplate === 'FLYER' ? act : idl;
+      if (btnHi) btnHi.className = launchKitLang === 'HI' ? act : idl;
+      if (btnMr) btnMr.className = launchKitLang === 'MR' ? act : idl;
+
+      const isMr = launchKitLang === 'MR';
+      const copy = isMr ? {
+        noWa: 'व्हॉट्सॲपची गरज नाही!',
+        sub: '4G/5G वरून QR स्कॅन करा • १० सेकंदात फास्ट प्रिंट • १००% गोपनीयता',
+        s1t: '१. QR कोड स्कॅन करा',
+        s1d: 'कोणतेही ॲप किंवा Wi-Fi पासवर्ड नको — थेट 4G/5G वर चालते.',
+        s2t: '२. फाइल आणि कॉपी निवडा',
+        s2d: 'PDF, Word, Excel, फोटो निवडा — कलर / B&W / ड्युप्लेक्स सेटिंग्ज.',
+        s3t: '३. UPI पे करा आणि प्रिंट घ्या',
+        s3d: 'प्रिंट झाल्यानंतर तुमची फाइल दुकानदाराच्या PC मधून ऑटो-डिलीट होते!',
+        qrHint: 'दुकानाचा स्थायी QR कोड येथे दिसेल',
+        privacy: '१००% ग्राहक गोपनीयता — प्रिंट नंतर फाइल्स कायमच्या डिलीट होतात',
+        flyerSub: 'व्हॉट्सॲप वेबचा त्रास संपवा — तुमचे झेरॉक्स / प्रिंट दुकान स्मार्ट बनवा!'
+      } : {
+        noWa: 'व्हाट्सएप की जरूरत नहीं!',
+        sub: '4G/5G से QR स्कैन करें • 10 सेकंड में फास्ट प्रिंट • 100% प्राइवेसी',
+        s1t: '1. QR कोड स्कैन करें',
+        s1d: 'कोई ऐप या Wi-Fi पासवर्ड नहीं — सीधे आपके 4G/5G इंटरनेट पर चलता है।',
+        s2t: '2. फाइल और कॉपी चुनें',
+        s2d: 'PDF, Word, Excel, फोटो भेजें — Color / B&W / Duplex खुद चुनें।',
+        s3t: '3. UPI पे करें और प्रिंट पाएं',
+        s3d: 'प्रिंट होते ही आपकी फाइल दुकान के PC से ऑटो-डिलीट हो जाती है!',
+        qrHint: 'दुकान का स्थायी QR कोड यहाँ लगेगा',
+        privacy: '100% ग्राहक प्राइवेसी — प्रिंट के बाद फाइल दुकान के कंप्यूटर से डिलीट',
+        flyerSub: 'WhatsApp Web की झंझट खत्म करें — अपनी Xerox / Print दुकान को स्मार्ट बनाएं!'
+      };
+
+      if (launchKitTemplate === 'STANDEE') {
+        sheet.innerHTML = `
+          <div style="border: 3px solid #4f46e5; border-radius: 20px; overflow: hidden; background: #ffffff; color: #0f172a; font-family: 'Inter', sans-serif;">
+            <div style="background: linear-gradient(135deg, #312e81 0%, #4f46e5 55%, #7c3aed 100%); color: #ffffff; padding: 26px 24px; text-align: center;">
+              <div style="display: inline-block; background: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.35); padding: 4px 14px; border-radius: 999px; font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;">
+                PrintDrop Express Counter OS
+              </div>
+              <h1 style="font-size: 32px; font-weight: 900; margin: 12px 0 4px; line-height: 1.1; letter-spacing: -0.02em;">NO WHATSAPP NEEDED!</h1>
+              <div style="font-size: 24px; font-weight: 800; color: #fde68a; margin-bottom: 8px;">${copy.noWa}</div>
+              <div style="font-size: 14px; font-weight: 600; color: #e0e7ff;">Scan QR for 10-Sec Private Print &bull; ${copy.sub}</div>
+            </div>
+
+            <div style="padding: 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 22px; align-items: center;">
+              <div style="border: 2.5px dashed #6366f1; border-radius: 18px; padding: 22px; text-align: center; background: #f8fafc;">
+                <div style="width: 175px; height: 175px; margin: 0 auto; border-radius: 14px; background: #ffffff; border: 2px solid #e2e8f0; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #4f46e5; padding: 12px;">
+                  <div style="font-size: 13px; font-weight: 800; letter-spacing: 0.04em;">SHOP LIVE QR</div>
+                  <div style="font-size: 11px; color: #64748b; margin-top: 6px;">${copy.qrHint}</div>
+                </div>
+                <div style="margin-top: 12px; font-size: 12px; font-weight: 800; color: #1e293b;">WORKS ON JIO • AIRTEL • VI (4G/5G)</div>
+                <div style="margin-top: 4px; font-size: 11px; color: #475569;">PDF • JPG • PNG • Word • Excel • PPT</div>
+              </div>
+
+              <div style="display: flex; flex-direction: column; gap: 14px;">
+                <div style="padding: 12px 14px; border-radius: 12px; background: #eef2ff; border-left: 4px solid #4f46e5;">
+                  <div style="font-size: 13px; font-weight: 800; color: #312e81;">1. Scan QR on Phone Camera &bull; ${copy.s1t}</div>
+                  <div style="font-size: 11.5px; color: #334155; margin-top: 3px;">${copy.s1d}</div>
+                </div>
+                <div style="padding: 12px 14px; border-radius: 12px; background: #f5f3ff; border-left: 4px solid #7c3aed;">
+                  <div style="font-size: 13px; font-weight: 800; color: #4c1d95;">2. Select Files &amp; Settings &bull; ${copy.s2t}</div>
+                  <div style="font-size: 11.5px; color: #334155; margin-top: 3px;">${copy.s2d}</div>
+                </div>
+                <div style="padding: 12px 14px; border-radius: 12px; background: #ecfdf5; border-left: 4px solid #059669;">
+                  <div style="font-size: 13px; font-weight: 800; color: #065f46;">3. Pay UPI &amp; Auto-Delete &bull; ${copy.s3t}</div>
+                  <div style="font-size: 11.5px; color: #334155; margin-top: 3px;">${copy.s3d}</div>
+                </div>
+              </div>
+            </div>
+
+            <div style="margin: 0 24px 18px; padding: 10px 14px; border-radius: 10px; background: #ecfdf5; border: 1px solid #6ee7b7; text-align: center; font-size: 12px; font-weight: 800; color: #065f46;">
+              100% Privacy Shield &bull; ${copy.privacy}
+            </div>
+
+            <div style="background: #0f172a; color: #f8fafc; padding: 14px 24px; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;">
+              <div>
+                <div style="font-size: 10px; color: #94a3b8; text-transform: uppercase; font-weight: 700;">Start 14-Day Free Trial — Contact Authorized Partner</div>
+                <div style="font-size: 14px; font-weight: 800; color: #ffffff; margin-top: 2px;">${partnerName}${partnerPhone ? ' &bull; ' + partnerPhone : ''}${partnerCity ? ' (' + partnerCity + ')' : ''}</div>
+              </div>
+              <div style="text-align: right;">
+                <div style="font-size: 10px; color: #c4b5fd; font-weight: 700;">OFFICIAL PARTNER ID</div>
+                <div style="font-family: 'JetBrains Mono', monospace; font-size: 15px; font-weight: 800; color: #fde68a;">${partnerCode}</div>
+              </div>
+            </div>
+          </div>
+        `;
+      } else {
+        sheet.innerHTML = `
+          <div style="border: 2px solid #1e293b; border-radius: 18px; overflow: hidden; background: #ffffff; color: #0f172a; font-family: 'Inter', sans-serif;">
+            <div style="background: linear-gradient(135deg, #0f172a 0%, #312e81 100%); color: #ffffff; padding: 22px 24px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px;">
+                <div>
+                  <div style="font-size: 11px; font-weight: 800; color: #a5b4fc; text-transform: uppercase; letter-spacing: 0.08em;">${provName}</div>
+                  <h1 style="font-size: 26px; font-weight: 900; margin: 4px 0;">Upgrade Your Xerox &amp; Print Shop Today</h1>
+                  <div style="font-size: 13.5px; font-weight: 600; color: #fde68a;">${copy.flyerSub}</div>
+                </div>
+                <div style="background: #10b981; color: #022c22; padding: 8px 14px; border-radius: 12px; font-weight: 900; font-size: 12px; text-align: center; white-space: nowrap;">
+                  14 DAYS<br/>FREE TRIAL
+                </div>
+              </div>
+            </div>
+
+            <div style="padding: 20px 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+              <div style="padding: 16px; border-radius: 14px; background: #fff1f2; border: 1.5px solid #fecdd3;">
+                <div style="font-size: 13px; font-weight: 900; color: #9f1239; margin-bottom: 10px;">OLD WAY (WhatsApp Web Problems)</div>
+                <ul style="margin: 0; padding-left: 16px; font-size: 12px; color: #4c0519; line-height: 1.75;">
+                  <li>Personal mobile number exposed to every customer</li>
+                  <li>Phone gallery &amp; PC Downloads folder full of junk</li>
+                  <li>Manual page counting &amp; billing calculation errors</li>
+                  <li>Slow file download &amp; manual print dialog clicks</li>
+                  <li>Customers worry about Aadhaar / PAN privacy</li>
+                </ul>
+              </div>
+              <div style="padding: 16px; border-radius: 14px; background: #ecfdf5; border: 1.5px solid #a7f3d0;">
+                <div style="font-size: 13px; font-weight: 900; color: #065f46; margin-bottom: 10px;">SMART WAY (PrintDrop Counter OS)</div>
+                <ul style="margin: 0; padding-left: 16px; font-size: 12px; color: #064e3b; line-height: 1.75;">
+                  <li>Customers scan Permanent QR on 4G/5G — No WhatsApp!</li>
+                  <li>Auto page count &amp; instant billing (B&amp;W / Color / Duplex / A3)</li>
+                  <li>1-click silent batch printing with smart printer routing</li>
+                  <li>Built-in Counter UPI QR &amp; online payment verification</li>
+                  <li>1-tap Customer Privacy Erasure after payment &amp; pickup</li>
+                </ul>
+              </div>
+            </div>
+
+            <div style="margin: 0 24px 18px; padding: 14px 18px; border-radius: 14px; background: #f8fafc; border: 1.5px solid #e2e8f0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; text-align: center;">
+              <div>
+                <div style="font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase;">Pay-As-You-Go Wallet</div>
+                <div style="font-size: 18px; font-weight: 900; color: #0f172a; margin-top: 2px;">From ₹80</div>
+                <div style="font-size: 11px; color: #475569;">No Expiry • Lifetime Pages</div>
+              </div>
+              <div style="border-left: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0;">
+                <div style="font-size: 10px; font-weight: 800; color: #4f46e5; text-transform: uppercase;">Unlimited Monthly</div>
+                <div style="font-size: 18px; font-weight: 900; color: #4f46e5; margin-top: 2px;">₹299 / mo</div>
+                <div style="font-size: 11px; color: #475569;">Unlimited Prints &amp; Orders</div>
+              </div>
+              <div>
+                <div style="font-size: 10px; font-weight: 800; color: #059669; text-transform: uppercase;">Best Value Annual</div>
+                <div style="font-size: 18px; font-weight: 900; color: #059669; margin-top: 2px;">₹2,299 / yr</div>
+                <div style="font-size: 11px; color: #475569;">Just ₹191/month!</div>
+              </div>
+            </div>
+
+            <div style="background: #0f172a; color: #f8fafc; padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;">
+              <div>
+                <div style="font-size: 10px; color: #94a3b8; text-transform: uppercase; font-weight: 700;">Book Live Demo &amp; Free Setup in 5 Minutes</div>
+                <div style="font-size: 15px; font-weight: 800; color: #ffffff; margin-top: 2px;">${partnerName}${partnerPhone ? ' &bull; ' + partnerPhone : ''}${partnerCity ? ' &bull; ' + partnerCity : ''}</div>
+              </div>
+              <div style="background: rgba(124,58,237,0.25); border: 1px solid #8b5cf6; padding: 6px 14px; border-radius: 10px; text-align: right;">
+                <div style="font-size: 9px; color: #ddd6fe; font-weight: 700;">MENTION PARTNER ID</div>
+                <div style="font-family: 'JetBrains Mono', monospace; font-size: 15px; font-weight: 800; color: #fde68a;">${partnerCode}</div>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+    }
   </script>
 
   <!-- ========================================================================= -->
@@ -1738,12 +1963,18 @@
         <button type="button" onclick="closePartnerToolkitModal()" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer"><i data-lucide="x" class="w-4 h-4"></i></button>
       </div>
       <div class="p-5 overflow-y-auto partner-scroll space-y-4 text-xs">
-        <div class="p-3 rounded-xl bg-violet-950/35 border border-violet-500/35 flex items-center justify-between">
+        <div class="p-3 rounded-xl bg-violet-950/35 border border-violet-500/35 flex flex-wrap items-center justify-between gap-2">
           <div>
             <div class="text-[10px] text-slate-400 uppercase font-bold">Your Official Partner ID</div>
             <div id="tkPartnerCode" class="font-mono text-base font-extrabold text-violet-300">PD-XXXX-XXXX</div>
           </div>
-          <button type="button" onclick="copyPartnerCode()" class="px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 text-white font-bold cursor-pointer">Copy ID</button>
+          <div class="flex items-center gap-2">
+            <button type="button" onclick="copyPartnerCode()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold border border-slate-700 cursor-pointer">Copy ID</button>
+            <button type="button" onclick="closePartnerToolkitModal(); openLaunchKitModal('STANDEE')" class="px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 text-white font-bold flex items-center gap-1.5 cursor-pointer">
+              <i data-lucide="printer" class="w-3.5 h-3.5"></i>
+              <span>Print Launch Kit PDF</span>
+            </button>
+          </div>
         </div>
 
         <div class="space-y-1.5">
@@ -1767,6 +1998,33 @@
           </div>
           <textarea id="tkPitchHi" rows="5" readonly class="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 text-[11px] leading-relaxed"></textarea>
         </div>
+      </div>
+    </div>
+  </div>
+  <!-- ========================================================================= -->
+  <!-- MODAL 5: PRINTABLE BILINGUAL FIELD PARTNER LAUNCH KIT (PDF / STANDEE)     -->
+  <!-- ========================================================================= -->
+  <div id="printableLaunchKitModal" class="fixed inset-0 z-[70] hidden bg-black/85 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
+    <div class="w-full max-w-4xl bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[94vh]">
+      <div class="no-print px-4 py-3 border-b border-slate-800 bg-slate-950/85 flex flex-wrap items-center justify-between gap-2">
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="text-xs font-extrabold text-white mr-1">Field Launch Kit:</span>
+          <button id="lkBtnStandee" type="button" onclick="setLaunchKitTemplate('STANDEE')" class="px-3 py-1.5 rounded-lg bg-violet-600 text-white font-bold text-xs cursor-pointer">Countertop Standee</button>
+          <button id="lkBtnFlyer" type="button" onclick="setLaunchKitTemplate('FLYER')" class="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 font-bold text-xs cursor-pointer">Shopkeeper Pitch Flyer</button>
+          <span class="text-slate-700">|</span>
+          <button id="lkBtnHi" type="button" onclick="setLaunchKitLang('HI')" class="px-3 py-1.5 rounded-lg bg-violet-600 text-white font-bold text-xs cursor-pointer">EN + हिंदी</button>
+          <button id="lkBtnMr" type="button" onclick="setLaunchKitLang('MR')" class="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 font-bold text-xs cursor-pointer">EN + मराठी</button>
+        </div>
+        <div class="flex items-center gap-2">
+          <button type="button" onclick="window.print()" class="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-extrabold flex items-center gap-1.5 cursor-pointer">
+            <i data-lucide="printer" class="w-3.5 h-3.5"></i>
+            <span>Print / Save PDF</span>
+          </button>
+          <button type="button" onclick="closeLaunchKitModal()" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer"><i data-lucide="x" class="w-4 h-4"></i></button>
+        </div>
+      </div>
+      <div class="p-4 sm:p-6 overflow-y-auto partner-scroll bg-slate-950/60">
+        <div id="launchKitSheet" class="max-w-[780px] mx-auto"></div>
       </div>
     </div>
   </div>
