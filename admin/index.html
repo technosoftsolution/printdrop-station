@@ -1559,6 +1559,39 @@
           <input type="text" id="otaBlockedVersions" placeholder="e.g. 1.0.15, 1.0.16" class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-rose-500/40 font-mono text-xs text-rose-300 focus:outline-none focus:border-rose-400">
           <p class="text-[10px] text-slate-400 mt-1">Any station running a recalled version sees a red Emergency Restore banner immediately.</p>
         </div>
+
+        <div class="pt-3 border-t border-slate-800 space-y-2.5">
+          <div class="flex items-center justify-between">
+            <label class="font-bold text-emerald-300 flex items-center gap-1.5">
+              <i data-lucide="shield-check" class="w-3.5 h-3.5"></i>
+              <span>Secure Installer Distribution (Private Releases)</span>
+            </label>
+            <span class="text-[10px] text-slate-400">Auto-expiring link</span>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <select id="adminDlEdition" class="px-2.5 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white font-semibold focus:outline-none focus:border-emerald-500">
+              <option value="retail">Retail Edition (.exe)</option>
+              <option value="virtual">Virtual Demo (.exe)</option>
+            </select>
+            <select id="adminDlTtl" class="px-2.5 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white font-semibold focus:outline-none focus:border-emerald-500">
+              <option value="30">Expires in 30 mins</option>
+              <option value="120">Expires in 2 hours</option>
+              <option value="1440">Expires in 24 hours</option>
+            </select>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <button type="button" onclick="generateAdminInstallerLink('copy')" class="flex-1 px-3 py-2 rounded-xl bg-indigo-600/25 hover:bg-indigo-600/45 border border-indigo-500/40 text-indigo-200 font-bold text-[11px] cursor-pointer transition">
+              Copy Secure Link
+            </button>
+            <button type="button" onclick="generateAdminInstallerLink('download')" class="flex-1 px-3 py-2 rounded-xl bg-emerald-600/25 hover:bg-emerald-600/45 border border-emerald-500/40 text-emerald-200 font-bold text-[11px] cursor-pointer transition">
+              Direct Download
+            </button>
+            <button type="button" onclick="generateAdminInstallerLink('whatsapp')" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] cursor-pointer transition">
+              WhatsApp
+            </button>
+          </div>
+          <div id="adminDlStatus" class="hidden p-2.5 rounded-xl bg-slate-950 border border-emerald-500/30 text-[11px] text-emerald-300 break-all"></div>
+        </div>
       </div>
 
       <div class="px-5 py-3.5 border-t border-slate-800 bg-slate-950/70 flex items-center justify-end gap-2">
@@ -2995,6 +3028,56 @@
 
       closeOtaPolicyModal();
       alert(`✓ OTA Policy Published!\nRollout: ${rolloutPercentage}%\nCanary HWIDs: ${canaryHwids.length}\nBlocked Versions: ${blockedVersions.join(', ') || 'None'}`);
+    }
+
+    async function generateAdminInstallerLink(mode) {
+      const statusEl = document.getElementById('adminDlStatus');
+      const edition = document.getElementById('adminDlEdition')?.value || 'retail';
+      const ttlMinutes = Number(document.getElementById('adminDlTtl')?.value || 30);
+      const cleanUrl = (cloudConfig?.url || '').trim().replace(/\/$/, '');
+      if (!cleanUrl) {
+        alert('Supabase Cloud URL is not configured.');
+        return;
+      }
+      if (statusEl) {
+        statusEl.classList.remove('hidden');
+        statusEl.innerText = 'Generating secure expiring download link...';
+      }
+      try {
+        const ts = Date.now();
+        const sig = await signHmacSha256(`ADMIN_DL|${ts}`, MASTER_SIGNING_SECRET);
+        const res = await fetch(`${cleanUrl}/functions/v1/ota-update`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'create-download-link',
+            authType: 'admin',
+            adminTs: ts,
+            adminSignature: sig,
+            edition,
+            ttlMinutes
+          })
+        });
+        const data = await res.json();
+        if (!res.ok || !data?.downloadUrl) {
+          throw new Error(data?.error || `HTTP ${res.status}`);
+        }
+        const label = `${data.version} • ${data.fileName} (${data.fileSizeMb} MB) • Expires in ${data.ttlMinutes}m`;
+        if (statusEl) {
+          statusEl.innerText = `✓ Ready: ${label}\n${data.downloadUrl}`;
+        }
+        if (mode === 'download') {
+          window.open(data.downloadUrl, '_blank', 'noopener');
+        } else if (mode === 'whatsapp') {
+          const msg = `PrintDrop Windows 11 Installer (${data.version} - ${edition === 'virtual' ? 'Virtual Demo' : 'Retail'})\n\nSecure Download Link (valid for ${data.ttlMinutes} mins):\n${data.downloadUrl}\n\nNote: This link expires automatically for security.`;
+          window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank', 'noopener');
+        } else {
+          await navigator.clipboard.writeText(data.downloadUrl).catch(() => {});
+          if (statusEl) statusEl.innerText = `✓ Copied to clipboard! ${label}\n${data.downloadUrl}`;
+        }
+      } catch (err) {
+        if (statusEl) statusEl.innerText = `⚠️ Failed: ${err.message || err}`;
+      }
     }
 
     let cancelTargetHwid = null;
