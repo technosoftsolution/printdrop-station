@@ -1563,6 +1563,52 @@
       window.open(`https://wa.me/?text=${encodeURIComponent(txt)}`, '_blank', 'noopener');
     }
 
+    async function requestPartnerInstallerLink(mode) {
+      const statusEl = document.getElementById('partnerDlStatus');
+      const edition = document.getElementById('partnerDlEdition')?.value || 'retail';
+      const token = sessionStorage.getItem(TOKEN_STORAGE_KEY) || localStorage.getItem(TOKEN_STORAGE_KEY) || '';
+      if (!token) {
+        alert('Please sign in again to generate a secure installer link.');
+        return;
+      }
+      if (statusEl) {
+        statusEl.classList.remove('hidden');
+        statusEl.innerText = 'Generating secure 30-min installer link...';
+      }
+      try {
+        const res = await fetch(`${SB_URL}/functions/v1/ota-update`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'create-download-link',
+            authType: 'partner',
+            partnerToken: token,
+            edition,
+            ttlMinutes: 30
+          })
+        });
+        const data = await res.json();
+        if (!res.ok || !data?.downloadUrl) {
+          throw new Error(data?.error || `HTTP ${res.status}`);
+        }
+        const label = `${data.version} • ${data.fileName} (${data.fileSizeMb} MB) • Valid 30 mins`;
+        if (statusEl) statusEl.innerText = `✓ ${label}`;
+        if (mode === 'download') {
+          window.open(data.downloadUrl, '_blank', 'noopener');
+        } else if (mode === 'whatsapp') {
+          const pName = partnerData?.partner?.full_name || 'PrintDrop Partner';
+          const pCode = partnerData?.partner?.partner_code || '';
+          const msg = `PrintDrop Windows 11 Installer (${data.version})\nShared by ${pName}${pCode ? ` (${pCode})` : ''}\n\nSecure Download Link (valid for 30 mins):\n${data.downloadUrl}\n\nNote: This link expires automatically for security.`;
+          window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank', 'noopener');
+        } else {
+          await navigator.clipboard.writeText(data.downloadUrl).catch(() => {});
+          if (statusEl) statusEl.innerText = `✓ 30-min link copied! (${label})`;
+        }
+      } catch (err) {
+        if (statusEl) statusEl.innerText = `⚠️ ${err.message || err}`;
+      }
+    }
+
     // --- 5. SIGN OUT ALL DEVICES ---
     async function handlePartnerLogoutAll() {
       if (!confirm('Sign out from ALL phones, tablets, and computers currently logged into your Partner Sales Portal?')) return;
@@ -2020,6 +2066,30 @@
             </div>
           </div>
           <textarea id="tkPitchHi" rows="5" readonly class="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 text-[11px] leading-relaxed"></textarea>
+        </div>
+
+        <div class="pt-2 border-t border-slate-800 space-y-2.5">
+          <div class="flex items-center justify-between">
+            <label class="font-bold text-emerald-300 flex items-center gap-1.5">
+              <i data-lucide="shield-check" class="w-3.5 h-3.5"></i>
+              <span>Secure PrintDrop Windows Installer</span>
+            </label>
+            <span class="text-[10px] text-slate-400">30-min expiring link</span>
+          </div>
+          <div class="p-3 rounded-xl bg-slate-950/90 border border-emerald-500/35 space-y-2">
+            <div class="flex items-center gap-2">
+              <select id="partnerDlEdition" class="flex-1 px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-[11px] text-white font-semibold focus:outline-none focus:border-emerald-500">
+                <option value="retail">Shopkeeper Retail Installer (.exe)</option>
+                <option value="virtual">Virtual Demo Installer (.exe)</option>
+              </select>
+            </div>
+            <div class="flex flex-wrap gap-1.5">
+              <button type="button" onclick="requestPartnerInstallerLink('download')" class="px-2.5 py-1.5 rounded-lg bg-emerald-600/25 hover:bg-emerald-600/45 border border-emerald-500/45 text-emerald-200 font-bold text-[11px] cursor-pointer transition">⬇️ Download (.exe)</button>
+              <button type="button" onclick="requestPartnerInstallerLink('copy')" class="px-2.5 py-1.5 rounded-lg bg-indigo-600/25 hover:bg-indigo-600/45 border border-indigo-500/40 text-indigo-200 font-bold text-[11px] cursor-pointer transition">🔗 Copy 30-Min Link</button>
+              <button type="button" onclick="requestPartnerInstallerLink('whatsapp')" class="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] cursor-pointer transition">💬 Share on WhatsApp</button>
+            </div>
+            <div id="partnerDlStatus" class="hidden text-[10px] text-emerald-300 bg-slate-900/90 border border-emerald-500/25 rounded-lg p-2 break-all"></div>
+          </div>
         </div>
 
         <div class="pt-2 border-t border-slate-800 space-y-2.5">

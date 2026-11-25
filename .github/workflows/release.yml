@@ -73,7 +73,7 @@ jobs:
         run: |
           $confPath = "src-tauri/tauri.conf.json"
           $conf = Get-Content $confPath -Raw | ConvertFrom-Json
-          $conf.plugins.updater.endpoints = @("https://github.com/technosoftsolution/printdrop-station/releases/latest/download/virtual-latest.json")
+          $conf.plugins.updater.endpoints = @("https://nslcrlvuulgqtrdqrkgv.supabase.co/functions/v1/ota-update?edition=virtual")
           $conf | ConvertTo-Json -Depth 10 | Set-Content $confPath -Encoding UTF8
 
           npx tauri build -f simulation --ignore-version-mismatches
@@ -84,6 +84,7 @@ jobs:
 
           $sigContent = (Get-Content $sigFile -Raw).Trim()
           $tag = "${{ github.ref_name }}"
+          $repo = "${{ github.repository }}"
           $version = $conf.version
           $manifest = @{
             version = $version
@@ -92,7 +93,7 @@ jobs:
             platforms = @{
               "windows-x86_64" = @{
                 signature = $sigContent
-                url = "https://github.com/technosoftsolution/printdrop-station/releases/download/$tag/PrintDrop_Demo_Station_Virtual_x64-setup.exe"
+                url = "https://github.com/$repo/releases/download/$tag/PrintDrop_Demo_Station_Virtual_x64-setup.exe"
               }
             }
           }

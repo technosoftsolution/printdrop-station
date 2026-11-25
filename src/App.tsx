@@ -613,7 +613,17 @@ export default function App() {
         setIsBlockedVersion(false);
       }
 
-      const update = await check();
+      let hwid = (licenseStateRef.current?.hwid || "").trim().toUpperCase();
+      if (!hwid) {
+        try {
+          const freshLic = await invoke<{ hwid?: string }>("get_license_state");
+          hwid = (freshLic?.hwid || "").trim().toUpperCase();
+        } catch {
+          // ignore if unavailable
+        }
+      }
+
+      const update = await check(hwid ? { headers: { "x-station-hwid": hwid } } : undefined);
       if (update?.available) {
         const nextVer = normalizeVer(update.version);
         if (nextVer && blockedSet.has(nextVer)) {
@@ -625,7 +635,6 @@ export default function App() {
         }
 
         const pct = typeof policy.rolloutPercentage === "number" ? policy.rolloutPercentage : 100;
-        const hwid = (licenseStateRef.current?.hwid || "").trim().toUpperCase();
         const isCanary =
           hwid !== "" &&
           Array.isArray(policy.canaryHwids) &&
