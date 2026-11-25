@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "PrintDrop Demo Station",
-  "version": "1.0.21",
+  "version": "1.0.22",
   "identifier": "com.printdrop.demo",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -55,7 +55,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEU5RjFFRjQ1NzhEMUFEMTYKUldRV3JkRjRSZS94NlVFRjZwT083c0lNN3YydHhXTmtHU05Zd2UwSmJuUTBHL1BNOWNyd3JwZ3YK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEYyNzQ0RTI3NTc4MkE2MDEKUldRQnBvSlhKMDUwOGhLb1VvNFRsMUhGYTJJWkJkSVAwR1B2akVCdXlSbmZlVEc3SzYwM1VrT3YK",
       "endpoints": [
         "https://nslcrlvuulgqtrdqrkgv.supabase.co/functions/v1/ota-update?edition=retail"
       ]
